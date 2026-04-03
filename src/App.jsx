@@ -14,6 +14,7 @@ import { downloadMarkdown } from "./export";
 import { saveDiscussion, loadDiscussion } from "./history";
 import HistoryPanel from "./components/HistoryPanel";
 import summaryPromptText from "./prompts/summary.txt?raw";
+import detailedPromptText from "./prompts/detailed-analysis.txt?raw";
 
 // ── Summary generation ────────────────────────────────────────
 
@@ -28,6 +29,26 @@ async function generateSummary(apiKey, messages, topic, roundNum) {
   const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
   const text = await callChatGPT(apiKey, "gpt-4o-mini", summaryPromptText, userMsg, () => {});
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  return JSON.parse(cleaned);
+}
+
+async function generateDetailedAnalysis(apiKey, allRounds, topic) {
+  const allText = allRounds
+    .map((round, i) => {
+      const msgs = round.messages
+        .map((m) => {
+          const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+          return `[${name}] ${m.text || "(エラー)"}`;
+        })
+        .join("\n\n");
+      return `【Round ${i + 1}】\n${msgs}`;
+    })
+    .join("\n\n---\n\n");
+
+  const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
+
+  const text = await callChatGPT(apiKey, "gpt-4o-mini", detailedPromptText, userMsg, () => {});
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   return JSON.parse(cleaned);
 }
@@ -51,6 +72,7 @@ export default function App() {
   const [mode, setMode]         = useState("best");
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
+  const [detailedAnalyses, setDetailedAnalyses] = useState([]);
   const [running, setRunning]   = useState(false);
   const [started, setStarted]   = useState(false);
   const [intervention, setIntervention] = useState("");
@@ -169,6 +191,18 @@ export default function App() {
     }
   }, [keys.chatgpt, topic]);
 
+  const runDetailedAnalysis = useCallback(async (roundIdx) => {
+    if (!keys.chatgpt || detailedAnalyses[roundIdx]) return;
+    setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
+    try {
+      const roundsUpTo = discussion.slice(0, roundIdx + 1);
+      const analysis = await generateDetailedAnalysis(keys.chatgpt, roundsUpTo, topic);
+      setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
+    } catch {
+      setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
+    }
+  }, [keys.chatgpt, topic, discussion, detailedAnalyses]);
+
   // ── ラウンド実行 ────────────────────────────────────────────
 
   const runRound = useCallback(async (currentHistory, roundNum, userIntervention) => {
@@ -233,6 +267,7 @@ export default function App() {
     if (!topic.trim() || running) return;
     setDiscussion([]);
     setSummaries([]);
+    setDetailedAnalyses([]);
     setStarted(true);
     setShowKeysPanel(false);
     setShowProfile(false);
@@ -251,7 +286,7 @@ export default function App() {
     if (discussion.length > 0 && topic.trim()) {
       saveDiscussion(topic, discussion, summaries, mode, discussionMode).catch(() => {});
     }
-    setDiscussion([]); setSummaries([]); setStarted(false); setShowIntervention(false); setSidePanel(false);
+    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setStarted(false); setShowIntervention(false); setSidePanel(false);
   };
 
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries); };
@@ -494,6 +529,8 @@ export default function App() {
                     onScrollToMessage={handleScrollToMessage}
                     sidePanel={false}
                     onToggleSidePanel={() => setSidePanel(true)}
+                    detailedAnalysis={detailedAnalyses[i]}
+                    onRequestDetailed={() => runDetailedAnalysis(i)}
                   />
                 )}
               </div>
@@ -536,6 +573,8 @@ export default function App() {
               onScrollToMessage={handleScrollToMessage}
               sidePanel={true}
               onToggleSidePanel={() => setSidePanel(false)}
+              detailedAnalysis={detailedAnalyses[discussion.length - 1]}
+              onRequestDetailed={() => runDetailedAnalysis(discussion.length - 1)}
             />
           )}
         </div>
