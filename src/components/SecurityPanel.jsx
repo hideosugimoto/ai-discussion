@@ -1,8 +1,6 @@
-import Collapsible from "./Collapsible";
-
-export default function SecurityPanel({ open, onToggle }) {
+export default function SecurityPanel() {
   return (
-    <Collapsible label="🔒 セキュリティについて" open={open} onToggle={onToggle}>
+    <div style={{ padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
       <div style={{ fontSize:13, color:"var(--text)", lineHeight:2 }}>
         <div>✅ APIキーは運営者サーバーに送信されません</div>
         <div>✅ 通信はブラウザ↔各AIのAPI間のみ（HTTPS）</div>
@@ -16,6 +14,6 @@ export default function SecurityPanel({ open, onToggle }) {
           <a href="https://github.com/hideosugimoto/ai-discussion" target="_blank" rel="noopener noreferrer" style={{ color:"var(--link)" }}>最も安全な使い方：GitHubからソースを取得してローカルで実行 →</a>
         </div>
       </div>
-    </Collapsible>
+    </div>
   );
 }

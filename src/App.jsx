@@ -80,11 +80,8 @@ export default function App() {
   const [profileNotice, setProfileNotice] = useState(false);
   const [sidePanel, setSidePanel] = useState(false);
 
-  const [showKeys, setShowKeysPanel]     = useState(!saved.keys?.claude);
-  const [showProfile, setShowProfile]   = useState(false);
-  const [showSave, setShowSave]         = useState(false);
-  const [showSecurity, setShowSecurity] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [activePanel, setActivePanel] = useState(!saved.keys?.claude ? "keys" : null);
+  const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
 
   const [exportPw, setExportPw]   = useState("");
@@ -163,7 +160,7 @@ export default function App() {
       setCryptoMsg("✓ 復元完了！");
       setImportText("");
       setImportPw("");
-      setTimeout(() => { setCryptoMsg(""); setShowSave(false); }, 1500);
+      setTimeout(() => { setCryptoMsg(""); setActivePanel(null); }, 1500);
     } catch {
       setCryptoMsg("❌ 復元失敗（パスワードが違うか、テキストが壊れています）");
       setTimeout(() => setCryptoMsg(""), 3000);
@@ -269,9 +266,7 @@ export default function App() {
     setSummaries([]);
     setDetailedAnalyses([]);
     setStarted(true);
-    setShowKeysPanel(false);
-    setShowProfile(false);
-    setShowSave(false);
+    setActivePanel(null);
     await runRound([], 1, "");
   };
 
@@ -376,111 +371,138 @@ export default function App() {
         </div>
 
         {/* Discussion Mode */}
-        <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
-          {DISCUSSION_MODES.map(({id,label,description}) => (
-            <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)} title={description}
-              style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
-              {label}
+        <div style={{ marginBottom:10 }}>
+          <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード — AIの議論スタイルを選択</div>
+          <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+            {DISCUSSION_MODES.map(({id,label,description}) => (
+              <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
+                style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize:11, color:"var(--text2)", marginTop:4 }}>
+            {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
+          </div>
+        </div>
+
+        {/* Settings bar - horizontal buttons */}
+        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
+          {[
+            { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠" },
+            { id:"security", label:"🔒 セキュリティ" },
+            { id:"profile",  label:"👤 プロフィール", badge:profile.trim()?"✓":null },
+            { id:"backup",   label:"🔐 バックアップ" },
+            { id:"history",  label:"📂 履歴" },
+          ].map(({id,label,badge}) => (
+            <button key={id} onClick={() => togglePanel(id)}
+              style={{ padding:"5px 12px", border:`1px solid ${activePanel===id?"var(--accent-bd)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:activePanel===id?"var(--accent-bg)":"transparent", color:activePanel===id?"var(--text)":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+              <span>{label}</span>
+              {badge && <span style={{ fontSize:10, color:badge==="✓"?"var(--success)":"var(--warning)" }}>{badge}</span>}
             </button>
           ))}
         </div>
 
-        {/* API Keys */}
-        <Collapsible label="APIキー" badge={allKeysSet?"✓ 全て設定済":null} hint={!allKeysSet?"⚠ 未設定あり":null} open={showKeys} onToggle={() => setShowKeysPanel((s)=>!s)}>
-          <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {keyConfigs.map(({id,label,ph,link}) => (
-              <div key={id}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                  <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace" }}>{label}</span>
-                  <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10, color:"var(--link)", textDecoration:"none" }}>取得 →</a>
+        {/* Expanded panel content */}
+        {activePanel === "keys" && (
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {keyConfigs.map(({id,label,ph,link}) => (
+                <div key={id}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                    <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace" }}>{label}</span>
+                    <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10, color:"var(--link)", textDecoration:"none" }}>取得 →</a>
+                  </div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <input type="password" value={keys[id]} onChange={(e) => updateKey(id, e.target.value)} placeholder={ph} aria-label={label}
+                      style={{ flex:1, background:"var(--bg)", border:`1px solid ${validationColor(id)}`, borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace" }} />
+                    <button onClick={() => validateKey(id, keys[id])} disabled={!keys[id] || keyStatus[id]==="checking"} aria-label={`${label} 疎通確認`}
+                      style={{ padding:"8px 12px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:6, color:keyStatus[id]==="ok"?"var(--success)":"var(--link)", cursor:keys[id]?"pointer":"not-allowed", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
+                      {keyStatus[id]==="checking"?"確認中..." : keyStatus[id]==="ok"?"✓ OK" : keyStatus[id]?.startsWith("error")?"✗ NG":"疎通確認"}
+                    </button>
+                  </div>
+                  {keyStatus[id]?.startsWith("error") && (
+                    <div style={{ fontSize:11, color:"var(--error)", marginTop:4 }}>{keyStatus[id]}</div>
+                  )}
                 </div>
-                <div style={{ display:"flex", gap:6 }}>
-                  <input type="password" value={keys[id]} onChange={(e) => updateKey(id, e.target.value)} placeholder={ph} aria-label={label}
-                    style={{ flex:1, background:"var(--bg)", border:`1px solid ${validationColor(id)}`, borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace" }} />
-                  <button onClick={() => validateKey(id, keys[id])} disabled={!keys[id] || keyStatus[id]==="checking"} aria-label={`${label} 疎通確認`}
-                    style={{ padding:"8px 12px", background:"var(--accent-bg)", border:"1px solid #2a4a7f", borderRadius:6, color:keyStatus[id]==="ok"?"var(--success)":"var(--link)", cursor:keys[id]?"pointer":"not-allowed", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
-                    {keyStatus[id]==="checking"?"確認中..." : keyStatus[id]==="ok"?"✓ OK" : keyStatus[id]?.startsWith("error")?"✗ NG":"疎通確認"}
-                  </button>
+              ))}
+              <div style={{ padding:"10px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <div>
+                  <div style={{ fontSize:12, color:"var(--text2)", fontWeight:600 }}>このブラウザに保存する</div>
+                  <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>デフォルトはOFF。ONにするとlocalStorageに保存されます。</div>
                 </div>
-                {keyStatus[id]?.startsWith("error") && (
-                  <div style={{ fontSize:11, color:"var(--error)", marginTop:4 }}>{keyStatus[id]}</div>
+                <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`} style={{ padding:"6px 16px", border:"none", borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:saveKeys?"var(--success)":"var(--border)", color:saveKeys?"#fff":"var(--text2)" }}>
+                  {saveKeys ? "ON" : "OFF"}
+                </button>
+              </div>
+              <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
+                ※ キーはこのブラウザのlocalStorageのみに保存。運営者サーバーには一切送信されません。<br/>
+                ※ XSSや端末共有・画面共有等の環境リスクはご自身で管理してください。
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activePanel === "security" && (
+          <div style={{ marginTop:8, marginBottom:10 }}>
+            <SecurityPanel />
+          </div>
+        )}
+
+        {activePanel === "profile" && (
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ fontSize:11, color:"var(--text3)" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
+              <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
+                placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
+                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
+              {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
+            </div>
+          </div>
+        )}
+
+        {activePanel === "backup" && (
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
+                ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
+                パスワードを忘れると復元できません。安全な場所に保管してください。
+              </div>
+              <div>
+                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>① バックアップの作成</div>
+                <input type="password" value={exportPw} onChange={(e) => setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
+                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
+                <button onClick={handleExport} disabled={!exportPw} style={{ width:"100%", background:exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:exportPw?"pointer":"not-allowed", fontWeight:600, opacity:exportPw?1:0.5 }}>
+                  🔐 暗号化してコピー
+                </button>
+                {exportText && (
+                  <textarea readOnly value={exportText} rows={3} aria-label="暗号化されたバックアップ"
+                    style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text2)", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
                 )}
               </div>
-            ))}
-
-            <div style={{ padding:"10px 12px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div style={{ height:1, background:"var(--border)" }} />
               <div>
-                <div style={{ fontSize:12, color:"var(--text2)", fontWeight:600 }}>このブラウザに保存する</div>
-                <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>デフォルトはOFF。ONにするとlocalStorageに保存されます。</div>
+                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>② バックアップから復元</div>
+                <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
+                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
+                <input type="password" value={importPw} onChange={(e) => setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
+                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
+                <button onClick={handleImport} disabled={!importText.trim()||!importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(importText.trim()&&importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(importText.trim()&&importPw)?1:0.4 }}>
+                  復元する
+                </button>
               </div>
-              <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`} style={{ padding:"6px 16px", border:"none", borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:saveKeys?"var(--success)":"#2a2a3a", color:saveKeys?"#fff":"var(--text2)" }}>
-                {saveKeys ? "ON" : "OFF"}
-              </button>
-            </div>
-
-            <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
-              ※ キーはこのブラウザのlocalStorageのみに保存。運営者サーバーには一切送信されません。<br/>
-              ※ XSSや端末共有・画面共有等の環境リスクはご自身で管理してください。
-            </div>
-          </div>
-        </Collapsible>
-
-        {/* Security */}
-        <SecurityPanel open={showSecurity} onToggle={() => setShowSecurity((s)=>!s)} />
-
-        {/* Profile */}
-        <Collapsible label="あなたのプロフィール" badge={profileBadge} hint={!profile.trim()?"任意":null} open={showProfile} onToggle={() => setShowProfile((s)=>!s)}>
-          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            <div style={{ fontSize:11, color:"#ffffff40" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
-            <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
-              placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
-              style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
-            {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid #3a2a2a", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
-          </div>
-        </Collapsible>
-
-        {/* Backup */}
-        <Collapsible label="🔐 設定の暗号化バックアップ" open={showSave} onToggle={() => setShowSave((s)=>!s)}>
-          <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid #78350f", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
-              ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
-              パスワードを忘れると復元できません。安全な場所に保管してください。
-            </div>
-
-            <div>
-              <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>① バックアップの作成</div>
-              <input type="password" value={exportPw} onChange={(e) => setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
-                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-              <button onClick={handleExport} disabled={!exportPw} style={{ width:"100%", background:exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid #2a4a7f", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:exportPw?"pointer":"not-allowed", fontWeight:600, opacity:exportPw?1:0.5 }}>
-                🔐 暗号化してコピー
-              </button>
-              {exportText && (
-                <textarea readOnly value={exportText} rows={3} aria-label="暗号化されたバックアップ"
-                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text2)", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
+              {cryptoMsg && (
+                <div style={{ fontSize:13, color:cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{cryptoMsg}</div>
               )}
             </div>
-
-            <div style={{ height:1, background:"var(--border)" }} />
-
-            <div>
-              <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>② バックアップから復元</div>
-              <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
-                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
-              <input type="password" value={importPw} onChange={(e) => setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
-                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-              <button onClick={handleImport} disabled={!importText.trim()||!importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(importText.trim()&&importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(importText.trim()&&importPw)?1:0.4 }}>
-                復元する
-              </button>
-            </div>
-
-            {cryptoMsg && (
-              <div style={{ fontSize:13, color:cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{cryptoMsg}</div>
-            )}
           </div>
-        </Collapsible>
+        )}
 
-        {/* History */}
-        <HistoryPanel open={showHistory} onToggle={() => setShowHistory((s)=>!s)} onLoad={handleLoadHistory} />
+        {activePanel === "history" && (
+          <div style={{ marginTop:8, marginBottom:10 }}>
+            <HistoryPanel open={true} onToggle={() => togglePanel("history")} onLoad={handleLoadHistory} />
+          </div>
+        )}
 
         {/* Topic */}
         {!started && (

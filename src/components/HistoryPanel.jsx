@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { loadHistory, deleteDiscussion } from "../history";
-import Collapsible from "./Collapsible";
 
 function timeAgo(isoStr) {
   const diff = Date.now() - new Date(isoStr).getTime();
@@ -15,7 +14,7 @@ function timeAgo(isoStr) {
   return new Date(isoStr).toLocaleDateString("ja-JP");
 }
 
-export default function HistoryPanel({ open, onToggle, onLoad }) {
+export default function HistoryPanel({ open, onLoad }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -39,8 +38,10 @@ export default function HistoryPanel({ open, onToggle, onLoad }) {
     }
   };
 
+  if (!open) return null;
+
   return (
-    <Collapsible label="📂 議論履歴" badge={history.length ? `${history.length}件` : null} open={open} onToggle={onToggle}>
+    <div style={{ padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
       {loading && <div style={{ color:"var(--text3)", fontSize:12 }}>読み込み中...</div>}
       {!loading && history.length === 0 && (
         <div style={{ color:"var(--text3)", fontSize:12 }}>保存された議論はありません</div>
@@ -58,6 +59,6 @@ export default function HistoryPanel({ open, onToggle, onLoad }) {
           </button>
         </div>
       ))}
-    </Collapsible>
+    </div>
   );
 }
