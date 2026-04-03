@@ -54,6 +54,26 @@ describe("buildPrompt", () => {
     expect(() => buildPrompt("unknown", "テスト", "", [], 1, "")).toThrow("Unknown model");
   });
 
+  it("debate mode includes 反論 instruction", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "debate");
+    expect(sys).toContain("立場を明確");
+  });
+
+  it("brainstorm mode includes アイデア instruction", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "brainstorm");
+    expect(sys).toContain("自由なアイデア");
+  });
+
+  it("factcheck mode includes 根拠 instruction", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "factcheck");
+    expect(sys).toContain("事実・データ・根拠");
+  });
+
+  it("unknown discussion mode falls back to standard", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "invalid");
+    expect(sys).toContain("300字以内");
+  });
+
   it("names other models correctly for each AI", () => {
     const { sys: claudeSys } = buildPrompt("claude", "テスト", "", [], 1, "");
     expect(claudeSys).toContain("ChatGPTとGemini");

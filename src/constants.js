@@ -22,3 +22,10 @@ export const THEMES = [
   { id: "base",      label: "☀️ Base" },
   { id: "feminine",  label: "🌸 Feminine" },
 ];
+
+export const DISCUSSION_MODES = [
+  { id: "standard",  label: "💬 標準",     description: "バランスの取れた議論" },
+  { id: "debate",    label: "⚔️ ディベート", description: "対立・反論を重視" },
+  { id: "brainstorm", label: "💡 ブレスト",  description: "発散・アイデア重視" },
+  { id: "factcheck", label: "🔍 事実検証",  description: "根拠・正確性を重視" },
+];

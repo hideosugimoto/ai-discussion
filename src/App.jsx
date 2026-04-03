@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MODELS, MODE_MODELS, THEMES } from "./constants";
+import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
 import { buildPrompt } from "./prompt";
 import { callClaude, callChatGPT, callGemini } from "./api";
 import { encryptSettings, decryptSettings } from "./crypto";
@@ -10,6 +10,9 @@ import Collapsible from "./components/Collapsible";
 import SecurityPanel from "./components/SecurityPanel";
 import SummaryPanel from "./components/SummaryPanel";
 import useKeyValidation from "./hooks/useKeyValidation";
+import { downloadMarkdown } from "./export";
+import { saveDiscussion, loadDiscussion } from "./history";
+import HistoryPanel from "./components/HistoryPanel";
 import summaryPromptText from "./prompts/summary.txt?raw";
 
 // ── Summary generation ────────────────────────────────────────
@@ -59,6 +62,8 @@ export default function App() {
   const [showProfile, setShowProfile]   = useState(false);
   const [showSave, setShowSave]         = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [discussionMode, setDiscussionMode] = useState("standard");
 
   const [exportPw, setExportPw]   = useState("");
   const [importPw, setImportPw]   = useState("");
@@ -180,7 +185,7 @@ export default function App() {
 
     const results = await Promise.all(
       MODELS.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -222,7 +227,7 @@ export default function App() {
       setShowIntervention(true);
       runSummary(results, roundNum);
     }
-  }, [mode, keys, topic, profile, runSummary]);
+  }, [mode, keys, topic, profile, discussionMode, runSummary]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -241,7 +246,25 @@ export default function App() {
   };
 
   const handleStop = () => { abortRef.current?.abort(); };
-  const handleReset = () => { abortRef.current?.abort(); setDiscussion([]); setSummaries([]); setStarted(false); setShowIntervention(false); setSidePanel(false); };
+  const handleReset = () => {
+    abortRef.current?.abort();
+    if (discussion.length > 0 && topic.trim()) {
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode).catch(() => {});
+    }
+    setDiscussion([]); setSummaries([]); setStarted(false); setShowIntervention(false); setSidePanel(false);
+  };
+
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries); };
+
+  const handleLoadHistory = (item) => {
+    setTopic(item.topic);
+    setDiscussion(item.discussion);
+    setSummaries(item.summaries);
+    setDiscussionMode(item.discussionMode || "standard");
+    setStarted(true);
+    setShowIntervention(true);
+    setShowHistory(false);
+  };
 
   const handleScrollToMessage = (quote) => {
     const els = document.querySelectorAll("[data-id^='msg-']");
@@ -314,6 +337,16 @@ export default function App() {
               <button key={id} role="radio" aria-checked={theme===id} onClick={() => setTheme(id)} style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:theme===id?"var(--accent)":"transparent", color:theme===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
+        </div>
+
+        {/* Discussion Mode */}
+        <div style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
+          {DISCUSSION_MODES.map(({id,label,description}) => (
+            <button key={id} onClick={() => setDiscussionMode(id)} title={description}
+              style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* API Keys */}
@@ -410,6 +443,9 @@ export default function App() {
           </div>
         </Collapsible>
 
+        {/* History */}
+        <HistoryPanel open={showHistory} onToggle={() => setShowHistory((s)=>!s)} onLoad={handleLoadHistory} />
+
         {/* Topic */}
         {!started && (
           <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", marginTop:4 }}>
@@ -434,7 +470,12 @@ export default function App() {
               <div style={{ fontSize:10, color:"var(--text3)", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
               <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
             </div>
-            <button onClick={handleReset} style={{ background:"none", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 10px", color:"#ffffff40", cursor:"pointer", fontSize:12 }}>リセット</button>
+            <div style={{ display:"flex", gap:6 }}>
+              {discussion.length > 0 && (
+                <button onClick={handleExportMd} aria-label="Markdownエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 MD</button>
+              )}
+              <button onClick={handleReset} style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
+            </div>
           </div>
         )}
 
