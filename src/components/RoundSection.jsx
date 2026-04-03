@@ -10,7 +10,7 @@ export default function RoundSection({ round, roundNum, isLatest }) {
           <div style={{ fontSize:11, color:"#a78bfa", fontStyle:"italic" }}>💬 {round.userIntervention}</div>
         )}
       </div>
-      <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+      <div className="round-messages">
         {round.messages.map((msg) => <MessageBubble key={msg.modelId} msg={msg} isNew={isLatest} />)}
       </div>
     </div>

@@ -6,6 +6,22 @@ textarea:focus, input:focus { outline: none; }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
 
+.round-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (min-width: 768px) {
+  .round-messages {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .round-messages > * {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }

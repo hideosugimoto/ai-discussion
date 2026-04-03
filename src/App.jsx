@@ -233,7 +233,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ width:"100%", maxWidth:720 }}>
+      <div style={{ width:"100%", maxWidth: started ? 1100 : 720 }}>
 
         {/* Mode */}
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
