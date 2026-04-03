@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 let mermaidLoading = null;
 
@@ -48,7 +48,7 @@ function buildMermaidSyntax(summary) {
 let renderCounter = 0;
 
 export default function MindMap({ summary }) {
-  const containerRef = useRef(null);
+  const [svgHtml, setSvgHtml] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -56,6 +56,7 @@ export default function MindMap({ summary }) {
     if (!summary) return;
     setError(null);
     setLoading(true);
+    setSvgHtml(null);
 
     let cancelled = false;
 
@@ -66,9 +67,7 @@ export default function MindMap({ summary }) {
         const diagram = buildMermaidSyntax(summary);
         const id = `mindmap-${++renderCounter}`;
         const { svg } = await mermaid.render(id, diagram);
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML = svg;
-        }
+        if (!cancelled) setSvgHtml(svg);
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -85,8 +84,8 @@ export default function MindMap({ summary }) {
   if (error) {
     return <div style={{ padding:14, color:"#ef4444", fontSize:13 }}>⚠ {error}</div>;
   }
-  if (loading) {
+  if (loading || !svgHtml) {
     return <div style={{ padding:14, color:"#ffffff30", animation:"pulse 1.2s infinite" }}>マップ生成中...</div>;
   }
-  return <div ref={containerRef} style={{ padding:8, overflow:"auto" }} />;
+  return <div style={{ padding:8, overflow:"auto" }} dangerouslySetInnerHTML={{ __html: svgHtml }} />;
 }
