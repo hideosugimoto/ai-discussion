@@ -1,11 +1,15 @@
 import { MODELS } from "./constants";
 
 export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention) {
-  const modelName = MODELS.find((m) => m.id === modelId).name;
+  const model = MODELS.find((m) => m.id === modelId);
+  if (!model) throw new Error(`Unknown model: ${modelId}`);
+  const modelName = model.name;
   const others    = MODELS.filter((m) => m.id !== modelId).map((m) => m.name).join("と");
+  const safeTopic   = topic.slice(0, 2000);
+  const safeProfile = profile.slice(0, 5000);
 
-  const prof = profile.trim()
-    ? `\n\n【質問者のプロフィール】\n${profile.trim()}\n上記を踏まえた上で、この人物に合った視点で議論してください。`
+  const prof = safeProfile.trim()
+    ? `\n\n【質問者のプロフィール】\n${safeProfile.trim()}\n上記を踏まえた上で、この人物に合った視点で議論してください。`
     : "";
 
   const sys =
@@ -30,6 +34,6 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
       ? `\n\n【司会者（ユーザー）からの介入】\n${userIntervention.trim()}`
       : "";
 
-  const user = `【議題】${topic}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const user = `【議題】${safeTopic}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   return { sys, user };
 }

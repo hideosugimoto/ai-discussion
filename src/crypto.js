@@ -26,7 +26,9 @@ export async function encryptSettings(data, password) {
   combined.set(salt, 0);
   combined.set(iv, 16);
   combined.set(new Uint8Array(encrypted), 28);
-  return btoa(String.fromCharCode(...combined));
+  let binary = "";
+  for (let i = 0; i < combined.length; i++) binary += String.fromCharCode(combined[i]);
+  return btoa(binary);
 }
 
 export async function decryptSettings(base64, password) {

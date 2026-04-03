@@ -16,7 +16,9 @@ export function saveSettings(obj) {
       }
     }
     localStorage.setItem(LS_KEY, JSON.stringify(next));
-  } catch {}
+  } catch (e) {
+    if (e.name === "QuotaExceededError") throw new Error("localStorage is full");
+  }
 }
 
 export function clearSettings() {
