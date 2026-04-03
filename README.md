@@ -85,3 +85,14 @@ npx wrangler pages deploy dist --project-name ai-discussion
 - プロフィール更新通知（30日未更新で通知バナー表示）
 - 設定のAES-GCM暗号化バックアップ/復元
 - SRIによるCDN改ざん検知・自動ブロック
+- 3テーマ切替（Dark / Base / Feminine）
+- ラウンドサマリー（合意点・対立点・未解決・立場変化を自動分析）
+- マインドマップ可視化（Mermaid.js）
+
+## ライセンス
+
+MIT License with Non-Commercial Clause
+
+- 個人利用・学習・改変・再配布：OK
+- 商用利用（販売・有料サービスへの組み込み・収益化）：事前の書面許可が必要
+- 詳細は [LICENSE](./LICENSE) を参照
