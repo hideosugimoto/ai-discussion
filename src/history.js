@@ -18,19 +18,42 @@ function openDB() {
   });
 }
 
+function validateMessage(m) {
+  if (typeof m !== "object" || m === null) return null;
+  return {
+    modelId: typeof m.modelId === "string" ? m.modelId : "unknown",
+    text: typeof m.text === "string" ? m.text.slice(0, 50000) : "",
+    error: typeof m.error === "string" ? m.error : null,
+    loading: false,
+  };
+}
+
+function validateRound(round) {
+  if (typeof round !== "object" || round === null) return null;
+  return {
+    messages: Array.isArray(round.messages)
+      ? round.messages.map(validateMessage).filter(Boolean)
+      : [],
+    userIntervention: typeof round.userIntervention === "string"
+      ? round.userIntervention.slice(0, 1000)
+      : "",
+  };
+}
+
 function validateDiscussion(data) {
   if (typeof data !== "object" || data === null) return null;
   if (typeof data.topic !== "string" || !data.topic.trim()) return null;
   if (!Array.isArray(data.discussion)) return null;
+  const validDiscussion = data.discussion.map(validateRound).filter(Boolean);
   return {
     id: typeof data.id === "string" ? data.id : crypto.randomUUID(),
     topic: data.topic.slice(0, 2000),
-    discussion: data.discussion,
+    discussion: validDiscussion,
     summaries: Array.isArray(data.summaries) ? data.summaries : [],
     mode: typeof data.mode === "string" ? data.mode : "best",
     discussionMode: typeof data.discussionMode === "string" ? data.discussionMode : "standard",
     createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
-    roundCount: Array.isArray(data.discussion) ? data.discussion.length : 0,
+    roundCount: validDiscussion.length,
   };
 }
 

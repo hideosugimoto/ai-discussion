@@ -50,9 +50,10 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
           )
           .join("\n\n---\n\n");
 
+  const safeIntervention = (userIntervention || "").slice(0, 1000);
   const interventionText =
-    userIntervention?.trim()
-      ? `\n\n【司会者（ユーザー）からの介入】\n${userIntervention.trim()}`
+    safeIntervention.trim()
+      ? `\n\n【司会者（ユーザー）からの介入】\n${safeIntervention.trim()}`
       : "";
 
   const user = `【議題】${safeTopic}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;

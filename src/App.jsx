@@ -257,10 +257,11 @@ export default function App() {
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries); };
 
   const handleLoadHistory = (item) => {
-    setTopic(item.topic);
+    if (!item?.topic || !Array.isArray(item.discussion)) return;
+    setTopic(item.topic.slice(0, 2000));
     setDiscussion(item.discussion);
-    setSummaries(item.summaries);
-    setDiscussionMode(item.discussionMode || "standard");
+    setSummaries(Array.isArray(item.summaries) ? item.summaries : []);
+    setDiscussionMode(DISCUSSION_MODES.some((m) => m.id === item.discussionMode) ? item.discussionMode : "standard");
     setStarted(true);
     setShowIntervention(true);
     setShowHistory(false);
@@ -340,9 +341,9 @@ export default function App() {
         </div>
 
         {/* Discussion Mode */}
-        <div style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
+        <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, marginBottom:10, flexWrap:"wrap" }}>
           {DISCUSSION_MODES.map(({id,label,description}) => (
-            <button key={id} onClick={() => setDiscussionMode(id)} title={description}
+            <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)} title={description}
               style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
               {label}
             </button>

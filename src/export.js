@@ -1,7 +1,11 @@
 import { MODELS } from "./constants";
 
 function sanitize(text) {
-  return (text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return (text || "")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
 }
 
 export function exportToMarkdown(topic, discussion, summaries) {
@@ -66,7 +70,7 @@ export function downloadMarkdown(topic, discussion, summaries) {
   const md = exportToMarkdown(topic, discussion, summaries);
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-  const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_");
+  const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_") || "untitled";
   const a = document.createElement("a");
   a.href = url;
   a.download = `discussion_${safeName}_${Date.now()}.md`;

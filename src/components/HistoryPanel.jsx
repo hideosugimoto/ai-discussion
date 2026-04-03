@@ -4,6 +4,7 @@ import Collapsible from "./Collapsible";
 
 function timeAgo(isoStr) {
   const diff = Date.now() - new Date(isoStr).getTime();
+  if (isNaN(diff)) return "不明";
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "たった今";
   if (mins < 60) return `${mins}分前`;
@@ -29,8 +30,13 @@ export default function HistoryPanel({ open, onToggle, onLoad }) {
   }, [open]);
 
   const handleDelete = async (id) => {
-    await deleteDiscussion(id);
-    setHistory((h) => h.filter((item) => item.id !== id));
+    if (!window.confirm("この議論を削除しますか？")) return;
+    try {
+      await deleteDiscussion(id);
+      setHistory((h) => h.filter((item) => item.id !== id));
+    } catch {
+      // deletion failed - keep item in list
+    }
   };
 
   return (
