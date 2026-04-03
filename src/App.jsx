@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MODELS, MODE_MODELS } from "./constants";
+import { MODELS, MODE_MODELS, THEMES } from "./constants";
 import { buildPrompt } from "./prompt";
 import { callClaude, callChatGPT, callGemini } from "./api";
 import { encryptSettings, decryptSettings } from "./crypto";
@@ -32,6 +32,13 @@ async function generateSummary(apiKey, messages, topic, roundNum) {
 // ── Main App ───────────────────────────────────────────────────
 
 export default function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("ai-discussion-theme", theme);
+  }, [theme]);
+
   const saved = loadSettings();
   const [keys, setKeys]         = useState({ claude:"", chatgpt:"", gemini:"", ...saved.keys });
   const [saveKeys, setSaveKeys] = useState(saved.saveKeys ?? false);
@@ -259,10 +266,10 @@ export default function App() {
 
   const validationColor = (id) => {
     const s = keyStatus[id];
-    if (!s) return "#2a2a3a";
-    if (s === "checking") return "#f59e0b40";
-    if (s === "ok") return "#16a34a60";
-    return "#ef444460";
+    if (!s) return "var(--border)";
+    if (s === "checking") return "var(--warning-bd)";
+    if (s === "ok") return "var(--success-bg)";
+    return "var(--error)";
   };
 
   const profileBadge = profile.trim()
@@ -274,20 +281,20 @@ export default function App() {
   const latestSummary = summaries[summaries.length - 1] ?? null;
 
   return (
-    <div style={{ minHeight:"100vh", background:"#09090f", color:"#e2e8f0", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
+    <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
 
       {/* Profile update notice */}
       {profileNotice && (
-        <div style={{ width:"100%", maxWidth:720, marginBottom:12, padding:"10px 16px", background:"#1c1a07", border:"1px solid #78580f", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
-          <span style={{ color:"#f59e0b", fontSize:13 }}>📅 プロフィールが{profileNotice}日間更新されていません。Claude.aiやChatGPTで最新情報を取得して更新することをおすすめします。</span>
-          <button onClick={() => { setProfileNotice(false); sessionStorage.setItem("profile-notice-dismissed","1"); }} aria-label="通知を閉じる" style={{ background:"none", border:"none", color:"#f59e0b", cursor:"pointer", fontSize:16, padding:"0 4px", flexShrink:0 }}>✕</button>
+        <div style={{ width:"100%", maxWidth:720, marginBottom:12, padding:"10px 16px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
+          <span style={{ color:"var(--warning)", fontSize:13 }}>📅 プロフィールが{profileNotice}日間更新されていません。Claude.aiやChatGPTで最新情報を取得して更新することをおすすめします。</span>
+          <button onClick={() => { setProfileNotice(false); sessionStorage.setItem("profile-notice-dismissed","1"); }} aria-label="通知を閉じる" style={{ background:"none", border:"none", color:"var(--warning)", cursor:"pointer", fontSize:16, padding:"0 4px", flexShrink:0 }}>✕</button>
         </div>
       )}
 
       {/* Header */}
       <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:720 }}>
-        <div style={{ fontSize:10, color:"#ffffff30", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
-        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"#f1f5f9" }}>3 AI Discussion</h1>
+        <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
+        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"var(--text)" }}>3 AI Discussion</h1>
         <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
           {MODELS.map((m) => <ModelBadge key={m.id} model={m} tag={cm[m.id].label} />)}
         </div>
@@ -295,11 +302,16 @@ export default function App() {
 
       <div style={{ width:"100%", maxWidth: started ? (sidePanel ? 1480 : 1100) : 720 }}>
 
-        {/* Mode */}
-        <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-          <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"#10101a", border:"1px solid #2a2a3a", borderRadius:8, overflow:"hidden" }}>
+        {/* Mode + Theme */}
+        <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
+          <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
             {[{id:"best",label:"🧠 最強"},{id:"fast",label:"⚡ 高速"}].map(({id,label}) => (
-              <button key={id} role="radio" aria-checked={mode===id} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"#7c3aed":"transparent", color:mode===id?"#fff":"#ffffff50" }}>{label}</button>
+              <button key={id} role="radio" aria-checked={mode===id} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"var(--accent)":"transparent", color:mode===id?"#fff":"var(--text2)" }}>{label}</button>
+            ))}
+          </div>
+          <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
+            {THEMES.map(({id,label}) => (
+              <button key={id} role="radio" aria-checked={theme===id} onClick={() => setTheme(id)} style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:theme===id?"var(--accent)":"transparent", color:theme===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
         </div>
@@ -310,34 +322,34 @@ export default function App() {
             {keyConfigs.map(({id,label,ph,link}) => (
               <div key={id}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                  <span style={{ fontSize:11, color:"#ffffff40", fontFamily:"monospace" }}>{label}</span>
-                  <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10, color:"#60a5fa80", textDecoration:"none" }}>取得 →</a>
+                  <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace" }}>{label}</span>
+                  <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10, color:"var(--link)", textDecoration:"none" }}>取得 →</a>
                 </div>
                 <div style={{ display:"flex", gap:6 }}>
                   <input type="password" value={keys[id]} onChange={(e) => updateKey(id, e.target.value)} placeholder={ph} aria-label={label}
-                    style={{ flex:1, background:"#09090f", border:`1px solid ${validationColor(id)}`, borderRadius:6, padding:"8px 10px", color:"#e2e8f0", fontSize:13, fontFamily:"monospace" }} />
+                    style={{ flex:1, background:"var(--bg)", border:`1px solid ${validationColor(id)}`, borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace" }} />
                   <button onClick={() => validateKey(id, keys[id])} disabled={!keys[id] || keyStatus[id]==="checking"} aria-label={`${label} 疎通確認`}
-                    style={{ padding:"8px 12px", background:"#1e3a5f", border:"1px solid #2a4a7f", borderRadius:6, color:keyStatus[id]==="ok"?"#4ade80":"#60a5fa", cursor:keys[id]?"pointer":"not-allowed", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
+                    style={{ padding:"8px 12px", background:"var(--accent-bg)", border:"1px solid #2a4a7f", borderRadius:6, color:keyStatus[id]==="ok"?"var(--success)":"var(--link)", cursor:keys[id]?"pointer":"not-allowed", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
                     {keyStatus[id]==="checking"?"確認中..." : keyStatus[id]==="ok"?"✓ OK" : keyStatus[id]?.startsWith("error")?"✗ NG":"疎通確認"}
                   </button>
                 </div>
                 {keyStatus[id]?.startsWith("error") && (
-                  <div style={{ fontSize:11, color:"#ef4444", marginTop:4 }}>{keyStatus[id]}</div>
+                  <div style={{ fontSize:11, color:"var(--error)", marginTop:4 }}>{keyStatus[id]}</div>
                 )}
               </div>
             ))}
 
-            <div style={{ padding:"10px 12px", background:"#0d0d1a", border:"1px solid #2a2a3a", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div style={{ padding:"10px 12px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <div>
-                <div style={{ fontSize:12, color:"#ffffff70", fontWeight:600 }}>このブラウザに保存する</div>
-                <div style={{ fontSize:11, color:"#ffffff30", marginTop:2 }}>デフォルトはOFF。ONにするとlocalStorageに保存されます。</div>
+                <div style={{ fontSize:12, color:"var(--text2)", fontWeight:600 }}>このブラウザに保存する</div>
+                <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>デフォルトはOFF。ONにするとlocalStorageに保存されます。</div>
               </div>
-              <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`} style={{ padding:"6px 16px", border:"none", borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:saveKeys?"#16a34a":"#2a2a3a", color:saveKeys?"#fff":"#ffffff50" }}>
+              <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`} style={{ padding:"6px 16px", border:"none", borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:saveKeys?"var(--success)":"#2a2a3a", color:saveKeys?"#fff":"var(--text2)" }}>
                 {saveKeys ? "ON" : "OFF"}
               </button>
             </div>
 
-            <div style={{ fontSize:11, color:"#ffffff20", lineHeight:1.6 }}>
+            <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
               ※ キーはこのブラウザのlocalStorageのみに保存。運営者サーバーには一切送信されません。<br/>
               ※ XSSや端末共有・画面共有等の環境リスクはご自身で管理してください。
             </div>
@@ -353,62 +365,62 @@ export default function App() {
             <div style={{ fontSize:11, color:"#ffffff40" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
             <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
               placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
-              style={{ width:"100%", background:"#09090f", border:"1px solid #2a2a3a", borderRadius:6, padding:10, color:"#e2e8f0", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
-            {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid #3a2a2a", borderRadius:6, padding:"4px 12px", color:"#ef444460", cursor:"pointer", fontSize:11 }}>クリア</button>}
+              style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
+            {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid #3a2a2a", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
           </div>
         </Collapsible>
 
         {/* Backup */}
         <Collapsible label="🔐 設定の暗号化バックアップ" open={showSave} onToggle={() => setShowSave((s)=>!s)}>
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            <div style={{ padding:"10px 12px", background:"#1c1207", border:"1px solid #78350f", borderRadius:8, fontSize:11, color:"#f59e0b", lineHeight:1.6 }}>
+            <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid #78350f", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
               ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
               パスワードを忘れると復元できません。安全な場所に保管してください。
             </div>
 
             <div>
-              <div style={{ fontSize:12, color:"#ffffff60", marginBottom:8 }}>① バックアップの作成</div>
+              <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>① バックアップの作成</div>
               <input type="password" value={exportPw} onChange={(e) => setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
-                style={{ width:"100%", background:"#09090f", border:"1px solid #2a2a3a", borderRadius:6, padding:"8px 10px", color:"#e2e8f0", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-              <button onClick={handleExport} disabled={!exportPw} style={{ width:"100%", background:exportPw?"#1e3a5f":"#1a1a2a", border:"1px solid #2a4a7f", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:exportPw?"pointer":"not-allowed", fontWeight:600, opacity:exportPw?1:0.5 }}>
+                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
+              <button onClick={handleExport} disabled={!exportPw} style={{ width:"100%", background:exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid #2a4a7f", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:exportPw?"pointer":"not-allowed", fontWeight:600, opacity:exportPw?1:0.5 }}>
                 🔐 暗号化してコピー
               </button>
               {exportText && (
                 <textarea readOnly value={exportText} rows={3} aria-label="暗号化されたバックアップ"
-                  style={{ width:"100%", background:"#09090f", border:"1px solid #2a2a3a", borderRadius:6, padding:10, color:"#ffffff60", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
+                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text2)", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
               )}
             </div>
 
-            <div style={{ height:1, background:"#2a2a3a" }} />
+            <div style={{ height:1, background:"var(--border)" }} />
 
             <div>
-              <div style={{ fontSize:12, color:"#ffffff60", marginBottom:8 }}>② バックアップから復元</div>
+              <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>② バックアップから復元</div>
               <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
-                style={{ width:"100%", background:"#09090f", border:"1px solid #2a2a3a", borderRadius:6, padding:10, color:"#e2e8f0", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
+                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
               <input type="password" value={importPw} onChange={(e) => setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
-                style={{ width:"100%", background:"#09090f", border:"1px solid #2a2a3a", borderRadius:6, padding:"8px 10px", color:"#e2e8f0", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-              <button onClick={handleImport} disabled={!importText.trim()||!importPw} style={{ width:"100%", background:"#7c3aed", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(importText.trim()&&importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(importText.trim()&&importPw)?1:0.4 }}>
+                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
+              <button onClick={handleImport} disabled={!importText.trim()||!importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(importText.trim()&&importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(importText.trim()&&importPw)?1:0.4 }}>
                 復元する
               </button>
             </div>
 
             {cryptoMsg && (
-              <div style={{ fontSize:13, color:cryptoMsg.startsWith("✓")?"#4ade80":"#ef4444", textAlign:"center" }}>{cryptoMsg}</div>
+              <div style={{ fontSize:13, color:cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{cryptoMsg}</div>
             )}
           </div>
         </Collapsible>
 
         {/* Topic */}
         {!started && (
-          <div style={{ background:"#10101a", border:"1px solid #2a2a3a", borderRadius:12, overflow:"hidden", marginTop:4 }}>
+          <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", marginTop:4 }}>
             <textarea value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={2000} aria-label="議題"
               onKeyDown={(e) => { if (e.key==="Enter"&&(e.metaKey||e.ctrlKey)) handleStart(); }}
               placeholder={"議題を入力...\n例: AIは人間の仕事を奪うか\nCtrl+Enter で開始"} rows={3}
-              style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"#e2e8f0", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
-            <div style={{ padding:"8px 12px", borderTop:"1px solid #1e1e2e", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:11, color:profile.trim()?"#4ade8060":"#ffffff20" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
+              style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
+            <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
               <button onClick={handleStart} disabled={!topic.trim()||running||!allKeysSet}
-                style={{ background:allKeysSet&&topic.trim()?"#7c3aed":"#2a2a3a", border:"none", borderRadius:8, padding:"8px 20px", color:"#fff", fontSize:13, fontWeight:700, cursor:(topic.trim()&&allKeysSet)?"pointer":"not-allowed", opacity:(topic.trim()&&allKeysSet)?1:0.35 }}>
+                style={{ background:allKeysSet&&topic.trim()?"var(--accent)":"#2a2a3a", border:"none", borderRadius:8, padding:"8px 20px", color:"#fff", fontSize:13, fontWeight:700, cursor:(topic.trim()&&allKeysSet)?"pointer":"not-allowed", opacity:(topic.trim()&&allKeysSet)?1:0.35 }}>
                 {!allKeysSet?"キーを設定してください":"▶ 開始"}
               </button>
             </div>
@@ -417,10 +429,10 @@ export default function App() {
 
         {/* Topic display */}
         {started && (
-          <div style={{ padding:"10px 14px", background:"#13102a", border:"1px solid #4c1d9540", borderRadius:10, marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ padding:"10px 14px", background:"var(--accent-bg)", border:"1px solid #4c1d9540", borderRadius:10, marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
-              <div style={{ fontSize:10, color:"#ffffff30", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
-              <div style={{ fontSize:14, color:"#c4b5fd", fontWeight:500 }}>{topic}</div>
+              <div style={{ fontSize:10, color:"var(--text3)", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
+              <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
             </div>
             <button onClick={handleReset} style={{ background:"none", border:"1px solid #3a2a5a", borderRadius:6, padding:"4px 10px", color:"#ffffff40", cursor:"pointer", fontSize:12 }}>リセット</button>
           </div>
@@ -448,7 +460,7 @@ export default function App() {
             {/* Stop button */}
             {running && (
               <div style={{ textAlign:"center", marginTop:8 }}>
-                <button onClick={handleStop} style={{ background:"none", border:"1px solid #ef4444", borderRadius:20, padding:"8px 24px", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                <button onClick={handleStop} style={{ background:"none", border:"1px solid #ef4444", borderRadius:20, padding:"8px 24px", color:"var(--error)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
                   ⏹ 停止
                 </button>
               </div>
@@ -457,14 +469,14 @@ export default function App() {
             {/* User intervention + next round */}
             {showIntervention && !running && discussion.length > 0 && (
               <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
-                <div style={{ background:"#10101a", border:"1px solid #4c1d95", borderRadius:12, overflow:"hidden" }}>
+                <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:12, overflow:"hidden" }}>
                   <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
                     placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
                     rows={2}
-                    style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"#c4b5fd", fontSize:13, lineHeight:1.6, resize:"none" }} />
+                    style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"var(--accent-light)", fontSize:13, lineHeight:1.6, resize:"none" }} />
                 </div>
                 <div style={{ textAlign:"center" }}>
-                  <button onClick={handleNextRound} style={{ background:"none", border:"1px solid #7c3aed", borderRadius:20, padding:"10px 28px", color:"#a78bfa", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                  <button onClick={handleNextRound} style={{ background:"none", border:"1px solid #7c3aed", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
                     ↻ 次のラウンドへ（Round {discussion.length+1}）
                   </button>
                 </div>

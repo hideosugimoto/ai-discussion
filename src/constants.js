@@ -12,7 +12,13 @@ export const MODE_MODELS = {
 };
 
 export const MODELS = [
-  { id: "claude",  name: "Claude",  color: "#f59e0b", dimColor: "#78350f", bg: "#1c1207", icon: "◆" },
-  { id: "chatgpt", name: "ChatGPT", color: "#10a37f", dimColor: "#134e3f", bg: "#07120f", icon: "◉" },
-  { id: "gemini",  name: "Gemini",  color: "#60a5fa", dimColor: "#1e3a5f", bg: "#070d1c", icon: "✦" },
+  { id: "claude",  name: "Claude",  color: "var(--claude-color)",  dimColor: "var(--claude-bd)",  bg: "var(--claude-bg)",  icon: "◆" },
+  { id: "chatgpt", name: "ChatGPT", color: "var(--chatgpt-color)", dimColor: "var(--chatgpt-bd)", bg: "var(--chatgpt-bg)", icon: "◉" },
+  { id: "gemini",  name: "Gemini",  color: "var(--gemini-color)",  dimColor: "var(--gemini-bd)",  bg: "var(--gemini-bg)",  icon: "✦" },
+];
+
+export const THEMES = [
+  { id: "dark",      label: "🌙 Dark" },
+  { id: "base",      label: "☀️ Base" },
+  { id: "feminine",  label: "🌸 Feminine" },
 ];
