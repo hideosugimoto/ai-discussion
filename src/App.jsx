@@ -8,7 +8,26 @@ import ModelBadge from "./components/ModelBadge";
 import RoundSection from "./components/RoundSection";
 import Collapsible from "./components/Collapsible";
 import SecurityPanel from "./components/SecurityPanel";
+import SummaryPanel from "./components/SummaryPanel";
 import useKeyValidation from "./hooks/useKeyValidation";
+import summaryPromptText from "./prompts/summary.txt?raw";
+
+// ── Summary generation ────────────────────────────────────────
+
+async function generateSummary(apiKey, messages, topic, roundNum) {
+  const roundText = messages
+    .map((m) => {
+      const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+      return `[${name}] ${m.text || "(エラー)"}`;
+    })
+    .join("\n\n");
+
+  const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
+
+  const text = await callChatGPT(apiKey, "gpt-4o-mini", summaryPromptText, userMsg, () => {});
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  return JSON.parse(cleaned);
+}
 
 // ── Main App ───────────────────────────────────────────────────
 
@@ -21,11 +40,13 @@ export default function App() {
   const [topic, setTopic]       = useState("");
   const [mode, setMode]         = useState("best");
   const [discussion, setDiscussion] = useState([]);
+  const [summaries, setSummaries] = useState([]);
   const [running, setRunning]   = useState(false);
   const [started, setStarted]   = useState(false);
   const [intervention, setIntervention] = useState("");
   const [showIntervention, setShowIntervention] = useState(false);
   const [profileNotice, setProfileNotice] = useState(false);
+  const [sidePanel, setSidePanel] = useState(false);
 
   const [showKeys, setShowKeysPanel]     = useState(!saved.keys?.claude);
   const [showProfile, setShowProfile]   = useState(false);
@@ -51,7 +72,6 @@ export default function App() {
     }
   }, [profile, profileUpdatedAt]);
 
-  // キー更新 + 保存
   const updateKey = (id, val) => {
     const next = { ...keys, [id]:val };
     setKeys(next);
@@ -116,6 +136,27 @@ export default function App() {
     }
   };
 
+  // ── サマリー生成 ────────────────────────────────────────────
+
+  const runSummary = useCallback(async (roundMessages, roundNum) => {
+    if (!keys.chatgpt) return;
+    setSummaries((s) => [...s, null]);
+    try {
+      const summary = await generateSummary(keys.chatgpt, roundMessages, topic, roundNum);
+      setSummaries((s) => {
+        const next = [...s];
+        next[roundNum - 1] = summary;
+        return next;
+      });
+    } catch {
+      setSummaries((s) => {
+        const next = [...s];
+        next[roundNum - 1] = { agreements:[], disagreements:[], unresolved:[], positionChanges:[], error:true };
+        return next;
+      });
+    }
+  }, [keys.chatgpt, topic]);
+
   // ── ラウンド実行 ────────────────────────────────────────────
 
   const runRound = useCallback(async (currentHistory, roundNum, userIntervention) => {
@@ -169,12 +210,17 @@ export default function App() {
 
     setRunning(false);
     abortRef.current = null;
-    if (!controller.signal.aborted) setShowIntervention(true);
-  }, [mode, keys, topic, profile]);
+
+    if (!controller.signal.aborted) {
+      setShowIntervention(true);
+      runSummary(results, roundNum);
+    }
+  }, [mode, keys, topic, profile, runSummary]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
     setDiscussion([]);
+    setSummaries([]);
     setStarted(true);
     setShowKeysPanel(false);
     setShowProfile(false);
@@ -188,7 +234,19 @@ export default function App() {
   };
 
   const handleStop = () => { abortRef.current?.abort(); };
-  const handleReset = () => { abortRef.current?.abort(); setDiscussion([]); setStarted(false); setShowIntervention(false); };
+  const handleReset = () => { abortRef.current?.abort(); setDiscussion([]); setSummaries([]); setStarted(false); setShowIntervention(false); setSidePanel(false); };
+
+  const handleScrollToMessage = (quote) => {
+    const els = document.querySelectorAll("[data-id^='msg-']");
+    for (const el of els) {
+      if (el.textContent?.includes(quote)) {
+        el.scrollIntoView({ behavior:"smooth", block:"center" });
+        el.style.outline = "2px solid #7c3aed";
+        setTimeout(() => { el.style.outline = "none"; }, 2000);
+        return;
+      }
+    }
+  };
 
   const cm = MODE_MODELS[mode];
   const allKeysSet = keys.claude && keys.chatgpt && keys.gemini;
@@ -213,6 +271,8 @@ export default function App() {
         : "✓ 設定済")
     : null;
 
+  const latestSummary = summaries[summaries.length - 1] ?? null;
+
   return (
     <div style={{ minHeight:"100vh", background:"#09090f", color:"#e2e8f0", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
 
@@ -233,7 +293,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ width:"100%", maxWidth: started ? 1100 : 720 }}>
+      <div style={{ width:"100%", maxWidth: started ? (sidePanel ? 1480 : 1100) : 720 }}>
 
         {/* Mode */}
         <div style={{ display:"flex", gap:8, marginBottom:10 }}>
@@ -366,38 +426,65 @@ export default function App() {
           </div>
         )}
 
-        {/* Discussion */}
-        {discussion.map((round, i) => (
-          <RoundSection key={i} round={round} roundNum={i+1} isLatest={i===discussion.length-1} />
-        ))}
+        {/* Discussion + Side Panel layout */}
+        <div className={sidePanel ? "app-layout" : ""}>
+          <div className={sidePanel ? "app-main" : ""}>
+            {/* Discussion rounds with inline summaries */}
+            {discussion.map((round, i) => (
+              <div key={i}>
+                <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} />
+                {!sidePanel && summaries[i] !== undefined && (
+                  <SummaryPanel
+                    summary={summaries[i]}
+                    roundNum={i+1}
+                    onScrollToMessage={handleScrollToMessage}
+                    sidePanel={false}
+                    onToggleSidePanel={() => setSidePanel(true)}
+                  />
+                )}
+              </div>
+            ))}
 
-        {/* Stop button */}
-        {running && (
-          <div style={{ textAlign:"center", marginTop:8 }}>
-            <button onClick={handleStop} style={{ background:"none", border:"1px solid #ef4444", borderRadius:20, padding:"8px 24px", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-              ⏹ 停止
-            </button>
+            {/* Stop button */}
+            {running && (
+              <div style={{ textAlign:"center", marginTop:8 }}>
+                <button onClick={handleStop} style={{ background:"none", border:"1px solid #ef4444", borderRadius:20, padding:"8px 24px", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                  ⏹ 停止
+                </button>
+              </div>
+            )}
+
+            {/* User intervention + next round */}
+            {showIntervention && !running && discussion.length > 0 && (
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{ background:"#10101a", border:"1px solid #4c1d95", borderRadius:12, overflow:"hidden" }}>
+                  <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
+                    placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
+                    rows={2}
+                    style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"#c4b5fd", fontSize:13, lineHeight:1.6, resize:"none" }} />
+                </div>
+                <div style={{ textAlign:"center" }}>
+                  <button onClick={handleNextRound} style={{ background:"none", border:"1px solid #7c3aed", borderRadius:20, padding:"10px 28px", color:"#a78bfa", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+                    ↻ 次のラウンドへ（Round {discussion.length+1}）
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div ref={bottomRef} />
           </div>
-        )}
 
-        {/* User intervention + next round */}
-        {showIntervention && !running && discussion.length > 0 && (
-          <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={{ background:"#10101a", border:"1px solid #4c1d95", borderRadius:12, overflow:"hidden" }}>
-              <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
-                placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
-                rows={2}
-                style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"#c4b5fd", fontSize:13, lineHeight:1.6, resize:"none" }} />
-            </div>
-            <div style={{ textAlign:"center" }}>
-              <button onClick={handleNextRound} style={{ background:"none", border:"1px solid #7c3aed", borderRadius:20, padding:"10px 28px", color:"#a78bfa", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-                ↻ 次のラウンドへ（Round {discussion.length+1}）
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div ref={bottomRef} />
+          {/* Side panel mode */}
+          {sidePanel && latestSummary !== undefined && (
+            <SummaryPanel
+              summary={latestSummary}
+              roundNum={discussion.length}
+              onScrollToMessage={handleScrollToMessage}
+              sidePanel={true}
+              onToggleSidePanel={() => setSidePanel(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
