@@ -10,7 +10,7 @@ import Collapsible from "./components/Collapsible";
 import SecurityPanel from "./components/SecurityPanel";
 import SummaryPanel from "./components/SummaryPanel";
 import useKeyValidation from "./hooks/useKeyValidation";
-import { downloadMarkdown } from "./export";
+import { downloadMarkdown, downloadHtml } from "./export";
 import { saveDiscussion, loadDiscussion } from "./history";
 import HistoryPanel from "./components/HistoryPanel";
 import summaryPromptText from "./prompts/summary.txt?raw";
@@ -285,6 +285,7 @@ export default function App() {
   };
 
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries); };
 
   const handleLoadHistory = (item) => {
     if (!item?.topic || !Array.isArray(item.discussion)) return;
@@ -529,9 +530,10 @@ export default function App() {
               <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
             </div>
             <div style={{ display:"flex", gap:6 }}>
-              {discussion.length > 0 && (
+              {discussion.length > 0 && (<>
+                <button onClick={handleExportHtml} aria-label="HTMLエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 HTML</button>
                 <button onClick={handleExportMd} aria-label="Markdownエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 MD</button>
-              )}
+              </>)}
               <button onClick={handleReset} style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
             </div>
           </div>
