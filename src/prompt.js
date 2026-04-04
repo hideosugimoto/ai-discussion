@@ -21,7 +21,7 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -42,13 +42,18 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
     ? `\n\n【質問者のプロフィール】\n${safeProfile.trim()}\n上記を踏まえた上で、この人物に合った視点で議論してください。`
     : "";
 
+  const safeConstitution = (constitution || "").slice(0, 2000).trim();
+  const constText = safeConstitution
+    ? `\n\n【議論の憲法（ユーザーの意思決定基準）】\n${safeConstitution}\n上記の価値観に照らして、推奨・非推奨を明示してください。`
+    : "";
+
   const modeKey = discussionMode && MODE_INSTRUCTIONS[discussionMode] ? discussionMode : "standard";
   const instruction = roundNum === 1
     ? MODE_INSTRUCTIONS[modeKey].round1
     : MODE_INSTRUCTIONS[modeKey].roundN;
 
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
-  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}`;
+  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}`;
 
   const histText =
     history.length === 0

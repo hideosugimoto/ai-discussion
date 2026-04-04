@@ -14,6 +14,9 @@ import { downloadMarkdown, downloadHtml } from "./export";
 import { saveDiscussion, loadDiscussion } from "./history";
 import HistoryPanel from "./components/HistoryPanel";
 import PersonaPanel from "./components/PersonaPanel";
+import ActionPlanView from "./components/ActionPlanView";
+import { buildActionPlanPrompt, parseActionPlan } from "./actionPlan";
+import actionPlanPromptText from "./prompts/action-plan.txt?raw";
 import summaryPromptText from "./prompts/summary.txt?raw";
 import detailedPromptText from "./prompts/detailed-analysis.txt?raw";
 
@@ -87,6 +90,9 @@ export default function App() {
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
+  const [constitution, setConstitution] = useState(saved.constitution ?? "");
+  const [actionPlan, setActionPlan] = useState(null);
+  const [actionPlanLoading, setActionPlanLoading] = useState(false);
 
   const [exportPw, setExportPw]   = useState("");
   const [importPw, setImportPw]   = useState("");
@@ -110,21 +116,26 @@ export default function App() {
   const updateKey = (id, val) => {
     const next = { ...keys, [id]:val };
     setKeys(next);
-    if (saveKeys) saveSettings({ keys:next, saveKeys, profile });
+    if (saveKeys) saveSettings({ keys:next, saveKeys, profile, constitution });
   };
 
   const toggleSaveKeys = (val) => {
     setSaveKeys(val);
     if (val) {
-      saveSettings({ keys, saveKeys:true, profile });
+      saveSettings({ keys, saveKeys:true, profile, constitution });
     } else {
-      saveSettings({ keys:{}, saveKeys:false, profile });
+      saveSettings({ keys:{}, saveKeys:false, profile, constitution });
     }
   };
 
   const updateProfile = (val) => {
     setProfile(val);
-    if (saveKeys) saveSettings({ keys, saveKeys, profile:val });
+    if (saveKeys) saveSettings({ keys, saveKeys, profile:val, constitution });
+  };
+
+  const updateConstitution = (val) => {
+    setConstitution(val);
+    if (saveKeys) saveSettings({ keys, saveKeys, profile, constitution:val });
   };
 
   // ── 暗号化エクスポート ──────────────────────────────────────
@@ -220,7 +231,7 @@ export default function App() {
 
     const results = await Promise.all(
       MODELS.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -262,7 +273,7 @@ export default function App() {
       setShowIntervention(true);
       runSummary(results, roundNum);
     }
-  }, [mode, keys, topic, profile, discussionMode, personas, runSummary]);
+  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -285,7 +296,21 @@ export default function App() {
     if (discussion.length > 0 && topic.trim()) {
       saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas).catch(() => {});
     }
-    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setStarted(false); setShowIntervention(false); setSidePanel(false);
+    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false);
+  };
+
+  const handleGenerateActionPlan = async () => {
+    if (!keys.chatgpt || actionPlanLoading) return;
+    setActionPlanLoading(true);
+    try {
+      const userMsg = buildActionPlanPrompt(topic, discussion, summaries);
+      const raw = await callChatGPT(keys.chatgpt, "gpt-4o-mini", actionPlanPromptText, userMsg, () => {});
+      setActionPlan(parseActionPlan(raw));
+    } catch {
+      setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });
+    } finally {
+      setActionPlanLoading(false);
+    }
   };
 
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
@@ -401,6 +426,7 @@ export default function App() {
             { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠" },
             { id:"security", label:"🔒 セキュリティ" },
             { id:"profile",  label:"👤 プロフィール", badge:profile.trim()?"✓":null },
+            { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null },
             { id:"backup",   label:"🔐 バックアップ" },
             { id:"history",  label:"📂 履歴" },
           ].map(({id,label,badge}) => (
@@ -465,6 +491,19 @@ export default function App() {
                 placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
                 style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
               {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
+            </div>
+          </div>
+        )}
+
+        {activePanel === "constitution" && (
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ fontSize:11, color:"var(--text3)" }}>あなたの意思決定の基準・価値観を定義してください。議論中、各AIがこの憲法に基づいて推奨・非推奨を明示します。</div>
+              <textarea value={constitution} onChange={(e) => updateConstitution(e.target.value)} maxLength={2000} aria-label="議論の憲法"
+                placeholder={"例:\n- 最小労働・最大成果を優先する\n- 短期利益より長期の自由度を重視\n- リスクは取るが、破産リスクは絶対に避ける\n- 技術的負債は3ヶ月以内に返済する"}
+                rows={5}
+                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
+              {constitution.trim() && <button onClick={() => updateConstitution("")} aria-label="憲法をクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
             </div>
           </div>
         )}
@@ -591,6 +630,11 @@ export default function App() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* Action Plan */}
+            {!running && discussion.length > 0 && (
+              <ActionPlanView plan={actionPlan} loading={actionPlanLoading} onGenerate={handleGenerateActionPlan} />
             )}
 
             <div ref={bottomRef} />
