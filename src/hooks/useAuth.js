@@ -14,29 +14,54 @@ function parseJWT(token) {
   }
 }
 
+async function fetchPlanFromServer(token, retries = 5) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch("/api/usage", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.plan) return data.plan;
+      }
+    } catch {
+      // retry
+    }
+    // Webhook may not have arrived yet, wait before retry
+    if (i < retries - 1) await new Promise((r) => setTimeout(r, 1500));
+  }
+  return "free";
+}
+
 export default function useAuth() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState("free");
+  const [planLoading, setPlanLoading] = useState(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
     const authCode = url.searchParams.get("auth_code");
     const authError = url.searchParams.get("auth_error");
+    const checkoutResult = url.searchParams.get("checkout");
+
+    // Clean up URL params
+    if (authError || authCode || checkoutResult) {
+      const cleanUrl = new URL(url);
+      cleanUrl.searchParams.delete("auth_error");
+      cleanUrl.searchParams.delete("auth_code");
+      cleanUrl.searchParams.delete("checkout");
+      window.history.replaceState({}, "", cleanUrl.pathname);
+    }
 
     if (authError) {
-      url.searchParams.delete("auth_error");
-      window.history.replaceState({}, "", url.pathname);
       setLoading(false);
       return;
     }
 
     // Exchange one-time code for JWT (code never contains the actual token)
     if (authCode) {
-      url.searchParams.delete("auth_code");
-      window.history.replaceState({}, "", url.pathname);
-
       fetch("/api/auth/exchange", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,6 +90,15 @@ export default function useAuth() {
       if (parsed) {
         setToken(stored);
         setUser(parsed);
+
+        // After Stripe checkout, poll for plan update with retries
+        if (checkoutResult === "success") {
+          setPlanLoading(true);
+          fetchPlanFromServer(stored, 5).then((p) => {
+            setPlan(p);
+            setPlanLoading(false);
+          });
+        }
       } else {
         localStorage.removeItem(TOKEN_KEY);
       }
@@ -78,14 +112,11 @@ export default function useAuth() {
       setPlan("free");
       return;
     }
-    fetch("/api/usage", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.plan) setPlan(data.plan);
-      })
-      .catch(() => {});
+    setPlanLoading(true);
+    fetchPlanFromServer(token, 1).then((p) => {
+      setPlan(p);
+      setPlanLoading(false);
+    });
   }, [token]);
 
   const login = useCallback(() => {
@@ -101,5 +132,5 @@ export default function useAuth() {
 
   const isPremium = plan === "premium";
 
-  return { user, token, loading, isPremium, plan, login, logout };
+  return { user, token, loading, isPremium, plan, planLoading, login, logout };
 }

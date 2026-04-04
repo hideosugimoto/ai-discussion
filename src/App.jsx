@@ -143,8 +143,13 @@ export default function App() {
         )}
       </div>
 
-      {/* Premium badge */}
-      {auth.isPremium && (
+      {/* Premium badge or loading */}
+      {auth.planLoading && auth.user && (
+        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:8, fontSize:12, color:"var(--accent-light)", textAlign:"center" }}>
+          プラン情報を確認中...
+        </div>
+      )}
+      {auth.isPremium && !auth.planLoading && (
         <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", textAlign:"center" }}>
           Premium Plan — APIキー不要・サーバー経由で安全に通信
         </div>
