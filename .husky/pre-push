@@ -2,7 +2,7 @@ echo "🔨 Pre-push: フロントエンドビルドチェック..."
 npx vite build || exit 1
 
 echo "🔨 Pre-push: Functions 構文チェック..."
-npx esbuild functions/**/*.js --bundle --format=esm --outdir=/tmp/ai-discussion-check --platform=neutral 2>&1 || exit 1
-rm -rf /tmp/ai-discussion-check
+find functions -name '*.js' | xargs npx esbuild --bundle --format=esm --outdir=/tmp/ai-discussion-check --platform=neutral 2>&1 || exit 1
+rm -r /tmp/ai-discussion-check 2>/dev/null
 
 echo "✅ ビルドチェック完了"
