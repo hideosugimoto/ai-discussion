@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES, UI_MODES } from "./constants";
+import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
 import { buildPrompt } from "./prompt";
 import { callClaude, callChatGPT, callGemini } from "./api";
 import { encryptSettings, decryptSettings } from "./crypto";
@@ -76,17 +76,11 @@ async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
-  const [uiMode, setUiMode] = useState(() => localStorage.getItem("ai-discussion-ui-mode") || "normal");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("ai-discussion-theme", theme);
   }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-ui-mode", uiMode);
-    localStorage.setItem("ai-discussion-ui-mode", uiMode);
-  }, [uiMode]);
 
   const saved = loadSettings();
   const [keys, setKeys]         = useState({ claude:"", chatgpt:"", gemini:"", ...saved.keys });
@@ -396,89 +390,126 @@ export default function App() {
       )}
 
       {/* Header */}
-      <div className="app-header" style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:720 }}>
-        <div className="header-subtitle" style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
-        <h1 style={{ margin:"0 0 14px", fontSize:"var(--ui-header-font)", fontWeight:700, color:"var(--text)" }}>3 AI Discussion</h1>
-        <div className="header-badges" style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
+      <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:900 }}>
+        <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
+        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"var(--text)" }}>3 AI Discussion</h1>
+        <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap", marginBottom:12 }}>
           {MODELS.map((m) => <ModelBadge key={m.id} model={m} tag={cm[m.id].label} />)}
         </div>
-      </div>
-
-      <div className="app-container" style={{ width:"100%", maxWidth: started ? (sidePanel ? 1480 : 1100) : 720 }}>
-
-        {/* Mode + Theme */}
-        <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
-          <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"var(--ui-radius)", overflow:"hidden" }}>
+        <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
+          <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
             {[{id:"best",label:"🧠 最強"},{id:"fast",label:"⚡ 高速"}].map(({id,label}) => (
               <button key={id} role="radio" aria-checked={mode===id} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"var(--accent)":"transparent", color:mode===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
-          <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:"var(--ui-radius)", overflow:"hidden" }}>
+          <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
             {THEMES.map(({id,label}) => (
               <button key={id} role="radio" aria-checked={theme===id} onClick={() => setTheme(id)} style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:theme===id?"var(--accent)":"transparent", color:theme===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
-          <div role="radiogroup" aria-label="UIモード選択" className="ui-mode-switcher">
-            {UI_MODES.map(({id,label,icon}) => (
-              <button key={id} role="radio" aria-checked={uiMode===id} onClick={() => setUiMode(id)} className="ui-mode-btn">
-                {icon} {label}
+        </div>
+      </div>
+
+      <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
+
+        {/* ── APIキー（未設定時は目立つ） ── */}
+        {!allKeysSet && !started && (
+          <div style={{ marginBottom:12, padding:"10px 14px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:10, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }} onClick={() => togglePanel("keys")}>
+            <span style={{ color:"var(--warning)", fontSize:13, fontWeight:600 }}>⚠ APIキーを設定してください</span>
+            <span style={{ color:"var(--text3)", fontSize:11 }}>— 3つのAIサービスのAPIキーが必要です</span>
+          </div>
+        )}
+
+        {/* ── 議題入力 ── */}
+        {!started && (
+          <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, overflow:"hidden", marginBottom:16 }}>
+            <textarea value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={2000} aria-label="議題"
+              onKeyDown={(e) => { if (e.key==="Enter"&&(e.metaKey||e.ctrlKey)) handleStart(); }}
+              placeholder={"議題を入力...\n例: AIは人間の仕事を奪うか\nCtrl+Enter で開始"} rows={3}
+              style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
+            <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
+              <button onClick={handleStart} disabled={!topic.trim()||running||!allKeysSet}
+                style={{ background:allKeysSet&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 20px", color:allKeysSet&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&allKeysSet)?"pointer":"not-allowed", opacity:(topic.trim()&&allKeysSet)?1:0.35 }}>
+                {!allKeysSet?"キーを設定してください":"▶ 開始"}
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-        <div className="ui-mode-desc">{UI_MODES.find((m) => m.id === uiMode)?.description}</div>
+        )}
 
-        {/* Discussion Mode */}
-        <div className="discussion-mode-section" style={{ marginBottom:10 }}>
-          <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード — AIの議論スタイルを選択</div>
-          <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-            {DISCUSSION_MODES.map(({id,label,description}) => (
-              <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
-                style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:"var(--ui-radius-pill)", cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
-                {label}
+        {/* ── オプション設定 ── */}
+        {!started && (
+          <div style={{ marginBottom:16 }}>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:6 }}>
+              {[
+                { id:"keys",    label:"🔑 APIキー", badge:allKeysSet?"✓":"⚠" },
+                { id:"profile", label:"👤 プロフィール", badge:profile.trim()?"✓":null },
+                { id:"history", label:"📂 履歴" },
+              ].map(({id,label,badge}) => (
+                <button key={id} onClick={() => togglePanel(id)}
+                  style={{ padding:"5px 12px", border:`1px solid ${activePanel===id?"var(--accent-bd)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:activePanel===id?"var(--accent-bg)":"transparent", color:activePanel===id?"var(--text)":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+                  <span>{label}</span>
+                  {badge && <span style={{ fontSize:10, color:badge==="✓"?"var(--success)":"var(--warning)" }}>{badge}</span>}
+                </button>
+              ))}
+              <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`}
+                style={{ padding:"5px 12px", border:`1px solid ${saveKeys?"var(--success)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:saveKeys?"var(--success)":"transparent", color:saveKeys?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+                <span>{saveKeys ? "💾 保存ON" : "💾 保存OFF"}</span>
               </button>
-            ))}
-          </div>
-          <div style={{ fontSize:11, color:"var(--text2)", marginTop:4 }}>
-            {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
-          </div>
-        </div>
+            </div>
+            {saveKeys && (
+              <div style={{ fontSize:11, color:"var(--text3)", marginBottom:6 }}>
+                APIキーとプロフィールをこのブラウザに保存中（localStorage）
+              </div>
+            )}
 
-        {/* Persona */}
-        <div className="persona-section">
-          <PersonaPanel personas={personas} onChange={setPersonas} />
-        </div>
+            {/* ── 高度な設定（折りたたみ） ── */}
+            <details style={{ marginTop:8 }}>
+              <summary style={{ fontSize:11, color:"var(--text3)", cursor:"pointer", userSelect:"none", padding:"4px 0" }}>
+                高度な設定 — 議論モード・ペルソナ・憲法・セキュリティ・バックアップ
+              </summary>
+              <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:10 }}>
+                {/* Discussion Mode */}
+                <div>
+                  <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード</div>
+                  <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                    {DISCUSSION_MODES.map(({id,label,description}) => (
+                      <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
+                        style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:11, color:"var(--text2)", marginTop:4 }}>
+                    {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
+                  </div>
+                </div>
 
-        {/* Settings bar - horizontal buttons */}
-        <div className="settings-bar" style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
-          {[
-            { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠", cls:"" },
-            { id:"security", label:"🔒 セキュリティ", cls:"security-btn" },
-            { id:"profile",  label:"👤 プロフィール", badge:profile.trim()?"✓":null, cls:"" },
-            { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null, cls:"constitution-btn" },
-            { id:"backup",   label:"🔐 バックアップ", cls:"backup-btn" },
-            { id:"history",  label:"📂 履歴", cls:"" },
-          ].map(({id,label,badge,cls}) => (
-            <button key={id} className={cls} onClick={() => togglePanel(id)}
-              style={{ padding:"5px 12px", border:`1px solid ${activePanel===id?"var(--accent-bd)":"var(--border)"}`, borderRadius:"var(--ui-radius)", cursor:"pointer", fontSize:11, fontFamily:"monospace", background:activePanel===id?"var(--accent-bg)":"transparent", color:activePanel===id?"var(--text)":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
-              <span>{label}</span>
-              {badge && <span style={{ fontSize:10, color:badge==="✓"?"var(--success)":"var(--warning)" }}>{badge}</span>}
-            </button>
-          ))}
-          <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`}
-            style={{ marginLeft:"auto", padding:"5px 12px", border:`1px solid ${saveKeys?"var(--success)":"var(--border)"}`, borderRadius:"var(--ui-radius)", cursor:"pointer", fontSize:11, fontFamily:"monospace", background:saveKeys?"var(--success)":"transparent", color:saveKeys?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
-            <span>{saveKeys ? "💾 保存ON" : "💾 保存OFF"}</span>
-          </button>
-        </div>
-        {saveKeys && (
-          <div style={{ fontSize:11, color:"var(--text3)", marginBottom:8 }}>
-            APIキーとプロフィールをこのブラウザに保存中（localStorage）
+                {/* Persona */}
+                <PersonaPanel personas={personas} onChange={setPersonas} />
+
+                {/* Advanced settings buttons */}
+                <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                  {[
+                    { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null },
+                    { id:"security",     label:"🔒 セキュリティ" },
+                    { id:"backup",       label:"🔐 バックアップ" },
+                  ].map(({id,label,badge}) => (
+                    <button key={id} onClick={() => togglePanel(id)}
+                      style={{ padding:"5px 12px", border:`1px solid ${activePanel===id?"var(--accent-bd)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:activePanel===id?"var(--accent-bg)":"transparent", color:activePanel===id?"var(--text)":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+                      <span>{label}</span>
+                      {badge && <span style={{ fontSize:10, color:"var(--success)" }}>{badge}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </details>
           </div>
         )}
 
         {/* Expanded panel content */}
         {activePanel === "keys" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)" }}>
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
               {keyConfigs.map(({id,label,ph,link}) => (
                 <div key={id}>
@@ -513,7 +544,7 @@ export default function App() {
         )}
 
         {activePanel === "profile" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)" }}>
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               <div style={{ fontSize:11, color:"var(--text3)" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
               <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
@@ -525,7 +556,7 @@ export default function App() {
         )}
 
         {activePanel === "constitution" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)" }}>
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               <div style={{ fontSize:11, color:"var(--text3)" }}>あなたの意思決定の基準・価値観を定義してください。議論中、各AIがこの憲法に基づいて推奨・非推奨を明示します。</div>
               <textarea value={constitution} onChange={(e) => updateConstitution(e.target.value)} maxLength={2000} aria-label="議論の憲法"
@@ -538,7 +569,7 @@ export default function App() {
         )}
 
         {activePanel === "backup" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)" }}>
+          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
               <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
                 ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
@@ -580,26 +611,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Topic */}
-        {!started && (
-          <div style={{ background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)", overflow:"hidden", marginTop:4 }}>
-            <textarea value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={2000} aria-label="議題"
-              onKeyDown={(e) => { if (e.key==="Enter"&&(e.metaKey||e.ctrlKey)) handleStart(); }}
-              placeholder={"議題を入力...\n例: AIは人間の仕事を奪うか\nCtrl+Enter で開始"} rows={3}
-              style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
-            <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
-              <button onClick={handleStart} disabled={!topic.trim()||running||!allKeysSet}
-                style={{ background:allKeysSet&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:"var(--ui-radius)", padding:"8px 20px", color:allKeysSet&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&allKeysSet)?"pointer":"not-allowed", opacity:(topic.trim()&&allKeysSet)?1:0.35 }}>
-                {!allKeysSet?"キーを設定してください":"▶ 開始"}
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Topic display */}
         {started && (
-          <div className="topic-display" style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:"var(--ui-radius-lg)", marginBottom:"var(--ui-gap-lg)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div style={{ padding:"10px 14px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10, marginBottom:20, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
               <div style={{ fontSize:10, color:"var(--text3)", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
               <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
@@ -638,7 +652,7 @@ export default function App() {
             {/* Stop button */}
             {running && (
               <div style={{ textAlign:"center", marginTop:8 }}>
-                <button onClick={handleStop} style={{ background:"none", border:"1px solid var(--error)", borderRadius:"var(--ui-radius-pill)", padding:"var(--ui-btn-pad)", color:"var(--error)", cursor:"pointer", fontSize:"var(--ui-btn-font)", fontWeight:600 }}>
+                <button onClick={handleStop} style={{ background:"none", border:"1px solid var(--error)", borderRadius:20, padding:"8px 24px", color:"var(--error)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
                   ⏹ 停止
                 </button>
               </div>
@@ -646,15 +660,15 @@ export default function App() {
 
             {/* User intervention + next round */}
             {showIntervention && !running && discussion.length > 0 && (
-              <div className="controls-bar" style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
-                <div style={{ background:"var(--ui-card-bg)", border:"1px solid var(--accent-bd)", borderRadius:"var(--ui-radius-lg)", overflow:"hidden" }}>
+              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+                <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:10, overflow:"hidden" }}>
                   <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
                     placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
                     rows={2}
                     style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"var(--accent-light)", fontSize:13, lineHeight:1.6, resize:"none" }} />
                 </div>
                 <div style={{ textAlign:"center" }}>
-                  <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:"var(--ui-radius-pill)", padding:"var(--ui-btn-pad)", color:"var(--accent-light)", cursor:"pointer", fontSize:"var(--ui-btn-font)", fontWeight:600 }}>
+                  <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
                     ↻ 次のラウンドへ（Round {discussion.length+1}）
                   </button>
                 </div>

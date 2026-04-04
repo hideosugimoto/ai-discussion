@@ -100,84 +100,6 @@
   --gemini-bd:     #d0c4ec;
 }
 
-/* ── UI Mode: Normal (default) ─────────────────────── */
-:root, [data-ui-mode="normal"] {
-  --ui-gap:          14px;
-  --ui-gap-sm:       8px;
-  --ui-gap-lg:       28px;
-  --ui-pad:          14px;
-  --ui-pad-sm:       8px;
-  --ui-pad-lg:       24px;
-  --ui-radius:       8px;
-  --ui-radius-sm:    6px;
-  --ui-radius-lg:    10px;
-  --ui-radius-pill:  20px;
-  --ui-btn-pad:      6px 14px;
-  --ui-btn-font:     12px;
-  --ui-shadow:       none;
-  --ui-shadow-hover: none;
-  --ui-anim:         none;
-  --ui-anim-dur:     0s;
-  --ui-card-bg:      var(--surface);
-  --ui-card-border:  1px solid var(--border);
-  --ui-transition:   none;
-  --ui-msg-font:     13.5px;
-  --ui-msg-lh:       1.8;
-  --ui-header-font:  22px;
-}
-
-/* ── UI Mode: Simple ──────────────────────────────── */
-[data-ui-mode="simple"] {
-  --ui-gap:          14px;
-  --ui-gap-sm:       8px;
-  --ui-gap-lg:       24px;
-  --ui-pad:          14px;
-  --ui-pad-sm:       8px;
-  --ui-pad-lg:       20px;
-  --ui-radius:       8px;
-  --ui-radius-sm:    6px;
-  --ui-radius-lg:    10px;
-  --ui-radius-pill:  20px;
-  --ui-btn-pad:      6px 14px;
-  --ui-btn-font:     12px;
-  --ui-shadow:       none;
-  --ui-shadow-hover: none;
-  --ui-anim:         none;
-  --ui-anim-dur:     0s;
-  --ui-card-bg:      var(--surface);
-  --ui-card-border:  1px solid var(--border);
-  --ui-transition:   none;
-  --ui-msg-font:     14px;
-  --ui-msg-lh:       1.8;
-  --ui-header-font:  22px;
-}
-
-/* ── UI Mode: Detailed ────────────────────────────── */
-[data-ui-mode="detailed"] {
-  --ui-gap:          8px;
-  --ui-gap-sm:       4px;
-  --ui-gap-lg:       14px;
-  --ui-pad:          10px;
-  --ui-pad-sm:       6px;
-  --ui-pad-lg:       14px;
-  --ui-radius:       6px;
-  --ui-radius-sm:    4px;
-  --ui-radius-lg:    8px;
-  --ui-radius-pill:  14px;
-  --ui-btn-pad:      5px 12px;
-  --ui-btn-font:     12px;
-  --ui-shadow:       none;
-  --ui-shadow-hover: none;
-  --ui-anim:         none;
-  --ui-anim-dur:     0s;
-  --ui-card-bg:      var(--surface);
-  --ui-card-border:  1px solid var(--border);
-  --ui-transition:   none;
-  --ui-msg-font:     12.5px;
-  --ui-msg-lh:       1.6;
-  --ui-header-font:  18px;
-}
-
 /* ── Global styles ──────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Sans', 'Noto Sans JP', -apple-system, sans-serif; transition: background .3s, color .3s; }
@@ -185,11 +107,11 @@ textarea:focus, input:focus { outline: none; }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 
-/* ── Base message layout ──────────────────────────── */
+/* ── Layout ─────────────────────────────────────────── */
 .round-messages {
   display: flex;
   flex-direction: column;
-  gap: var(--ui-gap);
+  gap: 14px;
 }
 @media (min-width: 768px) {
   .round-messages {
@@ -218,82 +140,7 @@ textarea:focus, input:focus { outline: none; }
   overflow-y: auto;
 }
 
-/* ── Simple mode: hide advanced features ─────────── */
-[data-ui-mode="simple"] .persona-section,
-[data-ui-mode="simple"] .discussion-mode-section,
-[data-ui-mode="simple"] .constitution-btn,
-[data-ui-mode="simple"] .backup-btn,
-[data-ui-mode="simple"] .security-btn {
-  display: none !important;
-}
-[data-ui-mode="simple"] .round-messages {
-  flex-direction: column !important;
-  max-width: 720px;
-}
-[data-ui-mode="simple"] .round-messages > * {
-  flex: none !important;
-  min-width: auto !important;
-}
-[data-ui-mode="simple"] .app-container {
-  max-width: 800px !important;
-}
-[data-ui-mode="simple"] .app-header .header-subtitle {
-  display: none;
-}
-[data-ui-mode="simple"] .ui-mode-desc {
-  display: none;
-}
-[data-ui-mode="simple"] .side-panel-toggle {
-  display: none !important;
-}
-
-/* ── Normal mode: default balanced (no overrides) ── */
-
-/* ── Detailed mode: wide, compact, everything shown ─ */
-[data-ui-mode="detailed"] .app-container {
-  max-width: 1400px !important;
-}
-[data-ui-mode="detailed"] .app-header {
-  display: flex !important;
-  align-items: center;
-  gap: 12px;
-  text-align: left !important;
-  margin-bottom: 8px !important;
-}
-[data-ui-mode="detailed"] .app-header h1 {
-  font-size: 18px !important;
-  margin: 0 !important;
-}
-[data-ui-mode="detailed"] .app-header .header-subtitle {
-  display: none;
-}
-[data-ui-mode="detailed"] .round-messages {
-  gap: 6px;
-}
-[data-ui-mode="detailed"] .round-section {
-  margin-bottom: var(--ui-gap) !important;
-}
-[data-ui-mode="detailed"] .msg-bubble {
-  border-left-width: 2px !important;
-}
-[data-ui-mode="detailed"] .settings-bar {
-  gap: 4px;
-}
-[data-ui-mode="detailed"] .ui-mode-desc {
-  display: none;
-}
-[data-ui-mode="detailed"] .controls-bar {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-  padding: 8px 16px;
-  margin: 0 -16px;
-  z-index: 100;
-}
-
+/* ── Animations ─────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -307,42 +154,17 @@ textarea:focus, input:focus { outline: none; }
   50%       { opacity: 0; }
 }
 
-/* ── UI Mode switcher ─────────────────────────────── */
-.ui-mode-switcher {
-  display: flex;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--ui-radius);
-  overflow: hidden;
+/* ── Advanced settings (details/summary) ────────────── */
+details > summary {
+  list-style: none;
 }
-.ui-mode-btn {
-  padding: 6px 14px;
-  border: none;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  background: transparent;
-  color: var(--text2);
-  transition: background 0.2s, color 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+details > summary::-webkit-details-marker {
+  display: none;
 }
-.ui-mode-btn[aria-checked="true"] {
-  background: var(--accent);
-  color: #fff;
+details > summary::before {
+  content: "▸ ";
+  color: var(--text3);
 }
-.ui-mode-btn:hover:not([aria-checked="true"]) {
-  background: var(--accent-bg);
-}
-.ui-mode-desc {
-  font-size: 11px;
-  color: var(--text2);
-  margin-top: 4px;
-}
-
-/* ── Detailed mode: larger touch targets ──────────── */
-[data-ui-mode="detailed"] button {
-  min-height: 34px;
+details[open] > summary::before {
+  content: "▾ ";
 }

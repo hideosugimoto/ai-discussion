@@ -2,7 +2,7 @@ import { MODELS, PERSONA_PRESETS, PERSONA_PACKS } from "../constants";
 
 function PersonaCard({ model, persona, onChange }) {
   return (
-    <div className="persona-card" style={{ flex:1, minWidth:180, padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius)", borderTop:`3px solid ${model.color}` }}>
+    <div className="persona-card" style={{ flex:1, minWidth:180, padding:10, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, borderTop:`3px solid ${model.color}` }}>
       <div style={{ fontSize:12, fontWeight:600, color:model.color, marginBottom:8, display:"flex", alignItems:"center", gap:4 }}>
         <span>{model.icon}</span> {model.name}
       </div>
@@ -16,7 +16,7 @@ function PersonaCard({ model, persona, onChange }) {
       </div>
       <input type="text" value={persona} onChange={(e) => onChange(e.target.value)} maxLength={50}
         placeholder="例: 孫正義の視点で" aria-label={`${model.name}のペルソナ`}
-        style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:"var(--ui-radius-sm)", padding:"var(--ui-pad-sm)", color:"var(--text)", fontSize:12 }} />
+        style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"6px 8px", color:"var(--text)", fontSize:12 }} />
     </div>
   );
 }

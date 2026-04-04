@@ -23,11 +23,6 @@ export const THEMES = [
   { id: "feminine",  label: "🌸 Feminine" },
 ];
 
-export const UI_MODES = [
-  { id: "simple",   label: "シンプル", icon: "○", description: "必要最低限のUIだけ表示" },
-  { id: "normal",   label: "通常",     icon: "◉", description: "全機能をバランスよく表示" },
-  { id: "detailed", label: "詳細",     icon: "◎", description: "情報を最大限に表示" },
-];
 
 export const PERSONA_PRESETS = [
   { id: "ceo",        label: "CEO" },

@@ -22,7 +22,7 @@ export default function SummaryPanel({ summary, roundNum, onScrollToMessage, sid
   };
 
   return (
-    <div className={`${sidePanel ? "summary-side-panel" : ""} summary-card`} style={{ background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)", overflow:"hidden", marginTop:"var(--ui-gap-sm)", marginBottom:"var(--ui-gap-sm)" }}>
+    <div className={`${sidePanel ? "summary-side-panel" : ""} summary-card`} style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, overflow:"hidden", marginTop:8, marginBottom:8 }}>
       <div style={{ display:"flex", borderBottom:"1px solid var(--border)", alignItems:"center", flexWrap:"wrap" }}>
         {TABS.map(({ id, label }) => (
           <button key={id} onClick={() => handleTabClick(id)}
