@@ -23,6 +23,12 @@ export const THEMES = [
   { id: "feminine",  label: "🌸 Feminine" },
 ];
 
+export const UI_MODES = [
+  { id: "structure",  label: "構造優先",  icon: "▦", description: "迷わないUI — 正確性・理解を優先" },
+  { id: "action",     label: "操作最適",  icon: "⚡", description: "最短操作UI — スピードを優先" },
+  { id: "experience", label: "体験重視",  icon: "✧", description: "気持ちよいUI — 満足度を優先" },
+];
+
 export const PERSONA_PRESETS = [
   { id: "ceo",        label: "CEO" },
   { id: "investor",   label: "投資家" },

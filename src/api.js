@@ -48,7 +48,9 @@ export async function callClaude(apiKey, model, sys, user, onChunk, signal) {
       const json = JSON.parse(data);
       const chunk = json?.delta?.text ?? "";
       if (chunk) { full += chunk; onChunk(chunk); }
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") console.warn("Claude SSE parse error:", e.message);
+    }
   }, signal);
   return full;
 }
@@ -96,7 +98,9 @@ export async function callChatGPT(apiKey, model, sys, user, onChunk, signal) {
       const json  = JSON.parse(data);
       const chunk = json?.choices?.[0]?.delta?.content ?? "";
       if (chunk) { full += chunk; onChunk(chunk); }
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") console.warn("ChatGPT SSE parse error:", e.message);
+    }
   }, signal);
   return full;
 }
@@ -141,7 +145,9 @@ export async function callGemini(apiKey, model, sys, user, onChunk, signal) {
       const json  = JSON.parse(data);
       const chunk = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       if (chunk) { full += chunk; onChunk(chunk); }
-    } catch {}
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") console.warn("Gemini SSE parse error:", e.message);
+    }
   }, signal);
   return full;
 }

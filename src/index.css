@@ -100,6 +100,87 @@
   --gemini-bd:     #d0c4ec;
 }
 
+/* ── UI Mode: Structure (default) ──────────────────── */
+:root, [data-ui-mode="structure"] {
+  --ui-gap:          14px;
+  --ui-gap-sm:       8px;
+  --ui-gap-lg:       28px;
+  --ui-pad:          14px;
+  --ui-pad-sm:       8px;
+  --ui-pad-lg:       24px;
+  --ui-radius:       8px;
+  --ui-radius-sm:    6px;
+  --ui-radius-lg:    10px;
+  --ui-radius-pill:  20px;
+  --ui-btn-pad:      6px 14px;
+  --ui-btn-font:     12px;
+  --ui-shadow:       none;
+  --ui-shadow-hover: none;
+  --ui-anim:         none;
+  --ui-anim-dur:     0s;
+  --ui-card-bg:      var(--surface);
+  --ui-card-border:  1px solid var(--border);
+  --ui-transition:   none;
+
+  --ui-msg-font:     13.5px;
+  --ui-msg-lh:       1.8;
+  --ui-header-font:  22px;
+}
+
+/* ── UI Mode: Action ───────────────────────────────── */
+[data-ui-mode="action"] {
+  --ui-gap:          8px;
+  --ui-gap-sm:       4px;
+  --ui-gap-lg:       16px;
+  --ui-pad:          10px;
+  --ui-pad-sm:       6px;
+  --ui-pad-lg:       16px;
+  --ui-radius:       6px;
+  --ui-radius-sm:    4px;
+  --ui-radius-lg:    8px;
+  --ui-radius-pill:  16px;
+  --ui-btn-pad:      8px 18px;
+  --ui-btn-font:     13px;
+  --ui-shadow:       none;
+  --ui-shadow-hover: none;
+  --ui-anim:         none;
+  --ui-anim-dur:     0s;
+  --ui-card-bg:      var(--surface);
+  --ui-card-border:  1px solid var(--border);
+  --ui-transition:   none;
+
+  --ui-msg-font:     13px;
+  --ui-msg-lh:       1.65;
+  --ui-header-font:  20px;
+}
+
+/* ── UI Mode: Experience ───────────────────────────── */
+[data-ui-mode="experience"] {
+  --ui-gap:          18px;
+  --ui-gap-sm:       10px;
+  --ui-gap-lg:       32px;
+  --ui-pad:          18px;
+  --ui-pad-sm:       10px;
+  --ui-pad-lg:       28px;
+  --ui-radius:       14px;
+  --ui-radius-sm:    10px;
+  --ui-radius-lg:    18px;
+  --ui-radius-pill:  24px;
+  --ui-btn-pad:      8px 16px;
+  --ui-btn-font:     12px;
+  --ui-shadow:       0 2px 12px rgba(0,0,0,.08);
+  --ui-shadow-hover: 0 4px 20px rgba(0,0,0,.12);
+  --ui-anim:         fadeIn 0.5s ease;
+  --ui-anim-dur:     0.3s;
+  --ui-card-bg:      var(--surface);
+  --ui-card-border:  1px solid var(--border);
+  --ui-transition:   all 0.3s ease;
+
+  --ui-msg-font:     14px;
+  --ui-msg-lh:       1.9;
+  --ui-header-font:  24px;
+}
+
 /* ── Global styles ──────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Sans', 'Noto Sans JP', -apple-system, sans-serif; transition: background .3s, color .3s; }
@@ -150,4 +231,90 @@ textarea:focus, input:focus { outline: none; }
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
+}
+
+/* ── UI Mode switcher ─────────────────────────────── */
+.ui-mode-switcher {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--ui-radius);
+  overflow: hidden;
+}
+.ui-mode-btn {
+  padding: 6px 14px;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text2);
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ui-mode-btn[aria-checked="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+.ui-mode-btn:hover:not([aria-checked="true"]) {
+  background: var(--accent-bg);
+}
+.ui-mode-desc {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+
+/* ── Action mode: larger touch targets ────────────── */
+[data-ui-mode="action"] button {
+  min-height: 36px;
+}
+[data-ui-mode="action"] .round-messages {
+  gap: 8px;
+}
+[data-ui-mode="action"] .ui-mode-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+/* ── Experience mode: card shadows + animations ───── */
+[data-ui-mode="experience"] .msg-bubble {
+  box-shadow: var(--ui-shadow);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+[data-ui-mode="experience"] .msg-bubble:hover {
+  box-shadow: var(--ui-shadow-hover);
+  transform: translateY(-1px);
+}
+[data-ui-mode="experience"] .round-section {
+  animation: fadeIn 0.5s ease;
+}
+[data-ui-mode="experience"] .summary-card,
+[data-ui-mode="experience"] .action-plan-card {
+  box-shadow: var(--ui-shadow);
+  transition: box-shadow 0.3s ease;
+}
+[data-ui-mode="experience"] .summary-card:hover,
+[data-ui-mode="experience"] .action-plan-card:hover {
+  box-shadow: var(--ui-shadow-hover);
+}
+[data-ui-mode="experience"] .persona-card {
+  box-shadow: var(--ui-shadow);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+[data-ui-mode="experience"] .persona-card:hover {
+  box-shadow: var(--ui-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* ── Structure mode: clean separators ─────────────── */
+[data-ui-mode="structure"] .round-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--ui-gap-lg);
+}
+[data-ui-mode="structure"] .round-section:last-child {
+  border-bottom: none;
 }

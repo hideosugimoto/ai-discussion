@@ -28,7 +28,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
   }
 
   return (
-    <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, overflow:"hidden", marginTop:16 }}>
+    <div className="action-plan-card" style={{ background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)", overflow:"hidden", marginTop:"var(--ui-gap)" }}>
       <button onClick={() => setOpen((o) => !o)} style={{ width:"100%", background:"none", border:"none", padding:"12px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:8, color:"var(--text)", fontSize:13, fontWeight:600 }}>
         <span>{open ? "▾" : "▸"}</span>
         <span>📋 アクションプラン</span>
@@ -38,7 +38,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
         <div style={{ padding:"0 14px 14px" }}>
           {/* Conclusion */}
           {plan.conclusion && (
-            <div style={{ padding:"10px 12px", background:"var(--accent-bg)", borderRadius:8, marginBottom:12, fontSize:13, color:"var(--text)", fontWeight:500 }}>
+            <div style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", background:"var(--accent-bg)", borderRadius:"var(--ui-radius)", marginBottom:12, fontSize:13, color:"var(--text)", fontWeight:500 }}>
               💡 {plan.conclusion}
             </div>
           )}
@@ -50,7 +50,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
               {plan.actions.map((action, i) => {
                 const ps = PRIORITY_STYLES[action.priority] || PRIORITY_STYLES.low;
                 return (
-                  <div key={i} style={{ padding:"8px 10px", marginBottom:4, borderRadius:6, background:"var(--bg)", borderLeft:`3px solid ${ps.color}`, fontSize:13 }}>
+                  <div key={i} style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", marginBottom:4, borderRadius:"var(--ui-radius-sm)", background:"var(--bg)", borderLeft:`3px solid ${ps.color}`, fontSize:13 }}>
                     <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:2 }}>
                       <span style={{ color:ps.color, fontSize:11 }}>{ps.icon} {ps.label}</span>
                       <span style={{ fontSize:10, color:"var(--text3)", background:"var(--surface)", padding:"1px 6px", borderRadius:8 }}>{action.timeframe}</span>
@@ -77,7 +77,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
 
           {/* Next Question */}
           {plan.nextQuestion && (
-            <div style={{ padding:"8px 12px", background:"var(--bg)", borderRadius:8, fontSize:12 }}>
+            <div style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", background:"var(--bg)", borderRadius:"var(--ui-radius)", fontSize:12 }}>
               <span style={{ color:"var(--text3)" }}>💬 次に議論すべきテーマ: </span>
               <span style={{ color:"var(--accent-light)" }}>{plan.nextQuestion}</span>
             </div>

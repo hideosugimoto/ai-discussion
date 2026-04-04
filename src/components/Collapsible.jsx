@@ -1,14 +1,14 @@
 export default function Collapsible({ label, badge, hint, open, onToggle, children }) {
   return (
     <div style={{ marginBottom:10 }}>
-      <button onClick={onToggle} aria-expanded={open} style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"7px 14px", color: badge ? "var(--success)" : "var(--text2)", cursor:"pointer", fontSize:12, fontFamily:"monospace", display:"flex", alignItems:"center", gap:8 }}>
+      <button onClick={onToggle} aria-expanded={open} style={{ background:"none", border:"1px solid var(--border)", borderRadius:"var(--ui-radius)", padding:"7px var(--ui-pad)", color: badge ? "var(--success)" : "var(--text2)", cursor:"pointer", fontSize:12, fontFamily:"monospace", display:"flex", alignItems:"center", gap:"var(--ui-gap-sm)" }}>
         <span>{open?"▾":"▸"}</span>
         <span>{label}</span>
         {badge && <span style={{ color:"var(--success)", fontSize:11 }}>{badge}</span>}
         {hint && <span style={{ color:"var(--error)", fontSize:11 }}>{hint}</span>}
       </button>
       {open && (
-        <div style={{ marginTop:8, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
+        <div style={{ marginTop:"var(--ui-gap-sm)", padding:"var(--ui-pad)", background:"var(--ui-card-bg)", border:"var(--ui-card-border)", borderRadius:"var(--ui-radius-lg)" }}>
           {children}
         </div>
       )}

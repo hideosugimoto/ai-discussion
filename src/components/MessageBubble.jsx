@@ -7,16 +7,16 @@ export default function MessageBubble({ msg, isNew, persona }) {
   const model = MODELS.find((m) => m.id === msg.modelId) ?? FALLBACK_MODEL;
   const isStreaming = msg.loading && msg.text;
   return (
-    <div data-id={`msg-${msg.roundNum ?? 0}-${msg.modelId}`} style={{ display:"flex", flexDirection:"column", gap:6, animation:isNew&&!msg.loading?"fadeIn 0.4s ease":"none" }}>
-      <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+    <div data-id={`msg-${msg.roundNum ?? 0}-${msg.modelId}`} style={{ display:"flex", flexDirection:"column", gap:"var(--ui-gap-sm)", animation:isNew&&!msg.loading?"var(--ui-anim, fadeIn 0.4s ease)":"none" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:"var(--ui-gap-sm)", flexWrap:"wrap" }}>
         <ModelBadge model={model} size="sm" />
         {persona && (
-          <span style={{ fontSize:10, color:"var(--text2)", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:10, padding:"1px 8px" }}>
+          <span style={{ fontSize:10, color:"var(--text2)", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:"var(--ui-radius-pill)", padding:"1px 8px" }}>
             {persona}
           </span>
         )}
       </div>
-      <div style={{ background:model.bg, border:`1px solid ${model.dimColor}`, borderLeft:`3px solid ${model.color}`, borderRadius:"0 10px 10px 10px", padding:"12px 16px", color:"var(--text)", fontSize:13.5, lineHeight:1.8, whiteSpace:"pre-wrap", minHeight:48 }}>
+      <div className="msg-bubble" style={{ background:model.bg, border:`1px solid ${model.dimColor}`, borderLeft:`3px solid ${model.color}`, borderRadius:`0 var(--ui-radius-lg) var(--ui-radius-lg) var(--ui-radius-lg)`, padding:"var(--ui-pad) var(--ui-pad-lg)", color:"var(--text)", fontSize:"var(--ui-msg-font)", lineHeight:"var(--ui-msg-lh)", whiteSpace:"pre-wrap", minHeight:48 }}>
         {msg.error
           ? <span style={{ color:"var(--error)" }}>⚠ {msg.error}</span>
           : msg.text
