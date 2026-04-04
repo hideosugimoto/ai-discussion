@@ -1,0 +1,16 @@
+name = "ai-discussion"
+compatibility_date = "2024-12-01"
+pages_build_output_dir = "dist"
+
+[vars]
+MONTHLY_COST_LIMIT_USD = "1.96"
+PLAN_PRICE_JPY = "980"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ai-discussion-db"
+database_id = ""
+
+[[kv_namespaces]]
+binding = "KV"
+id = ""

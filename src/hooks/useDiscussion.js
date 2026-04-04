@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { MODELS, MODE_MODELS } from "../constants";
 import { buildPrompt } from "../prompt";
 import { callClaude, callChatGPT, callGemini } from "../api";
+import { callProxyClaude, callProxyChatGPT, callProxyGemini } from "../apiProxy";
 import { saveDiscussion } from "../history";
 import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
@@ -58,7 +59,7 @@ async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution, authToken, isPremium }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -151,9 +152,17 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         try {
           let text = "";
           const sig = controller.signal;
-          if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig);
-          if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig);
-          if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig);
+          if (isPremium && authToken) {
+            // Premium: server-side proxy (no API keys needed)
+            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig);
+            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig);
+            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig);
+          } else {
+            // Free: direct API calls (user's own keys)
+            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig);
+            if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig);
+            if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig);
+          }
           return { modelId:model.id, text, error:null, loading:false };
         } catch (e) {
           const msg = controller.signal.aborted ? "停止しました" : e.message;
@@ -178,7 +187,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         .then((id) => { if (!discussionId) setDiscussionId(id); })
         .catch(() => {});
     }
-  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, discussion, summaries, discussionId]);
+  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, discussion, summaries, discussionId, isPremium, authToken]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;

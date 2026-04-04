@@ -92,8 +92,9 @@ npx wrangler pages deploy dist --project-name ai-discussion
 
 ## ライセンス
 
-MIT License with Non-Commercial Clause
+Business Source License 1.1 (BSL 1.1)
 
-- 個人利用・学習・改変・再配布：OK
-- 商用利用（販売・有料サービスへの組み込み・収益化）：事前の書面許可が必要
+- 個人利用・学習・改変・再配布・非商用利用：OK
+- 商用利用（有料サービスへの組み込み・収益化）：商用ライセンスの購入が必要
+- 2030-04-04 以降、MIT License に自動移行
 - 詳細は [LICENSE](./LICENSE) を参照

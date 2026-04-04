@@ -13,6 +13,8 @@ import ActionPlanView from "./components/ActionPlanView";
 import useSettings from "./hooks/useSettings";
 import useCryptoBackup from "./hooks/useCryptoBackup";
 import useDiscussion from "./hooks/useDiscussion";
+import useAuth from "./hooks/useAuth";
+import useUsage from "./hooks/useUsage";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -21,6 +23,9 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("ai-discussion-theme", theme);
   }, [theme]);
+
+  const auth = useAuth();
+  const { usage, fetchUsage } = useUsage(auth.token);
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
@@ -34,7 +39,7 @@ export default function App() {
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
 
-  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution });
+  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution, authToken: auth.token, isPremium: auth.isPremium });
   const { discussion, summaries, detailedAnalyses,
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
@@ -53,7 +58,15 @@ export default function App() {
 
   const { status: keyStatus, validate: validateKey } = useKeyValidation();
 
+  // Premium users don't need API keys
+  const canStart = auth.isPremium || allKeysSet;
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [discussion, bottomRef]);
+
+  // Fetch usage on login and after each round
+  useEffect(() => {
+    if (auth.isPremium) fetchUsage();
+  }, [auth.isPremium, discussion.length, fetchUsage]);
 
   const handleStart = async () => {
     setActivePanel(null);
@@ -112,6 +125,31 @@ export default function App() {
         </div>
       )}
 
+      {/* Auth bar */}
+      <div style={{ width:"100%", maxWidth:900, display:"flex", justifyContent:"flex-end", alignItems:"center", gap:8, marginBottom:8 }}>
+        {auth.user ? (
+          <>
+            {auth.isPremium && usage && (
+              <span style={{ fontSize:11, color:"var(--success)", fontFamily:"monospace" }}>
+                残り {usage.usage_percent != null ? `${Math.round(100 - usage.usage_percent)}%` : "---"}
+              </span>
+            )}
+            <span style={{ fontSize:12, color:"var(--text2)" }}>{auth.user.name}</span>
+            {auth.user.picture && <img src={auth.user.picture} alt="" style={{ width:24, height:24, borderRadius:"50%" }} referrerPolicy="no-referrer" />}
+            <button onClick={auth.logout} style={{ padding:"4px 10px", border:"1px solid var(--border)", borderRadius:6, background:"transparent", color:"var(--text3)", cursor:"pointer", fontSize:11 }}>ログアウト</button>
+          </>
+        ) : (
+          <button onClick={auth.login} style={{ padding:"6px 14px", border:"1px solid var(--accent)", borderRadius:8, background:"var(--accent-bg)", color:"var(--accent-light)", cursor:"pointer", fontSize:12, fontWeight:600 }}>Googleでログイン</button>
+        )}
+      </div>
+
+      {/* Premium badge */}
+      {auth.isPremium && (
+        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", textAlign:"center" }}>
+          Premium Plan — APIキー不要・サーバー経由で安全に通信
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:900 }}>
         <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
@@ -136,10 +174,10 @@ export default function App() {
       <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
 
         {/* ── APIキー（未設定時は目立つ） ── */}
-        {!allKeysSet && !started && (
+        {!canStart && !started && (
           <div style={{ marginBottom:12, padding:"10px 14px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:10, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }} onClick={() => togglePanel("keys")}>
             <span style={{ color:"var(--warning)", fontSize:13, fontWeight:600 }}>⚠ APIキーを設定してください</span>
-            <span style={{ color:"var(--text3)", fontSize:11 }}>— 3つのAIサービスのAPIキーが必要です</span>
+            <span style={{ color:"var(--text3)", fontSize:11 }}>— 3つのAIサービスのAPIキーが必要です（またはログインして有料プランをご利用ください）</span>
           </div>
         )}
 
@@ -152,9 +190,9 @@ export default function App() {
               style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
             <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
-              <button onClick={handleStart} disabled={!topic.trim()||running||!allKeysSet}
-                style={{ background:allKeysSet&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 20px", color:allKeysSet&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&allKeysSet)?"pointer":"not-allowed", opacity:(topic.trim()&&allKeysSet)?1:0.35 }}>
-                {!allKeysSet?"キーを設定してください":"▶ 開始"}
+              <button onClick={handleStart} disabled={!topic.trim()||running||!canStart}
+                style={{ background:canStart&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 20px", color:canStart&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&canStart)?"pointer":"not-allowed", opacity:(topic.trim()&&canStart)?1:0.35 }}>
+                {!canStart?"キーを設定またはログイン":"▶ 開始"}
               </button>
             </div>
           </div>
@@ -320,6 +358,26 @@ export default function App() {
                 <div style={{ fontSize:13, color:crypto.cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{crypto.cryptoMsg}</div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Upgrade to Premium */}
+        {auth.user && !auth.isPremium && activePanel === "keys" && (
+          <div style={{ marginBottom:12, padding:"12px 16px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:"var(--accent-light)" }}>Premium Plan — 月額980円</div>
+              <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>APIキー不要・サーバー経由で安全に通信・使用量ダッシュボード</div>
+            </div>
+            <button onClick={async () => {
+              const res = await fetch("/api/billing/checkout", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+              });
+              const data = await res.json();
+              if (data.url) window.location.href = data.url;
+            }} style={{ padding:"8px 18px", background:"var(--accent)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600, whiteSpace:"nowrap" }}>
+              アップグレード
+            </button>
           </div>
         )}
 
