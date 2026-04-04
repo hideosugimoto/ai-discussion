@@ -25,10 +25,10 @@ describe("UI_MODES constant", () => {
   });
 
   it("mode ids match expected values in order", () => {
-    expect(UI_MODES.map((m) => m.id)).toEqual(["structure", "action", "experience"]);
+    expect(UI_MODES.map((m) => m.id)).toEqual(["simple", "normal", "detailed"]);
   });
 
-  it("default mode is structure", () => {
-    expect(UI_MODES[0].id).toBe("structure");
+  it("default mode is normal (second element)", () => {
+    expect(UI_MODES[1].id).toBe("normal");
   });
 });

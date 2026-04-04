@@ -24,9 +24,9 @@ export const THEMES = [
 ];
 
 export const UI_MODES = [
-  { id: "structure",  label: "きっちり",  icon: "▦", description: "整理されたUI — 情報を正確に読みたい時に" },
-  { id: "action",     label: "サクサク",  icon: "⚡", description: "高密度UI — 最小クリックで素早く操作" },
-  { id: "experience", label: "リッチ",    icon: "✧", description: "演出ありUI — デモやプレゼンに最適" },
+  { id: "simple",   label: "シンプル", icon: "○", description: "必要最低限のUIだけ表示" },
+  { id: "normal",   label: "通常",     icon: "◉", description: "全機能をバランスよく表示" },
+  { id: "detailed", label: "詳細",     icon: "◎", description: "情報を最大限に表示" },
 ];
 
 export const PERSONA_PRESETS = [

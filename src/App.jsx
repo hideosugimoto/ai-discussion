@@ -76,7 +76,7 @@ async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
-  const [uiMode, setUiMode] = useState(() => localStorage.getItem("ai-discussion-ui-mode") || "structure");
+  const [uiMode, setUiMode] = useState(() => localStorage.getItem("ai-discussion-ui-mode") || "normal");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -452,14 +452,14 @@ export default function App() {
         {/* Settings bar - horizontal buttons */}
         <div className="settings-bar" style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
           {[
-            { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠" },
-            { id:"security", label:"🔒 セキュリティ" },
-            { id:"profile",  label:"👤 プロフィール", badge:profile.trim()?"✓":null },
-            { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null },
-            { id:"backup",   label:"🔐 バックアップ" },
-            { id:"history",  label:"📂 履歴" },
-          ].map(({id,label,badge}) => (
-            <button key={id} onClick={() => togglePanel(id)}
+            { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠", cls:"" },
+            { id:"security", label:"🔒 セキュリティ", cls:"security-btn" },
+            { id:"profile",  label:"👤 プロフィール", badge:profile.trim()?"✓":null, cls:"" },
+            { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null, cls:"constitution-btn" },
+            { id:"backup",   label:"🔐 バックアップ", cls:"backup-btn" },
+            { id:"history",  label:"📂 履歴", cls:"" },
+          ].map(({id,label,badge,cls}) => (
+            <button key={id} className={cls} onClick={() => togglePanel(id)}
               style={{ padding:"5px 12px", border:`1px solid ${activePanel===id?"var(--accent-bd)":"var(--border)"}`, borderRadius:"var(--ui-radius)", cursor:"pointer", fontSize:11, fontFamily:"monospace", background:activePanel===id?"var(--accent-bg)":"transparent", color:activePanel===id?"var(--text)":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
               <span>{label}</span>
               {badge && <span style={{ fontSize:10, color:badge==="✓"?"var(--success)":"var(--warning)" }}>{badge}</span>}

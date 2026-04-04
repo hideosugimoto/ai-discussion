@@ -100,8 +100,8 @@
   --gemini-bd:     #d0c4ec;
 }
 
-/* ── UI Mode: Structure (default) ──────────────────── */
-:root, [data-ui-mode="structure"] {
+/* ── UI Mode: Normal (default) ─────────────────────── */
+:root, [data-ui-mode="normal"] {
   --ui-gap:          14px;
   --ui-gap-sm:       8px;
   --ui-gap-lg:       28px;
@@ -121,26 +121,25 @@
   --ui-card-bg:      var(--surface);
   --ui-card-border:  1px solid var(--border);
   --ui-transition:   none;
-
   --ui-msg-font:     13.5px;
   --ui-msg-lh:       1.8;
   --ui-header-font:  22px;
 }
 
-/* ── UI Mode: Action ───────────────────────────────── */
-[data-ui-mode="action"] {
-  --ui-gap:          8px;
-  --ui-gap-sm:       4px;
-  --ui-gap-lg:       16px;
-  --ui-pad:          10px;
-  --ui-pad-sm:       6px;
-  --ui-pad-lg:       16px;
-  --ui-radius:       6px;
-  --ui-radius-sm:    4px;
-  --ui-radius-lg:    8px;
-  --ui-radius-pill:  16px;
-  --ui-btn-pad:      8px 18px;
-  --ui-btn-font:     13px;
+/* ── UI Mode: Simple ──────────────────────────────── */
+[data-ui-mode="simple"] {
+  --ui-gap:          14px;
+  --ui-gap-sm:       8px;
+  --ui-gap-lg:       24px;
+  --ui-pad:          14px;
+  --ui-pad-sm:       8px;
+  --ui-pad-lg:       20px;
+  --ui-radius:       8px;
+  --ui-radius-sm:    6px;
+  --ui-radius-lg:    10px;
+  --ui-radius-pill:  20px;
+  --ui-btn-pad:      6px 14px;
+  --ui-btn-font:     12px;
   --ui-shadow:       none;
   --ui-shadow-hover: none;
   --ui-anim:         none;
@@ -148,37 +147,35 @@
   --ui-card-bg:      var(--surface);
   --ui-card-border:  1px solid var(--border);
   --ui-transition:   none;
-
-  --ui-msg-font:     13px;
-  --ui-msg-lh:       1.65;
-  --ui-header-font:  20px;
+  --ui-msg-font:     14px;
+  --ui-msg-lh:       1.8;
+  --ui-header-font:  22px;
 }
 
-/* ── UI Mode: Experience ───────────────────────────── */
-[data-ui-mode="experience"] {
-  --ui-gap:          18px;
-  --ui-gap-sm:       10px;
-  --ui-gap-lg:       32px;
-  --ui-pad:          18px;
-  --ui-pad-sm:       10px;
-  --ui-pad-lg:       28px;
-  --ui-radius:       14px;
-  --ui-radius-sm:    10px;
-  --ui-radius-lg:    18px;
-  --ui-radius-pill:  24px;
-  --ui-btn-pad:      8px 16px;
+/* ── UI Mode: Detailed ────────────────────────────── */
+[data-ui-mode="detailed"] {
+  --ui-gap:          8px;
+  --ui-gap-sm:       4px;
+  --ui-gap-lg:       14px;
+  --ui-pad:          10px;
+  --ui-pad-sm:       6px;
+  --ui-pad-lg:       14px;
+  --ui-radius:       6px;
+  --ui-radius-sm:    4px;
+  --ui-radius-lg:    8px;
+  --ui-radius-pill:  14px;
+  --ui-btn-pad:      5px 12px;
   --ui-btn-font:     12px;
-  --ui-shadow:       0 2px 12px rgba(0,0,0,.08);
-  --ui-shadow-hover: 0 4px 20px rgba(0,0,0,.12);
-  --ui-anim:         fadeIn 0.5s ease;
-  --ui-anim-dur:     0.3s;
+  --ui-shadow:       none;
+  --ui-shadow-hover: none;
+  --ui-anim:         none;
+  --ui-anim-dur:     0s;
   --ui-card-bg:      var(--surface);
   --ui-card-border:  1px solid var(--border);
-  --ui-transition:   all 0.3s ease;
-
-  --ui-msg-font:     14px;
-  --ui-msg-lh:       1.9;
-  --ui-header-font:  24px;
+  --ui-transition:   none;
+  --ui-msg-font:     12.5px;
+  --ui-msg-lh:       1.6;
+  --ui-header-font:  18px;
 }
 
 /* ── Global styles ──────────────────────────────────── */
@@ -221,81 +218,71 @@ textarea:focus, input:focus { outline: none; }
   overflow-y: auto;
 }
 
-/* ── Structure mode: single column, always stacked ── */
-[data-ui-mode="structure"] .round-messages {
+/* ── Simple mode: hide advanced features ─────────── */
+[data-ui-mode="simple"] .persona-section,
+[data-ui-mode="simple"] .discussion-mode-section,
+[data-ui-mode="simple"] .constitution-btn,
+[data-ui-mode="simple"] .backup-btn,
+[data-ui-mode="simple"] .security-btn {
+  display: none !important;
+}
+[data-ui-mode="simple"] .round-messages {
   flex-direction: column !important;
-  gap: var(--ui-gap);
   max-width: 720px;
 }
-[data-ui-mode="structure"] .round-messages > * {
+[data-ui-mode="simple"] .round-messages > * {
   flex: none !important;
   min-width: auto !important;
 }
-[data-ui-mode="structure"] .app-header {
-  max-width: 720px;
-}
-[data-ui-mode="structure"] .app-container {
+[data-ui-mode="simple"] .app-container {
   max-width: 800px !important;
 }
-[data-ui-mode="structure"] .settings-bar {
-  flex-direction: column;
-  align-items: flex-start;
+[data-ui-mode="simple"] .app-header .header-subtitle {
+  display: none;
 }
-[data-ui-mode="structure"] .settings-bar > button {
-  width: 100%;
-  justify-content: flex-start;
+[data-ui-mode="simple"] .ui-mode-desc {
+  display: none;
 }
-[data-ui-mode="structure"] .round-header {
-  font-size: 13px;
-  letter-spacing: 0.25em;
-  padding-bottom: 8px;
-  border-bottom: 2px solid var(--accent-bd);
-  margin-bottom: var(--ui-gap);
-}
-[data-ui-mode="structure"] .msg-bubble {
-  border-left-width: 4px !important;
-  border-radius: 0 4px 4px 0 !important;
-}
-[data-ui-mode="structure"] .controls-bar {
-  border-top: 1px solid var(--border);
-  padding-top: var(--ui-gap);
-  margin-top: var(--ui-gap);
+[data-ui-mode="simple"] .side-panel-toggle {
+  display: none !important;
 }
 
-/* ── Action mode: 3-col, compact, sticky bottom bar ─ */
-[data-ui-mode="action"] .round-messages {
-  gap: 6px;
+/* ── Normal mode: default balanced (no overrides) ── */
+
+/* ── Detailed mode: wide, compact, everything shown ─ */
+[data-ui-mode="detailed"] .app-container {
+  max-width: 1400px !important;
 }
-[data-ui-mode="action"] .app-container {
-  max-width: 1280px !important;
-}
-[data-ui-mode="action"] .app-header {
+[data-ui-mode="detailed"] .app-header {
   display: flex !important;
   align-items: center;
   gap: 12px;
   text-align: left !important;
   margin-bottom: 8px !important;
 }
-[data-ui-mode="action"] .app-header h1 {
-  font-size: 16px !important;
+[data-ui-mode="detailed"] .app-header h1 {
+  font-size: 18px !important;
   margin: 0 !important;
 }
-[data-ui-mode="action"] .app-header .header-subtitle,
-[data-ui-mode="action"] .app-header .header-badges {
+[data-ui-mode="detailed"] .app-header .header-subtitle {
   display: none;
 }
-[data-ui-mode="action"] .app-header-inline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+[data-ui-mode="detailed"] .round-messages {
+  gap: 6px;
 }
-[data-ui-mode="action"] .persona-section {
+[data-ui-mode="detailed"] .round-section {
+  margin-bottom: var(--ui-gap) !important;
+}
+[data-ui-mode="detailed"] .msg-bubble {
+  border-left-width: 2px !important;
+}
+[data-ui-mode="detailed"] .settings-bar {
+  gap: 4px;
+}
+[data-ui-mode="detailed"] .ui-mode-desc {
   display: none;
 }
-[data-ui-mode="action"] .discussion-mode-section {
-  display: none;
-}
-[data-ui-mode="action"] .controls-bar {
+[data-ui-mode="detailed"] .controls-bar {
   position: sticky;
   bottom: 0;
   left: 0;
@@ -305,68 +292,6 @@ textarea:focus, input:focus { outline: none; }
   padding: 8px 16px;
   margin: 0 -16px;
   z-index: 100;
-}
-[data-ui-mode="action"] .msg-bubble {
-  border-left-width: 2px !important;
-}
-[data-ui-mode="action"] .round-section {
-  margin-bottom: var(--ui-gap) !important;
-}
-[data-ui-mode="action"] .settings-bar {
-  gap: 4px;
-}
-[data-ui-mode="action"] .ui-mode-desc {
-  display: none;
-}
-
-/* ── Experience mode: card grid, stagger animation ── */
-[data-ui-mode="experience"] .round-messages {
-  gap: var(--ui-gap-lg);
-}
-@media (min-width: 768px) {
-  [data-ui-mode="experience"] .round-messages {
-    flex-direction: column !important;
-  }
-  [data-ui-mode="experience"] .round-messages > * {
-    flex: none !important;
-    min-width: auto !important;
-  }
-}
-[data-ui-mode="experience"] .app-container {
-  max-width: 900px !important;
-}
-[data-ui-mode="experience"] .msg-bubble {
-  border-left: none !important;
-  border-radius: var(--ui-radius-lg) !important;
-  padding: var(--ui-pad-lg) !important;
-}
-[data-ui-mode="experience"] .round-messages > *:nth-child(1) { animation-delay: 0s; }
-[data-ui-mode="experience"] .round-messages > *:nth-child(2) { animation-delay: 0.1s; }
-[data-ui-mode="experience"] .round-messages > *:nth-child(3) { animation-delay: 0.2s; }
-[data-ui-mode="experience"] .round-header {
-  text-align: center;
-  font-size: 14px;
-  letter-spacing: 0.3em;
-}
-[data-ui-mode="experience"] .round-header .round-divider {
-  display: none;
-}
-[data-ui-mode="experience"] .controls-bar {
-  text-align: center;
-}
-[data-ui-mode="experience"] .persona-card {
-  border-top-width: 4px !important;
-}
-[data-ui-mode="experience"] .topic-display {
-  text-align: center;
-  border-radius: var(--ui-radius-lg) !important;
-}
-@keyframes staggerFadeIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-[data-ui-mode="experience"] .round-messages > * {
-  animation: staggerFadeIn 0.6s ease both;
 }
 
 @keyframes fadeIn {
@@ -417,50 +342,7 @@ textarea:focus, input:focus { outline: none; }
   margin-top: 4px;
 }
 
-/* ── Action mode: larger touch targets ────────────── */
-[data-ui-mode="action"] button {
-  min-height: 36px;
-}
-[data-ui-mode="action"] .ui-mode-btn {
-  padding: 8px 16px;
-  font-size: 12px;
-}
-
-/* ── Experience mode: card shadows + animations ───── */
-[data-ui-mode="experience"] .msg-bubble {
-  box-shadow: var(--ui-shadow);
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-}
-[data-ui-mode="experience"] .msg-bubble:hover {
-  box-shadow: var(--ui-shadow-hover);
-  transform: translateY(-2px);
-}
-[data-ui-mode="experience"] .round-section {
-  animation: fadeIn 0.5s ease;
-}
-[data-ui-mode="experience"] .summary-card,
-[data-ui-mode="experience"] .action-plan-card {
-  box-shadow: var(--ui-shadow);
-  transition: box-shadow 0.3s ease;
-}
-[data-ui-mode="experience"] .summary-card:hover,
-[data-ui-mode="experience"] .action-plan-card:hover {
-  box-shadow: var(--ui-shadow-hover);
-}
-[data-ui-mode="experience"] .persona-card {
-  box-shadow: var(--ui-shadow);
-  transition: box-shadow 0.3s ease, transform 0.3s ease;
-}
-[data-ui-mode="experience"] .persona-card:hover {
-  box-shadow: var(--ui-shadow-hover);
-  transform: translateY(-2px);
-}
-
-/* ── Structure mode: clean separators ─────────────── */
-[data-ui-mode="structure"] .round-section {
-  border-bottom: 1px solid var(--border);
-  padding-bottom: var(--ui-gap-lg);
-}
-[data-ui-mode="structure"] .round-section:last-child {
-  border-bottom: none;
+/* ── Detailed mode: larger touch targets ──────────── */
+[data-ui-mode="detailed"] button {
+  min-height: 34px;
 }
