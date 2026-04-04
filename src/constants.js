@@ -23,7 +23,6 @@ export const THEMES = [
   { id: "feminine",  label: "🌸 Feminine" },
 ];
 
-
 export const PERSONA_PRESETS = [
   { id: "ceo",        label: "CEO" },
   { id: "investor",   label: "投資家" },

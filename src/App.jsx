@@ -338,7 +338,7 @@ export default function App() {
     setPersonas(item.personas && typeof item.personas === "object" ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" } : { claude:"", chatgpt:"", gemini:"" });
     setStarted(true);
     setShowIntervention(true);
-    setShowHistory(false);
+    setActivePanel(null);
   };
 
   const handleScrollToMessage = (quote) => {
