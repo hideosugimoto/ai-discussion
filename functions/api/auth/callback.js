@@ -38,6 +38,7 @@ async function signJWT(payload, secret) {
 }
 
 export async function onRequestGet(context) {
+  try {
   const { request, env } = context;
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -142,6 +143,14 @@ export async function onRequestGet(context) {
   redirectUrl.searchParams.set("auth_code", exchangeCode);
 
   return Response.redirect(redirectUrl.toString(), 302);
+}
+
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
 
 function redirectWithError(message, origin) {
