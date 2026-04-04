@@ -8,7 +8,7 @@ function sanitize(text) {
     .replace(/\]/g, "\\]");
 }
 
-export function exportToMarkdown(topic, discussion, summaries) {
+export function exportToMarkdown(topic, discussion, summaries, personas) {
   const lines = [];
   lines.push(`# 3 AI Discussion`);
   lines.push(`**議題:** ${sanitize(topic)}`);
@@ -28,7 +28,8 @@ export function exportToMarkdown(topic, discussion, summaries) {
       const model = MODELS.find((m) => m.id === msg.modelId);
       const name = model?.name ?? msg.modelId;
       const icon = model?.icon ?? "?";
-      lines.push(`### ${icon} ${name}`);
+      const persona = personas?.[msg.modelId];
+      lines.push(`### ${icon} ${name}${persona ? `（${sanitize(persona)}）` : ""}`);
       if (msg.error) {
         lines.push(`*エラー: ${sanitize(msg.error)}*`);
       } else {
@@ -74,7 +75,7 @@ function sanitizeHtml(text) {
   return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-export function exportToHtml(topic, discussion, summaries) {
+export function exportToHtml(topic, discussion, summaries, personas) {
   const rounds = discussion.map((round, i) => {
     const intervention = round.userIntervention
       ? `<div style="background:#f0f4ff;border-left:3px solid #7c3aed;padding:8px 14px;margin-bottom:16px;border-radius:0 8px 8px 0;font-size:13px;color:#555">💬 <strong>司会者:</strong> ${sanitizeHtml(round.userIntervention)}</div>`
@@ -88,8 +89,10 @@ export function exportToHtml(topic, discussion, summaries) {
       const content = msg.error
         ? `<span style="color:#b91c1c">⚠ ${sanitizeHtml(msg.error)}</span>`
         : sanitizeHtml(msg.text).replace(/\n/g, "<br>");
+      const persona = personas?.[msg.modelId];
+      const displayName = persona ? `${name}（${sanitizeHtml(persona)}）` : name;
       return `<div style="border-left:3px solid ${color};padding:12px 16px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0">
-        <div style="font-weight:600;color:${color};margin-bottom:6px;font-size:14px">${icon} ${name}</div>
+        <div style="font-weight:600;color:${color};margin-bottom:6px;font-size:14px">${icon} ${displayName}</div>
         <div style="font-size:13px;line-height:1.8;color:#333">${content}</div>
       </div>`;
     }).join("");
@@ -149,8 +152,8 @@ ${rounds}
 </html>`;
 }
 
-export function downloadHtml(topic, discussion, summaries) {
-  const html = exportToHtml(topic, discussion, summaries);
+export function downloadHtml(topic, discussion, summaries, personas) {
+  const html = exportToHtml(topic, discussion, summaries, personas);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_") || "untitled";
@@ -161,8 +164,8 @@ export function downloadHtml(topic, discussion, summaries) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadMarkdown(topic, discussion, summaries) {
-  const md = exportToMarkdown(topic, discussion, summaries);
+export function downloadMarkdown(topic, discussion, summaries, personas) {
+  const md = exportToMarkdown(topic, discussion, summaries, personas);
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_") || "untitled";

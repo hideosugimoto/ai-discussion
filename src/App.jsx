@@ -13,16 +13,18 @@ import useKeyValidation from "./hooks/useKeyValidation";
 import { downloadMarkdown, downloadHtml } from "./export";
 import { saveDiscussion, loadDiscussion } from "./history";
 import HistoryPanel from "./components/HistoryPanel";
+import PersonaPanel from "./components/PersonaPanel";
 import summaryPromptText from "./prompts/summary.txt?raw";
 import detailedPromptText from "./prompts/detailed-analysis.txt?raw";
 
 // ── Summary generation ────────────────────────────────────────
 
-async function generateSummary(apiKey, messages, topic, roundNum) {
+async function generateSummary(apiKey, messages, topic, roundNum, personas) {
   const roundText = messages
     .map((m) => {
       const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-      return `[${name}] ${m.text || "(エラー)"}`;
+      const p = (personas?.[m.modelId] || "").trim();
+      return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
     })
     .join("\n\n");
 
@@ -33,13 +35,14 @@ async function generateSummary(apiKey, messages, topic, roundNum) {
   return JSON.parse(cleaned);
 }
 
-async function generateDetailedAnalysis(apiKey, allRounds, topic) {
+async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
   const allText = allRounds
     .map((round, i) => {
       const msgs = round.messages
         .map((m) => {
           const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-          return `[${name}] ${m.text || "(エラー)"}`;
+          const p = (personas?.[m.modelId] || "").trim();
+          return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
         })
         .join("\n\n");
       return `【Round ${i + 1}】\n${msgs}`;
@@ -83,6 +86,7 @@ export default function App() {
   const [activePanel, setActivePanel] = useState(!saved.keys?.claude ? "keys" : null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
+  const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
 
   const [exportPw, setExportPw]   = useState("");
   const [importPw, setImportPw]   = useState("");
@@ -173,7 +177,7 @@ export default function App() {
     if (!keys.chatgpt) return;
     setSummaries((s) => [...s, null]);
     try {
-      const summary = await generateSummary(keys.chatgpt, roundMessages, topic, roundNum);
+      const summary = await generateSummary(keys.chatgpt, roundMessages, topic, roundNum, personas);
       setSummaries((s) => {
         const next = [...s];
         next[roundNum - 1] = summary;
@@ -186,14 +190,14 @@ export default function App() {
         return next;
       });
     }
-  }, [keys.chatgpt, topic]);
+  }, [keys.chatgpt, topic, personas]);
 
   const runDetailedAnalysis = useCallback(async (roundIdx) => {
     if (!keys.chatgpt || detailedAnalyses[roundIdx]) return;
     setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
     try {
       const roundsUpTo = discussion.slice(0, roundIdx + 1);
-      const analysis = await generateDetailedAnalysis(keys.chatgpt, roundsUpTo, topic);
+      const analysis = await generateDetailedAnalysis(keys.chatgpt, roundsUpTo, topic, personas);
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
     } catch {
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
@@ -216,7 +220,7 @@ export default function App() {
 
     const results = await Promise.all(
       MODELS.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -258,7 +262,7 @@ export default function App() {
       setShowIntervention(true);
       runSummary(results, roundNum);
     }
-  }, [mode, keys, topic, profile, discussionMode, runSummary]);
+  }, [mode, keys, topic, profile, discussionMode, personas, runSummary]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -279,13 +283,13 @@ export default function App() {
   const handleReset = () => {
     abortRef.current?.abort();
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode).catch(() => {});
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas).catch(() => {});
     }
     setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setStarted(false); setShowIntervention(false); setSidePanel(false);
   };
 
-  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries); };
-  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries); };
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
 
   const handleLoadHistory = (item) => {
     if (!item?.topic || !Array.isArray(item.discussion)) return;
@@ -293,6 +297,7 @@ export default function App() {
     setDiscussion(item.discussion);
     setSummaries(Array.isArray(item.summaries) ? item.summaries : []);
     setDiscussionMode(DISCUSSION_MODES.some((m) => m.id === item.discussionMode) ? item.discussionMode : "standard");
+    setPersonas(item.personas && typeof item.personas === "object" ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" } : { claude:"", chatgpt:"", gemini:"" });
     setStarted(true);
     setShowIntervention(true);
     setShowHistory(false);
@@ -386,6 +391,9 @@ export default function App() {
             {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
           </div>
         </div>
+
+        {/* Persona */}
+        <PersonaPanel personas={personas} onChange={setPersonas} />
 
         {/* Settings bar - horizontal buttons */}
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
@@ -544,7 +552,7 @@ export default function App() {
             {/* Discussion rounds with inline summaries */}
             {discussion.map((round, i) => (
               <div key={i}>
-                <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} />
+                <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} />
                 {!sidePanel && summaries[i] !== undefined && (
                   <SummaryPanel
                     summary={summaries[i]}

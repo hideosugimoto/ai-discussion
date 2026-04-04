@@ -21,13 +21,22 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
-  const others    = MODELS.filter((m) => m.id !== modelId).map((m) => m.name).join("と");
   const safeTopic   = topic.slice(0, 2000);
   const safeProfile = profile.slice(0, 5000);
+
+  const myPersona = (personas?.[modelId] || "").slice(0, 100).trim();
+  const othersDesc = MODELS.filter((m) => m.id !== modelId).map((m) => {
+    const p = (personas?.[m.id] || "").trim();
+    return p ? `${m.name}（${p}）` : m.name;
+  }).join("と");
+
+  const personaInstruction = myPersona
+    ? `\n\n【あなたの役割】「${myPersona}」として議論に参加してください。この人物・役割の思考スタイル・価値観・判断基準で一貫して発言してください。`
+    : "";
 
   const prof = safeProfile.trim()
     ? `\n\n【質問者のプロフィール】\n${safeProfile.trim()}\n上記を踏まえた上で、この人物に合った視点で議論してください。`
@@ -38,7 +47,8 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
     ? MODE_INSTRUCTIONS[modeKey].round1
     : MODE_INSTRUCTIONS[modeKey].roundN;
 
-  const sys = `あなたは${modelName}です。${others}と3者でパネルディスカッションを行っています。${instruction}${prof}`;
+  const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
+  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}`;
 
   const histText =
     history.length === 0
@@ -47,7 +57,11 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
         history
           .map((r) =>
             r.messages
-              .map((m) => `[${MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId}] ${m.text || "(エラー)"}`)
+              .map((m) => {
+                const n = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+                const p = (personas?.[m.modelId] || "").trim();
+                return `[${p ? `${n}（${p}）` : n}] ${m.text || "(エラー)"}`;
+              })
               .join("\n")
           )
           .join("\n\n---\n\n");

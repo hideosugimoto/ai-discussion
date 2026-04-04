@@ -52,12 +52,15 @@ function validateDiscussion(data) {
     summaries: Array.isArray(data.summaries) ? data.summaries : [],
     mode: typeof data.mode === "string" ? data.mode : "best",
     discussionMode: typeof data.discussionMode === "string" ? data.discussionMode : "standard",
+    personas: data.personas && typeof data.personas === "object"
+      ? { claude: typeof data.personas.claude === "string" ? data.personas.claude : "", chatgpt: typeof data.personas.chatgpt === "string" ? data.personas.chatgpt : "", gemini: typeof data.personas.gemini === "string" ? data.personas.gemini : "" }
+      : { claude: "", chatgpt: "", gemini: "" },
     createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
     roundCount: validDiscussion.length,
   };
 }
 
-export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode) {
+export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas) {
   const db = await openDB();
   const entry = validateDiscussion({
     id: crypto.randomUUID(),
@@ -66,6 +69,7 @@ export async function saveDiscussion(topic, discussion, summaries, mode, discuss
     summaries,
     mode,
     discussionMode,
+    personas,
     createdAt: new Date().toISOString(),
   });
   if (!entry) throw new Error("Invalid discussion data");

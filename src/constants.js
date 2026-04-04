@@ -23,6 +23,29 @@ export const THEMES = [
   { id: "feminine",  label: "🌸 Feminine" },
 ];
 
+export const PERSONA_PRESETS = [
+  { id: "ceo",        label: "CEO" },
+  { id: "investor",   label: "投資家" },
+  { id: "marketer",   label: "マーケター" },
+  { id: "cfo",        label: "CFO" },
+  { id: "engineer",   label: "シニアエンジニア" },
+  { id: "researcher", label: "AI研究者" },
+  { id: "cto",        label: "スタートアップCTO" },
+  { id: "student",    label: "大学生" },
+  { id: "freelance",  label: "フリーランス" },
+  { id: "critic",     label: "批評家" },
+  { id: "optimist",   label: "楽観主義者" },
+  { id: "cautious",   label: "慎重派" },
+];
+
+export const PERSONA_PACKS = [
+  { id: "executive",  label: "🏢 経営会議",   personas: { claude: "CEO", chatgpt: "CFO", gemini: "マーケティング責任者" } },
+  { id: "investment", label: "💰 投資判断",   personas: { claude: "ベンチャーキャピタリスト", chatgpt: "慎重な個人投資家", gemini: "スタートアップ創業者" } },
+  { id: "product",    label: "🎯 商品企画",   personas: { claude: "プロダクトマネージャー", chatgpt: "UXデザイナー", gemini: "エンドユーザー代表" } },
+  { id: "generation", label: "👥 世代間対話", personas: { claude: "60代経営者", chatgpt: "30代ミドル", gemini: "20代Z世代" } },
+  { id: "global",     label: "🌍 グローバル", personas: { claude: "シリコンバレーのテック企業幹部", chatgpt: "日本の中小企業経営者", gemini: "東南アジアのスタートアップ創業者" } },
+];
+
 export const DISCUSSION_MODES = [
   { id: "standard",  label: "💬 標準",     description: "バランスの取れた議論" },
   { id: "debate",    label: "⚔️ ディベート", description: "対立・反論を重視" },
