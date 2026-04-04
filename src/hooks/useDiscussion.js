@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { MODELS, MODE_MODELS } from "../constants";
 import { buildPrompt } from "../prompt";
 import { callClaude, callChatGPT, callGemini } from "../api";
@@ -69,9 +69,24 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const [sidePanel, setSidePanel] = useState(false);
   const [actionPlan, setActionPlan] = useState(null);
   const [actionPlanLoading, setActionPlanLoading] = useState(false);
+  const [discussionId, setDiscussionId] = useState(null);
 
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
+
+  const autoSave = useCallback(() => {
+    if (discussion.length > 0 && topic.trim()) {
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId)
+        .then((id) => { if (!discussionId) setDiscussionId(id); })
+        .catch(() => {});
+    }
+  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId]);
+
+  useEffect(() => {
+    const handler = () => { autoSave(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [autoSave]);
 
   const runSummary = useCallback(async (roundMessages, roundNum) => {
     if (!keys.chatgpt) return;
@@ -159,8 +174,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     if (!controller.signal.aborted) {
       setShowIntervention(true);
       runSummary(results, roundNum);
+      saveDiscussion(topic, discussion.length > 0 ? [...discussion.slice(0, -1), { messages: results, userIntervention: userIntervention }] : [{ messages: results, userIntervention: userIntervention }], summaries, mode, discussionMode, personas, discussionId)
+        .then((id) => { if (!discussionId) setDiscussionId(id); })
+        .catch(() => {});
     }
-  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary]);
+  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, discussion, summaries, discussionId]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -181,9 +199,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const handleReset = () => {
     abortRef.current?.abort();
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas).catch(() => {});
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId).catch(() => {});
     }
-    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false);
+    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
 
   const handleGenerateActionPlan = async () => {
@@ -209,6 +227,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setPersonas(item.personas && typeof item.personas === "object"
       ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" }
       : { claude:"", chatgpt:"", gemini:"" });
+    setDiscussionId(item.id || null);
     setStarted(true);
     setShowIntervention(true);
   };

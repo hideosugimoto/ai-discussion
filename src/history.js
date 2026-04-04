@@ -60,17 +60,30 @@ function validateDiscussion(data) {
   };
 }
 
-export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas) {
+export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, existingId) {
   const db = await openDB();
+  const id = existingId || crypto.randomUUID();
+
+  let createdAt = new Date().toISOString();
+  if (existingId) {
+    const existing = await new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get(existingId);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    });
+    if (existing?.createdAt) createdAt = existing.createdAt;
+  }
+
   const entry = validateDiscussion({
-    id: crypto.randomUUID(),
+    id,
     topic,
     discussion,
     summaries,
     mode,
     discussionMode,
     personas,
-    createdAt: new Date().toISOString(),
+    createdAt,
   });
   if (!entry) throw new Error("Invalid discussion data");
 
