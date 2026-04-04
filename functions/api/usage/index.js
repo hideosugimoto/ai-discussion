@@ -10,6 +10,12 @@ export async function onRequestGet(context) {
     );
   }
 
+  // Get current plan from DB (not from JWT)
+  const dbUser = await env.DB.prepare("SELECT plan FROM users WHERE id = ?")
+    .bind(user.sub)
+    .first();
+  const currentPlan = dbUser?.plan || "free";
+
   const yearMonth = new Date().toISOString().slice(0, 7);
   const limitUSD = parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96");
 
@@ -40,7 +46,7 @@ export async function onRequestGet(context) {
 
   return new Response(
     JSON.stringify({
-      plan: user.plan,
+      plan: currentPlan,
       yearMonth,
       limit_usd: limitUSD,
       used_usd: Math.round(totalCost * 10000) / 10000,
