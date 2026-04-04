@@ -56,7 +56,7 @@ async function checkRateLimit(request, kv) {
   await kv.put(
     key,
     JSON.stringify({ count: current.count + 1, reset: current.reset }),
-    { expirationTtl: current.reset - now + 10 }
+    { expirationTtl: Math.max(60, current.reset - now + 10) }
   );
   return { allowed: true, remaining: maxRequests - current.count - 1 };
 }
