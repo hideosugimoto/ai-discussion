@@ -382,6 +382,14 @@ export default function App() {
                     rows={2}
                     style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"var(--accent-light)", fontSize:13, lineHeight:1.6, resize:"none" }} />
                 </div>
+                <div style={{ display:"flex", justifyContent:"center", gap:6, flexWrap:"wrap" }}>
+                  {DISCUSSION_MODES.map(({id,label}) => (
+                    <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
+                      style={{ padding:"4px 10px", border:"1px solid var(--border)", borderRadius:16, cursor:"pointer", fontSize:10, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text3)" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div style={{ textAlign:"center" }}>
                   <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
                     ↻ 次のラウンドへ（Round {discussion.length+1}）
