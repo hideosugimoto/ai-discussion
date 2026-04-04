@@ -378,7 +378,7 @@ export default function App() {
               <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
                 <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:10, overflow:"hidden" }}>
                   <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
-                    placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
+                    placeholder={"💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"}
                     rows={2}
                     style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"var(--accent-light)", fontSize:13, lineHeight:1.6, resize:"none" }} />
                 </div>
