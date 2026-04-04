@@ -9,7 +9,14 @@ import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import summaryPromptText from "../prompts/summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
-async function generateSummary(apiKey, messages, topic, roundNum, personas) {
+async function callGPTMini(apiKey, authToken, isPremium, sys, user) {
+  if (isPremium && authToken) {
+    return await callProxyChatGPT(authToken, "gpt-4o-mini", sys, user, () => {});
+  }
+  return await callChatGPT(apiKey, "gpt-4o-mini", sys, user, () => {});
+}
+
+async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas) {
   const roundText = messages
     .map((m) => {
       const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
@@ -20,7 +27,7 @@ async function generateSummary(apiKey, messages, topic, roundNum, personas) {
 
   const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
-  const text = await callChatGPT(apiKey, "gpt-4o-mini", summaryPromptText, userMsg, () => {});
+  const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
@@ -32,7 +39,7 @@ async function generateSummary(apiKey, messages, topic, roundNum, personas) {
   };
 }
 
-async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
+async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds, topic, personas) {
   const allText = allRounds
     .map((round, i) => {
       const msgs = round.messages
@@ -48,7 +55,7 @@ async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
 
   const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
 
-  const text = await callChatGPT(apiKey, "gpt-4o-mini", detailedPromptText, userMsg, () => {});
+  const text = await callGPTMini(apiKey, authToken, isPremium, detailedPromptText, userMsg);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid analysis format");
@@ -90,10 +97,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   }, [autoSave]);
 
   const runSummary = useCallback(async (roundMessages, roundNum) => {
-    if (!keys.chatgpt) return;
+    if (!keys.chatgpt && !isPremium) return;
     setSummaries((s) => [...s, null]);
     try {
-      const summary = await generateSummary(keys.chatgpt, roundMessages, topic, roundNum, personas);
+      const summary = await generateSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas);
       setSummaries((s) => {
         const next = [...s];
         next[roundNum - 1] = summary;
@@ -106,19 +113,19 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         return next;
       });
     }
-  }, [keys.chatgpt, topic, personas]);
+  }, [keys.chatgpt, authToken, isPremium, topic, personas]);
 
   const runDetailedAnalysis = useCallback(async (roundIdx) => {
-    if (!keys.chatgpt || detailedAnalyses[roundIdx]) return;
+    if ((!keys.chatgpt && !isPremium) || detailedAnalyses[roundIdx]) return;
     setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
     try {
       const roundsUpTo = discussion.slice(0, roundIdx + 1);
-      const analysis = await generateDetailedAnalysis(keys.chatgpt, roundsUpTo, topic, personas);
+      const analysis = await generateDetailedAnalysis(keys.chatgpt, authToken, isPremium, roundsUpTo, topic, personas);
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
     } catch {
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
     }
-  }, [keys.chatgpt, topic, discussion, detailedAnalyses]);
+  }, [keys.chatgpt, authToken, isPremium, topic, discussion, detailedAnalyses]);
 
   const runRound = useCallback(async (currentHistory, roundNum, userIntervention) => {
     const controller = new AbortController();
@@ -214,11 +221,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   };
 
   const handleGenerateActionPlan = async () => {
-    if (!keys.chatgpt || actionPlanLoading) return;
+    if ((!keys.chatgpt && !isPremium) || actionPlanLoading) return;
     setActionPlanLoading(true);
     try {
       const userMsg = buildActionPlanPrompt(topic, discussion, summaries);
-      const raw = await callChatGPT(keys.chatgpt, "gpt-4o-mini", actionPlanPromptText, userMsg, () => {});
+      const raw = await callGPTMini(keys.chatgpt, authToken, isPremium, actionPlanPromptText, userMsg);
       setActionPlan(parseActionPlan(raw));
     } catch {
       setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });
