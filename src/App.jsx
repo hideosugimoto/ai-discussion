@@ -150,8 +150,18 @@ export default function App() {
         </div>
       )}
       {auth.isPremium && !auth.planLoading && (
-        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", textAlign:"center" }}>
-          Premium Plan — APIキー不要・サーバー経由で安全に通信
+        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", display:"flex", justifyContent:"center", alignItems:"center", gap:12 }}>
+          <span>Premium Plan — APIキー不要・サーバー経由で安全に通信</span>
+          <button onClick={async () => {
+            const res = await fetch("/api/billing/portal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+            });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+          }} style={{ padding:"2px 8px", border:"1px solid var(--success, #22c55e)", borderRadius:4, background:"transparent", color:"var(--success, #22c55e)", cursor:"pointer", fontSize:11 }}>
+            プラン管理
+          </button>
         </div>
       )}
 
