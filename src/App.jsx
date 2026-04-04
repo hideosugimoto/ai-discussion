@@ -1,78 +1,18 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
-import { buildPrompt } from "./prompt";
-import { callClaude, callChatGPT, callGemini } from "./api";
-import { encryptSettings, decryptSettings } from "./crypto";
-import { loadSettings, saveSettings } from "./storage";
+import { saveSettings } from "./storage";
 import ModelBadge from "./components/ModelBadge";
 import RoundSection from "./components/RoundSection";
-import Collapsible from "./components/Collapsible";
 import SecurityPanel from "./components/SecurityPanel";
 import SummaryPanel from "./components/SummaryPanel";
 import useKeyValidation from "./hooks/useKeyValidation";
 import { downloadMarkdown, downloadHtml } from "./export";
-import { saveDiscussion, loadDiscussion } from "./history";
 import HistoryPanel from "./components/HistoryPanel";
 import PersonaPanel from "./components/PersonaPanel";
 import ActionPlanView from "./components/ActionPlanView";
-import { buildActionPlanPrompt, parseActionPlan } from "./actionPlan";
-import actionPlanPromptText from "./prompts/action-plan.txt?raw";
-import summaryPromptText from "./prompts/summary.txt?raw";
-import detailedPromptText from "./prompts/detailed-analysis.txt?raw";
-
-// ── Summary generation ────────────────────────────────────────
-
-async function generateSummary(apiKey, messages, topic, roundNum, personas) {
-  const roundText = messages
-    .map((m) => {
-      const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-      const p = (personas?.[m.modelId] || "").trim();
-      return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
-    })
-    .join("\n\n");
-
-  const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
-
-  const text = await callChatGPT(apiKey, "gpt-4o-mini", summaryPromptText, userMsg, () => {});
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  const parsed = JSON.parse(cleaned);
-  if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
-  return {
-    agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
-    disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
-    unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
-    positionChanges: Array.isArray(parsed.positionChanges) ? parsed.positionChanges : [],
-  };
-}
-
-async function generateDetailedAnalysis(apiKey, allRounds, topic, personas) {
-  const allText = allRounds
-    .map((round, i) => {
-      const msgs = round.messages
-        .map((m) => {
-          const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-          const p = (personas?.[m.modelId] || "").trim();
-          return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
-        })
-        .join("\n\n");
-      return `【Round ${i + 1}】\n${msgs}`;
-    })
-    .join("\n\n---\n\n");
-
-  const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
-
-  const text = await callChatGPT(apiKey, "gpt-4o-mini", detailedPromptText, userMsg, () => {});
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  const parsed = JSON.parse(cleaned);
-  if (!parsed || typeof parsed !== "object") throw new Error("Invalid analysis format");
-  return {
-    themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-    consensus: Array.isArray(parsed.consensus) ? parsed.consensus : [],
-    unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
-  };
-}
-
-// ── Main App ───────────────────────────────────────────────────
+import useSettings from "./hooks/useSettings";
+import useCryptoBackup from "./hooks/useCryptoBackup";
+import useDiscussion from "./hooks/useDiscussion";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -82,262 +22,50 @@ export default function App() {
     localStorage.setItem("ai-discussion-theme", theme);
   }, [theme]);
 
-  const saved = loadSettings();
-  const [keys, setKeys]         = useState({ claude:"", chatgpt:"", gemini:"", ...saved.keys });
-  const [saveKeys, setSaveKeys] = useState(saved.saveKeys ?? false);
-  const [profile, setProfile]   = useState(saved.profile ?? "");
-  const [profileUpdatedAt]      = useState(saved.profileUpdatedAt ?? null);
+  const settings = useSettings();
+  const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
+          updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
+          allKeysSet } = settings;
+
   const [topic, setTopic]       = useState("");
   const [mode, setMode]         = useState("best");
-  const [discussion, setDiscussion] = useState([]);
-  const [summaries, setSummaries] = useState([]);
-  const [detailedAnalyses, setDetailedAnalyses] = useState([]);
-  const [running, setRunning]   = useState(false);
-  const [started, setStarted]   = useState(false);
-  const [intervention, setIntervention] = useState("");
-  const [showIntervention, setShowIntervention] = useState(false);
-  const [profileNotice, setProfileNotice] = useState(false);
-  const [sidePanel, setSidePanel] = useState(false);
-
-  const [activePanel, setActivePanel] = useState(!saved.keys?.claude ? "keys" : null);
+  const [activePanel, setActivePanel] = useState(!keys.claude ? "keys" : null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
-  const [constitution, setConstitution] = useState(saved.constitution ?? "");
-  const [actionPlan, setActionPlan] = useState(null);
-  const [actionPlanLoading, setActionPlanLoading] = useState(false);
 
-  const [exportPw, setExportPw]   = useState("");
-  const [importPw, setImportPw]   = useState("");
-  const [importText, setImportText] = useState("");
-  const [exportText, setExportText] = useState("");
-  const [cryptoMsg, setCryptoMsg] = useState("");
+  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution });
+  const { discussion, summaries, detailedAnalyses,
+          running, started, intervention, setIntervention, showIntervention,
+          sidePanel, setSidePanel,
+          actionPlan, actionPlanLoading,
+          bottomRef,
+          handleStart: startDiscussion, handleNextRound, handleStop, handleReset: resetDiscussion,
+          handleGenerateActionPlan, runDetailedAnalysis, loadFromHistory } = disc;
 
-  const abortRef = useRef(null);
-  const bottomRef = useRef(null);
+  const crypto = useCryptoBackup({
+    keys, profile, saveKeys,
+    setKeys: (fn) => { const next = fn(keys); for (const id of ["claude","chatgpt","gemini"]) updateKey(id, next[id]); },
+    setProfile: (val) => updateProfile(val),
+    persistSettings: (data) => saveSettings(data),
+    onDone: () => setActivePanel(null),
+  });
+
   const { status: keyStatus, validate: validateKey } = useKeyValidation();
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [discussion]);
-
-  useEffect(() => {
-    if (profile.trim() && profileUpdatedAt && !sessionStorage.getItem("profile-notice-dismissed")) {
-      const days = Math.floor((Date.now() - new Date(profileUpdatedAt)) / (1000 * 60 * 60 * 24));
-      if (days >= 30) setProfileNotice(days);
-    }
-  }, [profile, profileUpdatedAt]);
-
-  const updateKey = (id, val) => {
-    const next = { ...keys, [id]:val };
-    setKeys(next);
-    if (saveKeys) saveSettings({ keys:next, saveKeys, profile, constitution });
-  };
-
-  const toggleSaveKeys = (val) => {
-    setSaveKeys(val);
-    if (val) {
-      saveSettings({ keys, saveKeys:true, profile, constitution });
-    } else {
-      saveSettings({ keys:{}, saveKeys:false, profile, constitution });
-    }
-  };
-
-  const updateProfile = (val) => {
-    setProfile(val);
-    if (saveKeys) saveSettings({ keys, saveKeys, profile:val, constitution });
-  };
-
-  const updateConstitution = (val) => {
-    setConstitution(val);
-    if (saveKeys) saveSettings({ keys, saveKeys, profile, constitution:val });
-  };
-
-  // ── 暗号化エクスポート ──────────────────────────────────────
-
-  const handleExport = async () => {
-    if (!exportPw) { setCryptoMsg("❌ パスワードを入力してください"); setTimeout(() => setCryptoMsg(""), 2000); return; }
-    try {
-      const data = JSON.stringify({ keys, profile });
-      const enc  = await encryptSettings(data, exportPw);
-      setExportText(enc);
-      await navigator.clipboard.writeText(enc).catch(() => {});
-      setExportPw("");
-      setCryptoMsg("✓ コピーしました（メモアプリに保存してください）");
-      setTimeout(() => setCryptoMsg(""), 4000);
-    } catch (e) {
-      setCryptoMsg(`❌ 暗号化失敗: ${e.message}`);
-      setTimeout(() => setCryptoMsg(""), 3000);
-    }
-  };
-
-  const handleImport = async () => {
-    if (!importPw || !importText.trim()) { setCryptoMsg("❌ パスワードとテキストを入力してください"); setTimeout(() => setCryptoMsg(""), 2000); return; }
-    try {
-      const raw    = await decryptSettings(importText.trim(), importPw);
-      const result = JSON.parse(raw);
-      if (typeof result !== "object" || result === null) throw new Error("Invalid data");
-      const validKeys = {};
-      if (result.keys && typeof result.keys === "object") {
-        for (const id of ["claude", "chatgpt", "gemini"]) {
-          validKeys[id] = typeof result.keys[id] === "string" ? result.keys[id] : "";
-        }
-      }
-      const validProfile = typeof result.profile === "string" ? result.profile.slice(0, 10000) : "";
-      setKeys((prev) => ({ ...prev, ...validKeys }));
-      if (validProfile) setProfile(validProfile);
-      if (saveKeys) saveSettings({ keys:{ ...keys, ...validKeys }, saveKeys, profile:validProfile||profile });
-      setCryptoMsg("✓ 復元完了！");
-      setImportText("");
-      setImportPw("");
-      setTimeout(() => { setCryptoMsg(""); setActivePanel(null); }, 1500);
-    } catch {
-      setCryptoMsg("❌ 復元失敗（パスワードが違うか、テキストが壊れています）");
-      setTimeout(() => setCryptoMsg(""), 3000);
-    }
-  };
-
-  // ── サマリー生成 ────────────────────────────────────────────
-
-  const runSummary = useCallback(async (roundMessages, roundNum) => {
-    if (!keys.chatgpt) return;
-    setSummaries((s) => [...s, null]);
-    try {
-      const summary = await generateSummary(keys.chatgpt, roundMessages, topic, roundNum, personas);
-      setSummaries((s) => {
-        const next = [...s];
-        next[roundNum - 1] = summary;
-        return next;
-      });
-    } catch {
-      setSummaries((s) => {
-        const next = [...s];
-        next[roundNum - 1] = { agreements:[], disagreements:[], unresolved:[], positionChanges:[], error:true };
-        return next;
-      });
-    }
-  }, [keys.chatgpt, topic, personas]);
-
-  const runDetailedAnalysis = useCallback(async (roundIdx) => {
-    if (!keys.chatgpt || detailedAnalyses[roundIdx]) return;
-    setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
-    try {
-      const roundsUpTo = discussion.slice(0, roundIdx + 1);
-      const analysis = await generateDetailedAnalysis(keys.chatgpt, roundsUpTo, topic, personas);
-      setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
-    } catch {
-      setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
-    }
-  }, [keys.chatgpt, topic, discussion, detailedAnalyses]);
-
-  // ── ラウンド実行 ────────────────────────────────────────────
-
-  const runRound = useCallback(async (currentHistory, roundNum, userIntervention) => {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setRunning(true);
-    setShowIntervention(false);
-    setIntervention("");
-
-    const initMessages = MODELS.map((m) => ({ modelId:m.id, text:"", error:null, loading:true }));
-    setDiscussion((d) => [...d, { messages:initMessages, userIntervention }]);
-
-    const models = MODE_MODELS[mode];
-
-    const results = await Promise.all(
-      MODELS.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution);
-        const tag = models[model.id].tag;
-
-        const onChunk = (chunk) => {
-          setDiscussion((d) => {
-            const u = [...d];
-            const last = { ...u[u.length - 1] };
-            last.messages = last.messages.map((m) =>
-              m.modelId === model.id ? { ...m, text:(m.text||"") + chunk } : m
-            );
-            u[u.length - 1] = last;
-            return u;
-          });
-        };
-
-        try {
-          let text = "";
-          const sig = controller.signal;
-          if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig);
-          if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig);
-          if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig);
-          return { modelId:model.id, text, error:null, loading:false };
-        } catch (e) {
-          const msg = controller.signal.aborted ? "停止しました" : e.message;
-          return { modelId:model.id, text:"", error:msg, loading:false };
-        }
-      })
-    );
-
-    setDiscussion((d) => {
-      const u = [...d];
-      u[u.length - 1] = { ...u[u.length - 1], messages:results };
-      return u;
-    });
-
-    setRunning(false);
-    abortRef.current = null;
-
-    if (!controller.signal.aborted) {
-      setShowIntervention(true);
-      runSummary(results, roundNum);
-    }
-  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [discussion, bottomRef]);
 
   const handleStart = async () => {
-    if (!topic.trim() || running) return;
-    setDiscussion([]);
-    setSummaries([]);
-    setDetailedAnalyses([]);
-    setStarted(true);
     setActivePanel(null);
-    await runRound([], 1, "");
+    await startDiscussion();
   };
 
-  const handleNextRound = async () => {
-    if (running) return;
-    await runRound(discussion, discussion.length + 1, intervention);
-  };
-
-  const handleStop = () => { abortRef.current?.abort(); };
   const handleReset = () => {
-    abortRef.current?.abort();
-    if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas).catch(() => {});
-    }
-    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false);
+    resetDiscussion();
   };
-
-  const handleGenerateActionPlan = async () => {
-    if (!keys.chatgpt || actionPlanLoading) return;
-    setActionPlanLoading(true);
-    try {
-      const userMsg = buildActionPlanPrompt(topic, discussion, summaries);
-      const raw = await callChatGPT(keys.chatgpt, "gpt-4o-mini", actionPlanPromptText, userMsg, () => {});
-      setActionPlan(parseActionPlan(raw));
-    } catch {
-      setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });
-    } finally {
-      setActionPlanLoading(false);
-    }
-  };
-
-  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
-  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
 
   const handleLoadHistory = (item) => {
-    if (!item?.topic || !Array.isArray(item.discussion)) return;
-    setTopic(item.topic.slice(0, 2000));
-    setDiscussion(item.discussion);
-    setSummaries(Array.isArray(item.summaries) ? item.summaries : []);
-    setDiscussionMode(DISCUSSION_MODES.some((m) => m.id === item.discussionMode) ? item.discussionMode : "standard");
-    setPersonas(item.personas && typeof item.personas === "object" ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" } : { claude:"", chatgpt:"", gemini:"" });
-    setStarted(true);
-    setShowIntervention(true);
+    loadFromHistory(item, setTopic, setDiscussionMode, setPersonas);
     setActivePanel(null);
   };
 
@@ -353,8 +81,11 @@ export default function App() {
     }
   };
 
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
+
   const cm = MODE_MODELS[mode];
-  const allKeysSet = keys.claude && keys.chatgpt && keys.gemini;
+  const latestSummary = summaries[summaries.length - 1] ?? null;
 
   const keyConfigs = [
     { id:"claude",  label:"Anthropic API Key (Claude)", ph:"sk-ant-...",  link:"https://console.anthropic.com" },
@@ -370,22 +101,14 @@ export default function App() {
     return "var(--error)";
   };
 
-  const profileBadge = profile.trim()
-    ? (profileUpdatedAt
-        ? (() => { const d = Math.floor((Date.now() - new Date(profileUpdatedAt)) / (1000*60*60*24)); return d >= 30 ? `⚠️ 設定済（${d}日前に更新）` : `✓ 設定済（${d}日前に更新）`; })()
-        : "✓ 設定済")
-    : null;
-
-  const latestSummary = summaries[summaries.length - 1] ?? null;
-
   return (
-    <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:`var(--ui-pad-lg) 16px 80px` }}>
+    <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
 
       {/* Profile update notice */}
       {profileNotice && (
         <div style={{ width:"100%", maxWidth:720, marginBottom:12, padding:"10px 16px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12 }}>
           <span style={{ color:"var(--warning)", fontSize:13 }}>📅 プロフィールが{profileNotice}日間更新されていません。Claude.aiやChatGPTで最新情報を取得して更新することをおすすめします。</span>
-          <button onClick={() => { setProfileNotice(false); sessionStorage.setItem("profile-notice-dismissed","1"); }} aria-label="通知を閉じる" style={{ background:"none", border:"none", color:"var(--warning)", cursor:"pointer", fontSize:16, padding:"0 4px", flexShrink:0 }}>✕</button>
+          <button onClick={dismissProfileNotice} aria-label="通知を閉じる" style={{ background:"none", border:"none", color:"var(--warning)", cursor:"pointer", fontSize:16, padding:"0 4px", flexShrink:0 }}>✕</button>
         </div>
       )}
 
@@ -469,11 +192,10 @@ export default function App() {
                 高度な設定 — 議論モード・ペルソナ・憲法・セキュリティ・バックアップ
               </summary>
               <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:10 }}>
-                {/* Discussion Mode */}
                 <div>
                   <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード</div>
                   <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                    {DISCUSSION_MODES.map(({id,label,description}) => (
+                    {DISCUSSION_MODES.map(({id,label}) => (
                       <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
                         style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
                         {label}
@@ -484,11 +206,7 @@ export default function App() {
                     {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
                   </div>
                 </div>
-
-                {/* Persona */}
                 <PersonaPanel personas={personas} onChange={setPersonas} />
-
-                {/* Advanced settings buttons */}
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
                   {[
                     { id:"constitution", label:"📜 憲法", badge:constitution.trim()?"✓":null },
@@ -577,29 +295,29 @@ export default function App() {
               </div>
               <div>
                 <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>① バックアップの作成</div>
-                <input type="password" value={exportPw} onChange={(e) => setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
+                <input type="password" value={crypto.exportPw} onChange={(e) => crypto.setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
                   style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-                <button onClick={handleExport} disabled={!exportPw} style={{ width:"100%", background:exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:exportPw?"pointer":"not-allowed", fontWeight:600, opacity:exportPw?1:0.5 }}>
+                <button onClick={crypto.handleExport} disabled={!crypto.exportPw} style={{ width:"100%", background:crypto.exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:crypto.exportPw?"pointer":"not-allowed", fontWeight:600, opacity:crypto.exportPw?1:0.5 }}>
                   🔐 暗号化してコピー
                 </button>
-                {exportText && (
-                  <textarea readOnly value={exportText} rows={3} aria-label="暗号化されたバックアップ"
+                {crypto.exportText && (
+                  <textarea readOnly value={crypto.exportText} rows={3} aria-label="暗号化されたバックアップ"
                     style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text2)", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
                 )}
               </div>
               <div style={{ height:1, background:"var(--border)" }} />
               <div>
                 <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>② バックアップから復元</div>
-                <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
+                <textarea value={crypto.importText} onChange={(e) => crypto.setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
                   style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
-                <input type="password" value={importPw} onChange={(e) => setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
+                <input type="password" value={crypto.importPw} onChange={(e) => crypto.setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
                   style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-                <button onClick={handleImport} disabled={!importText.trim()||!importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(importText.trim()&&importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(importText.trim()&&importPw)?1:0.4 }}>
+                <button onClick={crypto.handleImport} disabled={!crypto.importText.trim()||!crypto.importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(crypto.importText.trim()&&crypto.importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(crypto.importText.trim()&&crypto.importPw)?1:0.4 }}>
                   復元する
                 </button>
               </div>
-              {cryptoMsg && (
-                <div style={{ fontSize:13, color:cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{cryptoMsg}</div>
+              {crypto.cryptoMsg && (
+                <div style={{ fontSize:13, color:crypto.cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{crypto.cryptoMsg}</div>
               )}
             </div>
           </div>
@@ -631,7 +349,6 @@ export default function App() {
         {/* Discussion + Side Panel layout */}
         <div className={sidePanel ? "app-layout" : ""}>
           <div className={sidePanel ? "app-main" : ""}>
-            {/* Discussion rounds with inline summaries */}
             {discussion.map((round, i) => (
               <div key={i}>
                 <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} />
@@ -649,7 +366,6 @@ export default function App() {
               </div>
             ))}
 
-            {/* Stop button */}
             {running && (
               <div style={{ textAlign:"center", marginTop:8 }}>
                 <button onClick={handleStop} style={{ background:"none", border:"1px solid var(--error)", borderRadius:20, padding:"8px 24px", color:"var(--error)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
@@ -658,7 +374,6 @@ export default function App() {
               </div>
             )}
 
-            {/* User intervention + next round */}
             {showIntervention && !running && discussion.length > 0 && (
               <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
                 <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:10, overflow:"hidden" }}>
@@ -675,7 +390,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Action Plan */}
             {!running && discussion.length > 0 && (
               <ActionPlanView plan={actionPlan} loading={actionPlanLoading} onGenerate={handleGenerateActionPlan} />
             )}
@@ -683,7 +397,6 @@ export default function App() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Side panel mode */}
           {sidePanel && latestSummary !== undefined && (
             <SummaryPanel
               summary={latestSummary}
