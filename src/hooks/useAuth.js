@@ -38,7 +38,7 @@ export default function useAuth() {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState("free");
-  const [planLoading, setPlanLoading] = useState(false);
+  const [planLoading, setPlanLoading] = useState(() => !!localStorage.getItem(TOKEN_KEY));
 
   useEffect(() => {
     const url = new URL(window.location.href);
