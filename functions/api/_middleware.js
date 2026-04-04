@@ -107,6 +107,7 @@ const PUBLIC_PATHS = [
 ];
 
 export async function onRequest(context) {
+  try {
   const { request, env } = context;
   const url = new URL(request.url);
 
@@ -202,4 +203,10 @@ export async function onRequest(context) {
   }
 
   return response;
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
