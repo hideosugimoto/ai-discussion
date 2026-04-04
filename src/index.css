@@ -188,10 +188,11 @@ textarea:focus, input:focus { outline: none; }
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 
+/* ── Base message layout ──────────────────────────── */
 .round-messages {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--ui-gap);
 }
 @media (min-width: 768px) {
   .round-messages {
@@ -218,6 +219,154 @@ textarea:focus, input:focus { outline: none; }
   flex-shrink: 0;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+}
+
+/* ── Structure mode: single column, always stacked ── */
+[data-ui-mode="structure"] .round-messages {
+  flex-direction: column !important;
+  gap: var(--ui-gap);
+  max-width: 720px;
+}
+[data-ui-mode="structure"] .round-messages > * {
+  flex: none !important;
+  min-width: auto !important;
+}
+[data-ui-mode="structure"] .app-header {
+  max-width: 720px;
+}
+[data-ui-mode="structure"] .app-container {
+  max-width: 800px !important;
+}
+[data-ui-mode="structure"] .settings-bar {
+  flex-direction: column;
+  align-items: flex-start;
+}
+[data-ui-mode="structure"] .settings-bar > button {
+  width: 100%;
+  justify-content: flex-start;
+}
+[data-ui-mode="structure"] .round-header {
+  font-size: 13px;
+  letter-spacing: 0.25em;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent-bd);
+  margin-bottom: var(--ui-gap);
+}
+[data-ui-mode="structure"] .msg-bubble {
+  border-left-width: 4px !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+[data-ui-mode="structure"] .controls-bar {
+  border-top: 1px solid var(--border);
+  padding-top: var(--ui-gap);
+  margin-top: var(--ui-gap);
+}
+
+/* ── Action mode: 3-col, compact, sticky bottom bar ─ */
+[data-ui-mode="action"] .round-messages {
+  gap: 6px;
+}
+[data-ui-mode="action"] .app-container {
+  max-width: 1280px !important;
+}
+[data-ui-mode="action"] .app-header {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  text-align: left !important;
+  margin-bottom: 8px !important;
+}
+[data-ui-mode="action"] .app-header h1 {
+  font-size: 16px !important;
+  margin: 0 !important;
+}
+[data-ui-mode="action"] .app-header .header-subtitle,
+[data-ui-mode="action"] .app-header .header-badges {
+  display: none;
+}
+[data-ui-mode="action"] .app-header-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-ui-mode="action"] .persona-section {
+  display: none;
+}
+[data-ui-mode="action"] .discussion-mode-section {
+  display: none;
+}
+[data-ui-mode="action"] .controls-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 8px 16px;
+  margin: 0 -16px;
+  z-index: 100;
+}
+[data-ui-mode="action"] .msg-bubble {
+  border-left-width: 2px !important;
+}
+[data-ui-mode="action"] .round-section {
+  margin-bottom: var(--ui-gap) !important;
+}
+[data-ui-mode="action"] .settings-bar {
+  gap: 4px;
+}
+[data-ui-mode="action"] .ui-mode-desc {
+  display: none;
+}
+
+/* ── Experience mode: card grid, stagger animation ── */
+[data-ui-mode="experience"] .round-messages {
+  gap: var(--ui-gap-lg);
+}
+@media (min-width: 768px) {
+  [data-ui-mode="experience"] .round-messages {
+    flex-direction: column !important;
+  }
+  [data-ui-mode="experience"] .round-messages > * {
+    flex: none !important;
+    min-width: auto !important;
+  }
+}
+[data-ui-mode="experience"] .app-container {
+  max-width: 900px !important;
+}
+[data-ui-mode="experience"] .msg-bubble {
+  border-left: none !important;
+  border-radius: var(--ui-radius-lg) !important;
+  padding: var(--ui-pad-lg) !important;
+}
+[data-ui-mode="experience"] .round-messages > *:nth-child(1) { animation-delay: 0s; }
+[data-ui-mode="experience"] .round-messages > *:nth-child(2) { animation-delay: 0.1s; }
+[data-ui-mode="experience"] .round-messages > *:nth-child(3) { animation-delay: 0.2s; }
+[data-ui-mode="experience"] .round-header {
+  text-align: center;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+}
+[data-ui-mode="experience"] .round-header .round-divider {
+  display: none;
+}
+[data-ui-mode="experience"] .controls-bar {
+  text-align: center;
+}
+[data-ui-mode="experience"] .persona-card {
+  border-top-width: 4px !important;
+}
+[data-ui-mode="experience"] .topic-display {
+  text-align: center;
+  border-radius: var(--ui-radius-lg) !important;
+}
+@keyframes staggerFadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+[data-ui-mode="experience"] .round-messages > * {
+  animation: staggerFadeIn 0.6s ease both;
 }
 
 @keyframes fadeIn {
@@ -272,9 +421,6 @@ textarea:focus, input:focus { outline: none; }
 [data-ui-mode="action"] button {
   min-height: 36px;
 }
-[data-ui-mode="action"] .round-messages {
-  gap: 8px;
-}
 [data-ui-mode="action"] .ui-mode-btn {
   padding: 8px 16px;
   font-size: 12px;
@@ -287,7 +433,7 @@ textarea:focus, input:focus { outline: none; }
 }
 [data-ui-mode="experience"] .msg-bubble:hover {
   box-shadow: var(--ui-shadow-hover);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 [data-ui-mode="experience"] .round-section {
   animation: fadeIn 0.5s ease;

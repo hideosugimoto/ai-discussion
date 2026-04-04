@@ -396,15 +396,15 @@ export default function App() {
       )}
 
       {/* Header */}
-      <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:720 }}>
-        <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
+      <div className="app-header" style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:720 }}>
+        <div className="header-subtitle" style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
         <h1 style={{ margin:"0 0 14px", fontSize:"var(--ui-header-font)", fontWeight:700, color:"var(--text)" }}>3 AI Discussion</h1>
-        <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
+        <div className="header-badges" style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
           {MODELS.map((m) => <ModelBadge key={m.id} model={m} tag={cm[m.id].label} />)}
         </div>
       </div>
 
-      <div style={{ width:"100%", maxWidth: started ? (sidePanel ? 1480 : 1100) : 720 }}>
+      <div className="app-container" style={{ width:"100%", maxWidth: started ? (sidePanel ? 1480 : 1100) : 720 }}>
 
         {/* Mode + Theme */}
         <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
@@ -429,7 +429,7 @@ export default function App() {
         <div className="ui-mode-desc">{UI_MODES.find((m) => m.id === uiMode)?.description}</div>
 
         {/* Discussion Mode */}
-        <div style={{ marginBottom:10 }}>
+        <div className="discussion-mode-section" style={{ marginBottom:10 }}>
           <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード — AIの議論スタイルを選択</div>
           <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
             {DISCUSSION_MODES.map(({id,label,description}) => (
@@ -445,10 +445,12 @@ export default function App() {
         </div>
 
         {/* Persona */}
-        <PersonaPanel personas={personas} onChange={setPersonas} />
+        <div className="persona-section">
+          <PersonaPanel personas={personas} onChange={setPersonas} />
+        </div>
 
         {/* Settings bar - horizontal buttons */}
-        <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
+        <div className="settings-bar" style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:activePanel ? 0 : 10 }}>
           {[
             { id:"keys",     label:"APIキー",   badge:allKeysSet?"✓":"⚠" },
             { id:"security", label:"🔒 セキュリティ" },
@@ -597,7 +599,7 @@ export default function App() {
 
         {/* Topic display */}
         {started && (
-          <div style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:"var(--ui-radius-lg)", marginBottom:"var(--ui-gap-lg)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div className="topic-display" style={{ padding:"var(--ui-pad-sm) var(--ui-pad)", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:"var(--ui-radius-lg)", marginBottom:"var(--ui-gap-lg)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
               <div style={{ fontSize:10, color:"var(--text3)", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
               <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
@@ -644,7 +646,7 @@ export default function App() {
 
             {/* User intervention + next round */}
             {showIntervention && !running && discussion.length > 0 && (
-              <div style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
+              <div className="controls-bar" style={{ marginTop:16, display:"flex", flexDirection:"column", gap:10 }}>
                 <div style={{ background:"var(--ui-card-bg)", border:"1px solid var(--accent-bd)", borderRadius:"var(--ui-radius-lg)", overflow:"hidden" }}>
                   <textarea value={intervention} onChange={(e) => setIntervention(e.target.value)} maxLength={1000} aria-label="司会者介入"
                     placeholder="💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"
