@@ -143,7 +143,6 @@ export async function onRequestGet(context) {
   redirectUrl.searchParams.set("auth_code", exchangeCode);
 
   return Response.redirect(redirectUrl.toString(), 302);
-}
 
   } catch (e) {
     return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
