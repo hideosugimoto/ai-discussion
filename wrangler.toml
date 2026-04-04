@@ -9,8 +9,8 @@ PLAN_PRICE_JPY = "980"
 [[d1_databases]]
 binding = "DB"
 database_name = "ai-discussion-db"
-database_id = ""
+database_id = "bee06353-84d4-4300-bcad-179f43c55101"
 
 [[kv_namespaces]]
 binding = "KV"
-id = ""
+id = "bba6c8c77e3a45bda98480b265016b5e"
