@@ -402,7 +402,16 @@ export default function App() {
               {badge && <span style={{ fontSize:10, color:badge==="✓"?"var(--success)":"var(--warning)" }}>{badge}</span>}
             </button>
           ))}
+          <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`}
+            style={{ marginLeft:"auto", padding:"5px 12px", border:`1px solid ${saveKeys?"var(--success)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:saveKeys?"var(--success)":"transparent", color:saveKeys?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+            <span>{saveKeys ? "💾 保存ON" : "💾 保存OFF"}</span>
+          </button>
         </div>
+        {saveKeys && (
+          <div style={{ fontSize:11, color:"var(--text3)", marginBottom:8 }}>
+            APIキーとプロフィールをこのブラウザに保存中（localStorage）
+          </div>
+        )}
 
         {/* Expanded panel content */}
         {activePanel === "keys" && (
@@ -427,18 +436,8 @@ export default function App() {
                   )}
                 </div>
               ))}
-              <div style={{ padding:"10px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div>
-                  <div style={{ fontSize:12, color:"var(--text2)", fontWeight:600 }}>このブラウザに保存する</div>
-                  <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>デフォルトはOFF。ONにするとlocalStorageに保存されます。</div>
-                </div>
-                <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`} style={{ padding:"6px 16px", border:"none", borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:saveKeys?"var(--success)":"var(--border)", color:saveKeys?"#fff":"var(--text2)" }}>
-                  {saveKeys ? "ON" : "OFF"}
-                </button>
-              </div>
               <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
-                ※ キーはこのブラウザのlocalStorageのみに保存。運営者サーバーには一切送信されません。<br/>
-                ※ XSSや端末共有・画面共有等の環境リスクはご自身で管理してください。
+                ※ 運営者サーバーには一切送信されません。上部の「💾 保存」ボタンでブラウザ保存のON/OFFを切り替えられます。
               </div>
             </div>
           </div>

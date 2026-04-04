@@ -5,7 +5,7 @@ describe("buildPrompt", () => {
   it("round 1 includes topic and 300 char instruction", () => {
     const { sys, user } = buildPrompt("claude", "AIの未来", "", [], 1, "");
     expect(sys).toContain("Claude");
-    expect(sys).toContain("300字以内");
+    expect(sys).toContain("250〜350字");
     expect(user).toContain("AIの未来");
   });
 
@@ -16,7 +16,7 @@ describe("buildPrompt", () => {
       { modelId: "gemini", text: "Geminiの意見" },
     ]}];
     const { sys, user } = buildPrompt("chatgpt", "AIの未来", "", history, 2, "");
-    expect(sys).toContain("200字以内");
+    expect(sys).toContain("200〜300字");
     expect(user).toContain("これまでの議論");
   });
 
@@ -71,7 +71,7 @@ describe("buildPrompt", () => {
 
   it("unknown discussion mode falls back to standard", () => {
     const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "invalid");
-    expect(sys).toContain("300字以内");
+    expect(sys).toContain("250〜350字");
   });
 
   it("names other models correctly for each AI", () => {
