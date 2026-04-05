@@ -81,6 +81,13 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
+  const discussionRef = useRef(discussion);
+  const summariesRef = useRef(summaries);
+  const discussionIdRef = useRef(discussionId);
+
+  useEffect(() => { discussionRef.current = discussion; }, [discussion]);
+  useEffect(() => { summariesRef.current = summaries; }, [summaries]);
+  useEffect(() => { discussionIdRef.current = discussionId; }, [discussionId]);
 
   const autoSave = useCallback(() => {
     if (discussion.length > 0 && topic.trim()) {
@@ -190,11 +197,14 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     if (!controller.signal.aborted) {
       setShowIntervention(true);
       runSummary(results, roundNum);
-      saveDiscussion(topic, discussion.length > 0 ? [...discussion.slice(0, -1), { messages: results, userIntervention: userIntervention }] : [{ messages: results, userIntervention: userIntervention }], summaries, mode, discussionMode, personas, discussionId)
-        .then((id) => { if (!discussionId) setDiscussionId(id); })
+      const curDisc = discussionRef.current;
+      const curSummaries = summariesRef.current;
+      const curId = discussionIdRef.current;
+      saveDiscussion(topic, curDisc.length > 0 ? [...curDisc.slice(0, -1), { messages: results, userIntervention }] : [{ messages: results, userIntervention }], curSummaries, mode, discussionMode, personas, curId)
+        .then((id) => { if (!curId) setDiscussionId(id); })
         .catch(() => {});
     }
-  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, discussion, summaries, discussionId, isPremium, authToken]);
+  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, isPremium, authToken]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;

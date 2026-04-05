@@ -64,6 +64,15 @@ export async function onRequestPost(context) {
     return new Response("Invalid signature", { status: 400 });
   }
 
+  // Idempotency check - skip already processed events
+  if (env.KV) {
+    const processed = await env.KV.get(`stripe_event:${event.id}`);
+    if (processed) {
+      return new Response("Already processed", { status: 200 });
+    }
+    await env.KV.put(`stripe_event:${event.id}`, "1", { expirationTtl: 86400 });
+  }
+
   const sub = event.data?.object;
 
   switch (event.type) {

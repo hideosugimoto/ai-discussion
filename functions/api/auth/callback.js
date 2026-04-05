@@ -11,7 +11,7 @@ async function signJWT(payload, secret) {
   const claims = {
     ...payload,
     iat: now,
-    exp: now + 60 * 60, // 1 hour (short-lived)
+    exp: now + 24 * 60 * 60, // 24 hours
   };
 
   const body = btoa(JSON.stringify(claims))

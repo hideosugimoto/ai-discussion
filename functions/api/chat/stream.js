@@ -1,22 +1,29 @@
 // AI proxy: SSE streaming with token usage tracking
 
-// Model pricing (USD per 1M tokens) - 2026-04 rates
+// Model pricing (microdollars per token) - 2026-04 rates
+// 1 microdollar = $0.000001, so $5.00/1M tokens = 5 microdollars/token
 const MODEL_PRICING = {
-  "claude-opus-4-6":   { input: 5.00,  output: 25.00 },
-  "claude-sonnet-4-6": { input: 3.00,  output: 15.00 },
-  "gpt-4o":            { input: 2.50,  output: 10.00 },
-  "gpt-4o-mini":       { input: 0.15,  output: 0.60  },
-  "gemini-2.5-pro":    { input: 1.25,  output: 10.00 },
-  "gemini-2.5-flash":  { input: 0.30,  output: 2.50  },
+  "claude-opus-4-6":   { input: 5,    output: 25   },
+  "claude-sonnet-4-6": { input: 3,    output: 15   },
+  "gpt-4o":            { input: 2.5,  output: 10   },
+  "gpt-4o-mini":       { input: 0.15, output: 0.6  },
+  "gemini-2.5-pro":    { input: 1.25, output: 10   },
+  "gemini-2.5-flash":  { input: 0.30, output: 2.5  },
 };
 
-function calcCostUSD(model, inputTokens, outputTokens) {
+// Returns cost in microdollars (integer) - no floating point accumulation
+function calcCostMicro(model, inputTokens, outputTokens) {
   const pricing = MODEL_PRICING[model];
   if (!pricing) return 0;
-  return (
-    (inputTokens / 1_000_000) * pricing.input +
-    (outputTokens / 1_000_000) * pricing.output
-  );
+  return Math.round(inputTokens * pricing.input + outputTokens * pricing.output);
+}
+
+// Estimate max cost for pre-debit (assumes max output tokens)
+function estimateMaxCostMicro(model) {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return 0;
+  // Assume 500 input + 1000 output as max estimate
+  return Math.round(500 * pricing.input + 1000 * pricing.output);
 }
 
 function detectProvider(model) {
@@ -41,33 +48,56 @@ function validateRequest(body) {
   return null;
 }
 
-async function checkUsageLimit(db, userId, limitUSD) {
+// Convert USD to microdollars for limit comparison
+function usdToMicro(usd) {
+  return Math.round(usd * 1_000_000);
+}
+
+async function checkUsageLimit(db, userId, limitMicro) {
   const yearMonth = new Date().toISOString().slice(0, 7);
   const result = await db
     .prepare(
-      "SELECT COALESCE(SUM(cost_usd), 0) as total FROM usage_monthly WHERE user_id = ? AND year_month = ?"
+      "SELECT COALESCE(SUM(cost_micro), 0) as total FROM usage_monthly WHERE user_id = ? AND year_month = ?"
     )
     .bind(userId, yearMonth)
     .first();
   const total = result?.total || 0;
-  return { total, remaining: limitUSD - total, exceeded: total >= limitUSD };
+  return { totalMicro: total, remaining: limitMicro - total, exceeded: total >= limitMicro };
 }
 
-async function recordUsage(db, userId, model, inputTokens, outputTokens, costUSD) {
+// Pre-debit: insert estimated cost BEFORE API call to prevent race condition
+async function preDebitUsage(db, userId, model, estimatedMicro) {
   const yearMonth = new Date().toISOString().slice(0, 7);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const result = await db.batch([
+    db.prepare(
+      "INSERT INTO usage_monthly (user_id, year_month, model, input_tokens, output_tokens, cost_micro) VALUES (?, ?, ?, 0, 0, ?)"
+    ).bind(userId, yearMonth, model, estimatedMicro),
+    db.prepare(
+      `INSERT INTO usage_daily (user_id, date, total_cost_micro, request_count)
+       VALUES (?, ?, ?, 1)
+       ON CONFLICT(user_id, date) DO UPDATE SET
+         total_cost_micro = total_cost_micro + ?,
+         request_count = request_count + 1`
+    ).bind(userId, today, estimatedMicro, estimatedMicro),
+  ]);
+  // Return the inserted row ID for later reconciliation
+  return result[0]?.meta?.last_row_id;
+}
+
+// Reconcile: update pre-debit record with actual usage
+async function reconcileUsage(db, rowId, inputTokens, outputTokens, actualMicro, estimatedMicro) {
+  const diffMicro = actualMicro - estimatedMicro;
   const today = new Date().toISOString().slice(0, 10);
 
   await db.batch([
     db.prepare(
-      "INSERT INTO usage_monthly (user_id, year_month, model, input_tokens, output_tokens, cost_usd) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(userId, yearMonth, model, inputTokens, outputTokens, costUSD),
+      "UPDATE usage_monthly SET input_tokens = ?, output_tokens = ?, cost_micro = ? WHERE id = ?"
+    ).bind(inputTokens, outputTokens, actualMicro, rowId),
     db.prepare(
-      `INSERT INTO usage_daily (user_id, date, total_cost_usd, request_count)
-       VALUES (?, ?, ?, 1)
-       ON CONFLICT(user_id, date) DO UPDATE SET
-         total_cost_usd = total_cost_usd + ?,
-         request_count = request_count + 1`
-    ).bind(userId, today, costUSD, costUSD),
+      `UPDATE usage_daily SET total_cost_micro = total_cost_micro + ? WHERE user_id = (SELECT user_id FROM usage_monthly WHERE id = ?) AND date = ?`
+    ).bind(diffMicro, rowId, today),
   ]);
 }
 
@@ -171,19 +201,23 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Check monthly usage limit
-  const limitUSD = parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96");
-  const usage = await checkUsageLimit(env.DB, user.sub, limitUSD);
+  // Check monthly usage limit (in microdollars)
+  const limitMicro = usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96"));
+  const usage = await checkUsageLimit(env.DB, user.sub, limitMicro);
   if (usage.exceeded) {
     return new Response(
       JSON.stringify({
         error: "Monthly usage limit exceeded",
-        total: usage.total,
-        limit: limitUSD,
+        total_usd: usage.totalMicro / 1_000_000,
+        limit_usd: limitMicro / 1_000_000,
       }),
       { status: 429, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  // Pre-debit estimated cost to prevent race condition (#2,3)
+  const estimatedMicro = estimateMaxCostMicro(body.model);
+  const preDebitRowId = await preDebitUsage(env.DB, user.sub, body.model, estimatedMicro);
 
   const provider = detectProvider(body.model);
   const apiKeyMap = {
@@ -294,10 +328,10 @@ export async function onRequestPost(context) {
         await writer.close();
       }
 
-      // Record usage after stream completes
+      // Reconcile pre-debit with actual usage
       if (inputTokens > 0 || outputTokens > 0) {
-        const cost = calcCostUSD(model, inputTokens, outputTokens);
-        await recordUsage(env.DB, userId, model, inputTokens, outputTokens, cost);
+        const actualMicro = calcCostMicro(model, inputTokens, outputTokens);
+        await reconcileUsage(env.DB, preDebitRowId, inputTokens, outputTokens, actualMicro, estimatedMicro);
       }
     })()
   );
