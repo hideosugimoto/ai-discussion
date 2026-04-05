@@ -86,6 +86,18 @@ async function preDebitUsage(db, userId, model, estimatedMicro) {
   return result[0]?.meta?.last_row_id;
 }
 
+// Insert analytics log (non-blocking, best-effort)
+async function insertRequestLog(db, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs) {
+  try {
+    await db.prepare(
+      `INSERT INTO llm_request_log (user_id, session_id, turn_number, model, provider, input_tokens, output_tokens, latency_ms)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(userId, sessionId || null, turnNumber || null, model, provider, inputTokens, outputTokens, latencyMs).run();
+  } catch {
+    // Best-effort: don't fail the request if logging fails
+  }
+}
+
 // Reconcile: update pre-debit record with actual usage
 async function reconcileUsage(db, rowId, inputTokens, outputTokens, actualMicro, estimatedMicro) {
   const diffMicro = actualMicro - estimatedMicro;
@@ -220,6 +232,10 @@ export async function onRequestPost(context) {
   const preDebitRowId = await preDebitUsage(env.DB, user.sub, body.model, estimatedMicro);
 
   const provider = detectProvider(body.model);
+  const sessionId = typeof body.sessionId === "string" ? body.sessionId.slice(0, 100) : null;
+  const turnNumber = typeof body.turnNumber === "number" && Number.isInteger(body.turnNumber) ? body.turnNumber : null;
+  const apiCallStart = Date.now();
+
   const apiKeyMap = {
     anthropic: env.ANTHROPIC_API_KEY,
     openai: env.OPENAI_API_KEY,
@@ -329,10 +345,14 @@ export async function onRequestPost(context) {
       }
 
       // Reconcile pre-debit with actual usage
+      const latencyMs = Date.now() - apiCallStart;
       if (inputTokens > 0 || outputTokens > 0) {
         const actualMicro = calcCostMicro(model, inputTokens, outputTokens);
         await reconcileUsage(env.DB, preDebitRowId, inputTokens, outputTokens, actualMicro, estimatedMicro);
       }
+
+      // Analytics log (best-effort)
+      await insertRequestLog(env.DB, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs);
     })()
   );
 

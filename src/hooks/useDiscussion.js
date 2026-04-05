@@ -9,14 +9,14 @@ import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import summaryPromptText from "../prompts/summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
-async function callGPTMini(apiKey, authToken, isPremium, sys, user) {
+async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
   if (isPremium && authToken) {
-    return await callProxyChatGPT(authToken, "gpt-4o-mini", sys, user, () => {});
+    return await callProxyChatGPT(authToken, "gpt-4o-mini", sys, user, () => {}, undefined, sessionId, turnNumber);
   }
   return await callChatGPT(apiKey, "gpt-4o-mini", sys, user, () => {});
 }
 
-async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas) {
+async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {
   const roundText = messages
     .map((m) => {
       const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
@@ -27,7 +27,7 @@ async function generateSummary(apiKey, authToken, isPremium, messages, topic, ro
 
   const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
-  const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg);
+  const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg, sessionId, roundNum);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
@@ -39,7 +39,7 @@ async function generateSummary(apiKey, authToken, isPremium, messages, topic, ro
   };
 }
 
-async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds, topic, personas) {
+async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds, topic, personas, sessionId) {
   const allText = allRounds
     .map((round, i) => {
       const msgs = round.messages
@@ -55,7 +55,7 @@ async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds,
 
   const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
 
-  const text = await callGPTMini(apiKey, authToken, isPremium, detailedPromptText, userMsg);
+  const text = await callGPTMini(apiKey, authToken, isPremium, detailedPromptText, userMsg, sessionId, allRounds.length);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid analysis format");
@@ -103,11 +103,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     return () => window.removeEventListener("beforeunload", handler);
   }, [autoSave]);
 
-  const runSummary = useCallback(async (roundMessages, roundNum) => {
+  const runSummary = useCallback(async (roundMessages, roundNum, sessionId) => {
     if (!keys.chatgpt && !isPremium) return;
     setSummaries((s) => [...s, null]);
     try {
-      const summary = await generateSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas);
+      const summary = await generateSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, sessionId);
       setSummaries((s) => {
         const next = [...s];
         next[roundNum - 1] = summary;
@@ -127,7 +127,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
     try {
       const roundsUpTo = discussion.slice(0, roundIdx + 1);
-      const analysis = await generateDetailedAnalysis(keys.chatgpt, authToken, isPremium, roundsUpTo, topic, personas);
+      const analysis = await generateDetailedAnalysis(keys.chatgpt, authToken, isPremium, roundsUpTo, topic, personas, discussionIdRef.current);
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
     } catch {
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
@@ -168,9 +168,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
           const sig = controller.signal;
           if (isPremium && authToken) {
             // Premium: server-side proxy (no API keys needed)
-            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig);
-            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig);
-            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig);
+            const sid = discussionIdRef.current;
+            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
+            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
+            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
           } else {
             // Free: direct API calls (user's own keys)
             if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig);
@@ -196,7 +197,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     if (!controller.signal.aborted) {
       setShowIntervention(true);
-      runSummary(results, roundNum);
+      runSummary(results, roundNum, discussionIdRef.current);
       const curDisc = discussionRef.current;
       const curSummaries = summariesRef.current;
       const curId = discussionIdRef.current;

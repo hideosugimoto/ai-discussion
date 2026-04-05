@@ -22,14 +22,14 @@ async function readSSE(res, onChunk, signal) {
   }
 }
 
-export async function callProxyClaude(token, model, sys, user, onChunk, signal) {
+export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user }),
+    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
     signal,
   });
   if (!res.ok) {
@@ -47,14 +47,14 @@ export async function callProxyClaude(token, model, sys, user, onChunk, signal) 
   return full;
 }
 
-export async function callProxyChatGPT(token, model, sys, user, onChunk, signal) {
+export async function callProxyChatGPT(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user }),
+    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
     signal,
   });
   if (!res.ok) {
@@ -72,14 +72,14 @@ export async function callProxyChatGPT(token, model, sys, user, onChunk, signal)
   return full;
 }
 
-export async function callProxyGemini(token, model, sys, user, onChunk, signal) {
+export async function callProxyGemini(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user }),
+    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
     signal,
   });
   if (!res.ok) {
