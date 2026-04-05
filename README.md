@@ -4,24 +4,51 @@
 Claude・ChatGPT・Geminiの3AIに同じ議題を投げ、
 互いの発言を読みながら複数ラウンド議論させるWebアプリ。
 
-## セキュリティ設計
+## アーキテクチャ
 
-### 運営者サーバーへの送信：ゼロ
+### 2つの利用モード
+
+| | Free | Premium（月額980円） |
+|---|---|---|
+| API呼び出し | ブラウザから各社APIへ直接 | サーバーサイドプロキシ経由 |
+| APIキー | ユーザー自身で取得 | 不要（サーバー側で管理） |
+| 認証 | なし | Google OAuth + JWT |
+| 使用量追跡 | なし | D1でトークン・コスト記録 |
+
+### バックエンド構成（Premium）
+
+```
+Cloudflare Pages Functions（サーバーレス）
+├── /api/auth/*        Google OAuth + JWT認証
+├── /api/chat/stream   LLMプロキシ（SSEストリーミング）
+├── /api/usage         使用量照会
+└── /api/billing/*     Stripe決済
+```
+
+| リソース | 用途 |
+|----------|------|
+| D1 (SQLite) | ユーザー、使用量、リフレッシュトークン、リクエストログ |
+| KV | レート制限、OAuthステート、認証コード（短期TTL） |
+
+### セキュリティ設計
+
+**Freeモード：**
 - 通信はブラウザ↔各AI API間のみ（HTTPS直接）
 - APIキーは運営者サーバーに一切送信されない
+
+**Premiumモード（多層防御）：**
+- Layer 1: CORS（許可オリジンのみ）
+- Layer 2: IPベースレート制限（30req/60s）
+- Layer 3: JWT検証（HS256、15分有効期限）
+- Layer 4: 入力バリデーション（モデルホワイトリスト、文字数制限）
+- Layer 5: 出力サニタイズ（上流エラー詳細を非公開）
+- リフレッシュトークンはSHA-256ハッシュのみDB保存
+
+**共通：**
+- SRI（Subresource Integrity）によるCDN改ざん検知
 - コードはすべてGitHubで公開（誰でも確認可能）
 
-### CDN改ざん対策：SRI（Subresource Integrity）
-- ビルド時にファイルのハッシュをHTMLに埋め込む
-- ブラウザがファイル取得時にハッシュを自動照合
-- 改ざんを検知した場合はブラウザが読み込みを拒否・ブロック
-- 動いている間は改ざんされていないことが保証される
-
-### 残るリスク（正直に記載）
-- localStorageのXSSリスク → デフォルトOFFで対策済み
-- SRIは改ざんを防ぐが、Cloudflareアカウント自体の侵害は別問題
-
-### 最も安全な使い方（推奨）
+### ローカル開発（最も安全な使い方）
 ```bash
 git clone https://github.com/hideosugimoto/ai-discussion.git
 cd ai-discussion
@@ -34,10 +61,7 @@ LAN内のスマホからアクセスしたい場合：
 npm run dev -- --host
 ```
 
-### Cloudflare Pagesで使う場合
-外出先からスマホで使いたい場合はCloudflare Pagesにデプロイ
-
-## 必要なAPIキー
+## 必要なAPIキー（Freeモード）
 | サービス | 取得先 |
 |----------|--------|
 | Claude (Anthropic) | https://console.anthropic.com |
@@ -45,11 +69,42 @@ npm run dev -- --host
 | Gemini (Google) | https://aistudio.google.com/apikey |
 
 ## セットアップ
+
+### Freeモード（フロントエンドのみ）
 ```bash
 npm install
 npm run dev    # 開発
 npm run build  # ビルド
 ```
+
+### Premiumモード（バックエンド込み）
+
+Cloudflare D1・KV・環境変数の設定が必要：
+
+```bash
+# D1データベース作成・マイグレーション
+npx wrangler d1 create ai-discussion-db
+npx wrangler d1 execute ai-discussion-db --file=functions/schema.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v2.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v3.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v4.sql
+
+# KVネームスペース作成
+npx wrangler kv namespace create KV
+```
+
+必要な環境変数（Secrets）：
+
+| 変数名 | 用途 |
+|--------|------|
+| `JWT_SECRET` | JWT署名キー |
+| `GOOGLE_CLIENT_ID` | Google OAuth |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth |
+| `ANTHROPIC_API_KEY` | Claude APIプロキシ用 |
+| `OPENAI_API_KEY` | ChatGPTプロキシ用 |
+| `GOOGLE_AI_API_KEY` | Geminiプロキシ用 |
+| `STRIPE_SECRET_KEY` | 決済 |
+| `STRIPE_WEBHOOK_SECRET` | Webhook検証 |
 
 ## Cloudflare Pagesへのデプロイ
 
@@ -61,7 +116,8 @@ npm run build  # ビルド
    - Framework preset: Vite
    - Build command: npm run build
    - Build output directory: dist
-5. Save and Deploy
+5. D1・KV バインディングとSecrets を設定
+6. Save and Deploy
 
 ### 方法B：Direct Upload
 ```bash
@@ -76,18 +132,36 @@ npx wrangler pages deploy dist --project-name ai-discussion
 | ⚡高速 | claude-sonnet-4-6 | gpt-4o-mini | gemini-2.5-flash |
 
 ## 機能
+
+### ディスカッション
 - 3AIへの並列送信・ストリーミング表示
 - 複数ラウンドのディスカッション
+- 4つの議論モード（standard / debate / brainstorm / factcheck）
 - ユーザー介入機能（ラウンド間で司会者として介入可能）
+- ペルソナ設定（各AIに役割を付与）
+- コンスティテューション（AIの行動指針を設定）
 - 途中停止ボタン
+
+### 分析・可視化
+- ラウンドサマリー（合意点・対立点・未解決・立場変化を自動分析）
+- 詳細分析（テーマ抽出・合意形成・未解決事項）
+- アクションプラン生成
+- マインドマップ可視化（Mermaid.js）
+
+### 設定・管理
 - APIキー疎通確認
 - プロフィール入力（各AIのシステムプロンプトに自動注入）
 - プロフィール更新通知（30日未更新で通知バナー表示）
+- 議論履歴の保存・復元（IndexedDB、最大50件）
 - 設定のAES-GCM暗号化バックアップ/復元
-- SRIによるCDN改ざん検知・自動ブロック
 - 3テーマ切替（Dark / Base / Feminine）
-- ラウンドサマリー（合意点・対立点・未解決・立場変化を自動分析）
-- マインドマップ可視化（Mermaid.js）
+- SRIによるCDN改ざん検知・自動ブロック
+
+### Premium限定
+- APIキー不要（サーバー側プロキシ）
+- Google OAuth認証
+- 月次使用量ダッシュボード
+- LLMリクエストログ収集（トークン数・レイテンシ）
 
 
 ## ライセンス
