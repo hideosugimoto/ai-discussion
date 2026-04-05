@@ -22,8 +22,8 @@ function calcCostMicro(model, inputTokens, outputTokens) {
 function estimateMaxCostMicro(model) {
   const pricing = MODEL_PRICING[model];
   if (!pricing) return 0;
-  // Assume 500 input + 1000 output as max estimate
-  return Math.round(500 * pricing.input + 1000 * pricing.output);
+  // Assume 500 input + 4096 output as max estimate
+  return Math.round(500 * pricing.input + 4096 * pricing.output);
 }
 
 function detectProvider(model) {
@@ -154,7 +154,7 @@ async function callGoogle(apiKey, model, system, message) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ parts: [{ text: message }] }],
-        generationConfig: { maxOutputTokens: 1000 },
+        generationConfig: { maxOutputTokens: 4096 },
       }),
     }
   );
