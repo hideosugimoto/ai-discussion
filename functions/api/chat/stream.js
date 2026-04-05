@@ -124,6 +124,7 @@ async function callGoogle(apiKey, model, system, message) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ parts: [{ text: message }] }],
+        generationConfig: { maxOutputTokens: 1000 },
       }),
     }
   );

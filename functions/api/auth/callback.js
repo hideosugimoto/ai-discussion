@@ -145,7 +145,7 @@ export async function onRequestGet(context) {
   return Response.redirect(redirectUrl.toString(), 302);
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

@@ -10,21 +10,21 @@ export async function onRequestPost(context) {
     );
   }
 
-  if (user.plan === "premium") {
+  const origin = new URL(context.request.url).origin;
+
+  // Get user info and check plan
+  const dbUser = await env.DB.prepare(
+    "SELECT plan, stripe_customer_id FROM users WHERE id = ?"
+  )
+    .bind(user.sub)
+    .first();
+
+  if (dbUser?.plan === "premium") {
     return new Response(
       JSON.stringify({ error: "Already on premium plan" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
-
-  const origin = new URL(context.request.url).origin;
-
-  // Get or create Stripe customer
-  const dbUser = await env.DB.prepare(
-    "SELECT stripe_customer_id FROM users WHERE id = ?"
-  )
-    .bind(user.sub)
-    .first();
 
   let customerId = dbUser?.stripe_customer_id;
 

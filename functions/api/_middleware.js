@@ -204,7 +204,7 @@ export async function onRequest(context) {
 
   return response;
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message, stack: e.stack }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
