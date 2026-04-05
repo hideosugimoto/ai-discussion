@@ -103,6 +103,7 @@ const PUBLIC_PATHS = [
   "/api/auth/google",
   "/api/auth/callback",
   "/api/auth/exchange",
+  "/api/auth/refresh",
   "/api/billing/webhook",
 ];
 

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const TOKEN_KEY = "ai-discussion-jwt";
+const REFRESH_KEY = "ai-discussion-refresh";
 
 function parseJWT(token) {
   try {
@@ -11,6 +12,17 @@ function parseJWT(token) {
     return payload;
   } catch {
     return null;
+  }
+}
+
+function getJWTExpiry(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return 0;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return (payload.exp || 0) * 1000; // ms
+  } catch {
+    return 0;
   }
 }
 
@@ -27,18 +39,58 @@ async function fetchPlanFromServer(token, retries = 5) {
     } catch {
       // retry
     }
-    // Webhook may not have arrived yet, wait before retry
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 1500));
   }
   return "free";
 }
 
+async function refreshTokens(refreshToken) {
+  const res = await fetch("/api/auth/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+  if (!res.ok) return null;
+  return await res.json();
+}
+
 export default function useAuth() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState("free");
+  const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(() => !!localStorage.getItem(TOKEN_KEY));
+  const refreshTimerRef = useRef(null);
+
+  // Schedule auto-refresh 2 minutes before JWT expiry
+  const scheduleRefresh = useCallback((jwt, refresh) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+
+    const expiresAt = getJWTExpiry(jwt);
+    const now = Date.now();
+    const refreshIn = Math.max(0, expiresAt - now - 2 * 60 * 1000); // 2 min before expiry
+
+    refreshTimerRef.current = setTimeout(async () => {
+      const result = await refreshTokens(refresh);
+      if (result?.token && result?.refreshToken) {
+        const parsed = parseJWT(result.token);
+        if (parsed) {
+          localStorage.setItem(TOKEN_KEY, result.token);
+          localStorage.setItem(REFRESH_KEY, result.refreshToken);
+          setToken(result.token);
+          setUser(parsed);
+          scheduleRefresh(result.token, result.refreshToken);
+        }
+      } else {
+        // Refresh failed - clear session
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_KEY);
+        setUser(null);
+        setToken(null);
+        setPlan("free");
+      }
+    }, refreshIn);
+  }, []);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -46,7 +98,6 @@ export default function useAuth() {
     const authError = url.searchParams.get("auth_error");
     const checkoutResult = url.searchParams.get("checkout");
 
-    // Clean up URL params
     if (authError || authCode || checkoutResult) {
       const cleanUrl = new URL(url);
       cleanUrl.searchParams.delete("auth_error");
@@ -60,7 +111,7 @@ export default function useAuth() {
       return;
     }
 
-    // Exchange one-time code for JWT (code never contains the actual token)
+    // Exchange one-time code for JWT + refresh token
     if (authCode) {
       fetch("/api/auth/exchange", {
         method: "POST",
@@ -75,6 +126,10 @@ export default function useAuth() {
               localStorage.setItem(TOKEN_KEY, data.token);
               setToken(data.token);
               setUser(parsed);
+              if (data.refreshToken) {
+                localStorage.setItem(REFRESH_KEY, data.refreshToken);
+                scheduleRefresh(data.token, data.refreshToken);
+              }
             }
           }
         })
@@ -83,30 +138,58 @@ export default function useAuth() {
       return;
     }
 
-    // Check localStorage for existing token
-    const stored = localStorage.getItem(TOKEN_KEY);
-    if (stored) {
-      const parsed = parseJWT(stored);
-      if (parsed) {
-        setToken(stored);
-        setUser(parsed);
+    // Restore from localStorage
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    const storedRefresh = localStorage.getItem(REFRESH_KEY);
 
-        // After Stripe checkout, poll for plan update with retries
+    if (storedToken) {
+      const parsed = parseJWT(storedToken);
+      if (parsed) {
+        // JWT still valid
+        setToken(storedToken);
+        setUser(parsed);
+        if (storedRefresh) scheduleRefresh(storedToken, storedRefresh);
+
         if (checkoutResult === "success") {
           setPlanLoading(true);
-          fetchPlanFromServer(stored, 5).then((p) => {
+          fetchPlanFromServer(storedToken, 5).then((p) => {
             setPlan(p);
             setPlanLoading(false);
           });
         }
+      } else if (storedRefresh) {
+        // JWT expired but refresh token exists - try refresh immediately
+        refreshTokens(storedRefresh).then((result) => {
+          if (result?.token && result?.refreshToken) {
+            const p = parseJWT(result.token);
+            if (p) {
+              localStorage.setItem(TOKEN_KEY, result.token);
+              localStorage.setItem(REFRESH_KEY, result.refreshToken);
+              setToken(result.token);
+              setUser(p);
+              scheduleRefresh(result.token, result.refreshToken);
+            }
+          } else {
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REFRESH_KEY);
+          }
+        }).catch(() => {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(REFRESH_KEY);
+        }).finally(() => setLoading(false));
+        return;
       } else {
         localStorage.removeItem(TOKEN_KEY);
       }
     }
     setLoading(false);
-  }, []);
 
-  // Fetch current plan from server (not from JWT)
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, [scheduleRefresh]);
+
+  // Fetch current plan from server
   useEffect(() => {
     if (!token) {
       setPlan("free");
@@ -124,7 +207,9 @@ export default function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
     setUser(null);
     setToken(null);
     setPlan("free");

@@ -1,4 +1,4 @@
-// Google OAuth callback - exchanges code for tokens, creates/updates user, issues JWT
+// Google OAuth callback - exchanges code for tokens, creates/updates user, issues JWT + refresh token
 
 async function signJWT(payload, secret) {
   const encoder = new TextEncoder();
@@ -11,7 +11,7 @@ async function signJWT(payload, secret) {
   const claims = {
     ...payload,
     iat: now,
-    exp: now + 24 * 60 * 60, // 24 hours
+    exp: now + 15 * 60, // 15 minutes
   };
 
   const body = btoa(JSON.stringify(claims))
@@ -35,6 +35,39 @@ async function signJWT(payload, secret) {
     .replace(/=+$/, "");
 
   return `${data}.${signature}`;
+}
+
+async function hashToken(token) {
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(token));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function createRefreshToken(db, userId) {
+  const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+  const tokenHash = await hashToken(token);
+  const id = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Delete old refresh tokens for this user (max 5 sessions)
+  const existing = await db.prepare(
+    "SELECT id FROM refresh_tokens WHERE user_id = ? ORDER BY created_at DESC"
+  ).bind(userId).all();
+
+  if (existing.results && existing.results.length >= 5) {
+    const toDelete = existing.results.slice(4);
+    for (const row of toDelete) {
+      await db.prepare("DELETE FROM refresh_tokens WHERE id = ?").bind(row.id).run();
+    }
+  }
+
+  await db.prepare(
+    "INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)"
+  ).bind(id, userId, tokenHash, expiresAt).run();
+
+  return token;
 }
 
 export async function onRequestGet(context) {
@@ -123,7 +156,7 @@ export async function onRequestGet(context) {
     user = { id: userId, plan: "free" };
   }
 
-  // Issue JWT (no plan claim - always check DB for plan)
+  // Issue JWT (short-lived, 15 min)
   const jwt = await signJWT(
     {
       sub: user.id,
@@ -134,10 +167,16 @@ export async function onRequestGet(context) {
     env.JWT_SECRET
   );
 
-  // Store JWT in KV with a one-time exchange code (60s TTL)
-  // This prevents the JWT from being exposed in the URL
+  // Issue refresh token (long-lived, 30 days)
+  const refreshToken = await createRefreshToken(env.DB, user.id);
+
+  // Store both tokens in KV with a one-time exchange code (60s TTL)
   const exchangeCode = crypto.randomUUID();
-  await env.KV.put(`auth_code:${exchangeCode}`, jwt, { expirationTtl: 60 });
+  await env.KV.put(
+    `auth_code:${exchangeCode}`,
+    JSON.stringify({ token: jwt, refreshToken }),
+    { expirationTtl: 60 }
+  );
 
   const redirectUrl = new URL("/", url.origin);
   redirectUrl.searchParams.set("auth_code", exchangeCode);
