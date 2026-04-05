@@ -236,7 +236,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setActionPlanLoading(true);
     try {
       const userMsg = buildActionPlanPrompt(topic, discussion, summaries);
-      const raw = await callGPTMini(keys.chatgpt, authToken, isPremium, actionPlanPromptText, userMsg);
+      const raw = await callGPTMini(keys.chatgpt, authToken, isPremium, actionPlanPromptText, userMsg, discussionIdRef.current, discussion.length);
       setActionPlan(parseActionPlan(raw));
     } catch {
       setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });

@@ -233,7 +233,7 @@ export async function onRequestPost(context) {
 
   const provider = detectProvider(body.model);
   const sessionId = typeof body.sessionId === "string" ? body.sessionId.slice(0, 100) : null;
-  const turnNumber = typeof body.turnNumber === "number" && Number.isInteger(body.turnNumber) ? body.turnNumber : null;
+  const turnNumber = typeof body.turnNumber === "number" && Number.isInteger(body.turnNumber) && body.turnNumber > 0 && body.turnNumber <= 100 ? body.turnNumber : null;
   const apiCallStart = Date.now();
 
   const apiKeyMap = {
