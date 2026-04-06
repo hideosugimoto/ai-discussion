@@ -173,7 +173,16 @@ export default function App() {
       {/* Header */}
       <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:900 }}>
         <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
-        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"var(--text)" }}>3 AI Discussion</h1>
+        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"var(--text)", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28" style={{ flexShrink:0 }}>
+            <rect width="64" height="64" rx="14" fill="#161627"/>
+            <circle cx="32" cy="22" r="14" fill="#E8815C" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
+            <circle cx="22" cy="40" r="14" fill="#10A37F" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
+            <circle cx="42" cy="40" r="14" fill="#4285F4" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
+            <circle cx="32" cy="34" r="4" fill="#fff" opacity="0.9"/>
+          </svg>
+          3 AI Discussion
+        </h1>
         <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap", marginBottom:12 }}>
           {MODELS.map((m) => <ModelBadge key={m.id} model={m} tag={cm[m.id].label} />)}
         </div>
