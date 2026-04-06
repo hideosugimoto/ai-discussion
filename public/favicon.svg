@@ -1,1 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💬</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <style>
+      .blend { mix-blend-mode: screen; }
+    </style>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="64" height="64" rx="14" fill="#161627"/>
+
+  <!-- Three overlapping circles — each AI's brand color -->
+  <!-- Claude (orange/amber) — top -->
+  <circle class="blend" cx="32" cy="22" r="14" fill="#E8815C" opacity="0.85"/>
+  <!-- ChatGPT (green) — bottom-left -->
+  <circle class="blend" cx="22" cy="40" r="14" fill="#10A37F" opacity="0.85"/>
+  <!-- Gemini (blue) — bottom-right -->
+  <circle class="blend" cx="42" cy="40" r="14" fill="#4285F4" opacity="0.85"/>
+
+  <!-- Center glow where all three meet -->
+  <circle cx="32" cy="34" r="4" fill="#fff" opacity="0.9"/>
+</svg>
