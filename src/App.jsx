@@ -74,7 +74,26 @@ export default function App() {
   // Premium users don't need API keys
   const canStart = auth.isPremium || allKeysSet;
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [discussion, bottomRef]);
+  // 自動追従スクロール: ユーザーが上にスクロールしたら停止、下端付近に戻ったら再開
+  const [autoFollow, setAutoFollow] = useState(true);
+  useEffect(() => {
+    const handleScroll = () => {
+      const threshold = 100;
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - threshold;
+      setAutoFollow(nearBottom);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (autoFollow) bottomRef.current?.scrollIntoView({ behavior:"smooth" });
+  }, [discussion, bottomRef, autoFollow]);
+
+  const scrollToLatest = () => {
+    bottomRef.current?.scrollIntoView({ behavior:"smooth" });
+    setAutoFollow(true);
+  };
 
   // Fetch usage on login and after each round
   useEffect(() => {
@@ -584,6 +603,14 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* フローティング「↓ 最新へ」ボタン: 自動追従OFF時のみ表示 */}
+      {!autoFollow && started && discussion.length > 0 && (
+        <button onClick={scrollToLatest} aria-label="最新メッセージへスクロール"
+          style={{ position:"fixed", right:20, bottom:24, zIndex:100, padding:"12px 18px", background:"var(--accent)", color:"#fff", border:"none", borderRadius:24, fontSize:13, fontWeight:600, cursor:"pointer", boxShadow:"0 4px 14px rgba(0,0,0,0.25)", display:"flex", alignItems:"center", gap:6 }}>
+          ↓ 最新へ
+        </button>
+      )}
     </div>
   );
 }
