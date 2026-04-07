@@ -1,22 +1,5 @@
 import { useEffect, useState } from "react";
-
-let mermaidLoading = null;
-
-function loadMermaid() {
-  if (window.mermaid) return Promise.resolve(window.mermaid);
-  if (mermaidLoading) return mermaidLoading;
-  mermaidLoading = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
-    script.onload = () => {
-      window.mermaid.initialize({ startOnLoad: false, theme: "dark" });
-      resolve(window.mermaid);
-    };
-    script.onerror = () => reject(new Error("mermaid.js の読み込みに失敗"));
-    document.head.appendChild(script);
-  });
-  return mermaidLoading;
-}
+import { loadMermaid } from "../lib/mermaidLoader";
 
 function escapeQuote(s) {
   return (s || "").replace(/"/g, "'").replace(/\n/g, " ").slice(0, 40);
