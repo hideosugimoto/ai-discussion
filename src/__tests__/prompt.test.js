@@ -69,6 +69,23 @@ describe("buildPrompt", () => {
     expect(sys).toContain("事実・データ・根拠");
   });
 
+  it("conclusion mode includes 結論 instruction", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "conclusion");
+    expect(sys).toContain("結論");
+    expect(sys).toContain("論点を整理");
+  });
+
+  it("conclusion mode round 2 includes 収束 instruction", () => {
+    const history = [{ messages: [
+      { modelId: "claude", text: "Claudeの結論" },
+      { modelId: "chatgpt", text: "ChatGPTの結論" },
+      { modelId: "gemini", text: "Geminiの結論" },
+    ]}];
+    const { sys } = buildPrompt("claude", "テスト", "", history, 2, "", "conclusion");
+    expect(sys).toContain("合意できる点");
+    expect(sys).toContain("収束");
+  });
+
   it("unknown discussion mode falls back to standard", () => {
     const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "invalid");
     expect(sys).toContain("250〜350字");

@@ -51,4 +51,5 @@ export const DISCUSSION_MODES = [
   { id: "debate",    label: "⚔️ ディベート", description: "対立・反論を重視" },
   { id: "brainstorm", label: "💡 ブレスト",  description: "発散・アイデア重視" },
   { id: "factcheck", label: "🔍 事実検証",  description: "根拠・正確性を重視" },
+  { id: "conclusion", label: "📋 結論まとめ", description: "議論を収束・結論を導出" },
 ];

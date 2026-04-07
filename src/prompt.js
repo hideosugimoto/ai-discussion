@@ -19,6 +19,10 @@ const MODE_INSTRUCTIONS = {
     round1: `議題に対して、事実・データ・根拠に基づいた見解を250〜350字で述べてください。可能な限り具体的な数字や事例を挙げ、推測には「推測ですが」と明記してください。${QUALITY_GUIDE}`,
     roundN: `他のAIの発言の事実関係を検証してください。200〜300字で、正確な点は認め、不正確・曖昧な点は具体的に指摘し、正しい情報を補足してください。${QUALITY_GUIDE}`,
   },
+  conclusion: {
+    round1: `議題に対して、最も重要な論点を整理し、250〜350字であなたの結論を述べてください。「結論：」で始め、理由を簡潔に添えてください。他のAIとは異なる切り口で結論を出すことを意識してください。${QUALITY_GUIDE}`,
+    roundN: `これまでの議論全体を踏まえ、200〜300字で結論を更新・統合してください。各AIの主張の共通点と相違点を整理し、「合意できる点」「意見が分かれる点」「最終的な提言」を明確にしてください。議論を収束させることを意識してください。${QUALITY_GUIDE}`,
+  },
 };
 
 export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution) {

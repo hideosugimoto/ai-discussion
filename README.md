@@ -136,7 +136,7 @@ npx wrangler pages deploy dist --project-name ai-discussion
 ### ディスカッション
 - 3AIへの並列送信・ストリーミング表示
 - 複数ラウンドのディスカッション
-- 4つの議論モード（standard / debate / brainstorm / factcheck）
+- 5つの議論モード（standard / debate / brainstorm / factcheck / conclusion）
 - ユーザー介入機能（ラウンド間で司会者として介入可能）
 - ペルソナ設定（各AIに役割を付与）
 - コンスティテューション（AIの行動指針を設定）
