@@ -88,6 +88,7 @@ npx wrangler d1 execute ai-discussion-db --file=functions/schema.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v2.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v3.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v4.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v5.sql
 
 # KVネームスペース作成
 npx wrangler kv namespace create KV
