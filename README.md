@@ -165,6 +165,32 @@ npx wrangler pages deploy dist --project-name ai-discussion
 - 月次使用量ダッシュボード
 - LLMリクエストログ収集（トークン数・レイテンシ）
 
+## 開発
+
+### テスト
+```bash
+npm test               # 全テスト実行
+npm test -- --watch    # 監視モード
+```
+
+主要なテスト対象（vitest、計58テスト）:
+
+| 対象 | 内容 |
+|------|------|
+| `prompt.js` | モード別プロンプト生成・字数制限・モデル名解決・履歴フォーマット |
+| `suggestedQuestions.js` | 質問データ整合性（ID重複・mode/category参照・字数上限） |
+| `storage.js` | localStorage 保存/復元・バリデーション |
+| `crypto.js` | AES-GCM 暗号化バックアップ/復元 |
+| `actionPlan.js` | アクションプラン生成プロンプト・パース |
+| `export.js` | HTML/Markdown エクスポート |
+| `constitution.js` | 議論の憲法バリデーション |
+
+### ビルド
+```bash
+npm run build          # 本番ビルド（vite）
+```
+
+push 時には pre-push フックで `vite build` と Functions 構文チェックが自動実行されます。
 
 ## ライセンス
 
