@@ -1,4 +1,5 @@
 import { useState } from "react";
+import HelpHint from "./HelpHint";
 
 const PRIORITY_STYLES = {
   high:   { color: "var(--error)",   label: "高", icon: "▲" },
@@ -12,9 +13,14 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
   if (!plan && !loading) {
     return (
       <div style={{ textAlign:"center", marginTop:16 }}>
-        <button onClick={onGenerate} style={{ background:"var(--accent)", border:"none", borderRadius:20, padding:"10px 24px", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:600 }}>
+        <button onClick={onGenerate}
+          title="議論全体を要約し、優先度・期限付きの実行可能なアクションを自動生成"
+          style={{ background:"var(--accent)", border:"none", borderRadius:20, padding:"10px 24px", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:600 }}>
           📋 アクションプランを生成
         </button>
+        <HelpHint style={{ marginTop: 6 }}>
+          議論を踏まえて「結論／優先度付きアクション／リスク／次に議論すべきテーマ」を自動生成します（GPT-4o-mini 使用、約0.001ドル）
+        </HelpHint>
       </div>
     );
   }

@@ -22,6 +22,10 @@ import useShare from "./hooks/useShare";
 import SharedView from "./components/SharedView";
 import ShareDialog from "./components/ShareDialog";
 import PlanPicker from "./components/PlanPicker";
+import HelpHint from "./components/HelpHint";
+import PlanBadge from "./components/PlanBadge";
+import AuthBar from "./components/AuthBar";
+import { useHelp } from "./hooks/useHelp.jsx";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -49,6 +53,7 @@ export default function App() {
   const cloudHistory = useCloudHistory(auth.isPremium ? auth.token : null);
   const share = useShare(auth.isPremium ? auth.token : null);
   const [shareDialog, setShareDialog] = useState(null); // null | "creating" | { url } | { error }
+  const help = useHelp();
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
@@ -311,24 +316,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Auth bar */}
-      <div style={{ width:"100%", maxWidth:900, display:"flex", justifyContent:"flex-end", alignItems:"center", gap:8, marginBottom:8 }}>
-        {auth.user ? (
-          <>
-            {auth.isPremium && usage && (
-              <span style={{ fontSize:11, color:"var(--success)", fontFamily:"monospace" }}>
-                残り {usage.usage_percent != null ? `${Math.round(100 - usage.usage_percent)}%` : "---"}
-                {usage.credits_usd > 0 && <span style={{ color:"var(--accent-light)" }}> +C</span>}
-              </span>
-            )}
-            <span style={{ fontSize:12, color:"var(--text2)" }}>{auth.user.name}</span>
-            {auth.user.picture && <img src={auth.user.picture} alt="" style={{ width:24, height:24, borderRadius:"50%" }} referrerPolicy="no-referrer" />}
-            <button onClick={auth.logout} style={{ padding:"4px 10px", border:"1px solid var(--border)", borderRadius:6, background:"transparent", color:"var(--text3)", cursor:"pointer", fontSize:11 }}>ログアウト</button>
-          </>
-        ) : (
-          <button onClick={auth.login} style={{ padding:"6px 14px", border:"1px solid var(--accent)", borderRadius:8, background:"var(--accent-bg)", color:"var(--accent-light)", cursor:"pointer", fontSize:12, fontWeight:600 }}>Googleでログイン</button>
-        )}
-      </div>
+      <AuthBar auth={auth} usage={usage} />
 
       {/* Premium badge or loading */}
       {auth.planLoading && auth.user && (
@@ -337,39 +325,7 @@ export default function App() {
         </div>
       )}
       {auth.isPremium && !auth.planLoading && (
-        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"8px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", display:"flex", justifyContent:"center", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <span style={{ fontWeight:600 }}>{auth.plan === "plus" ? "Plus Plan" : "Premium Plan"}</span>
-          {usage && (
-            <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}>
-              {usage.used_usd?.toFixed(2)} / {usage.limit_usd?.toFixed(2)} USD
-              {usage.credits_usd > 0 && (
-                <span style={{ color:"var(--accent-light)" }}> (+{usage.credits_usd.toFixed(2)} クレジット)</span>
-              )}
-            </span>
-          )}
-          <button
-            onClick={startCreditPurchase}
-            title="500円で +$2 分の月内クレジットを追加（購入月末まで有効）"
-            style={{ padding:"3px 10px", border:"1px solid var(--accent-bd)", borderRadius:4, background:"var(--accent-bg)", color:"var(--accent-light)", cursor:"pointer", fontSize:11 }}
-          >
-            ＋クレジット
-          </button>
-          <button onClick={async () => {
-            try {
-              const res = await fetch("/api/billing/portal", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-              });
-              if (!res.ok) throw new Error("Request failed");
-              const data = await res.json();
-              if (data.url) window.location.href = data.url;
-            } catch {
-              alert("プラン管理ページの取得に失敗しました。再度お試しください。");
-            }
-          }} style={{ padding:"3px 10px", border:"1px solid var(--success, #22c55e)", borderRadius:4, background:"transparent", color:"var(--success, #22c55e)", cursor:"pointer", fontSize:11 }}>
-            プラン管理
-          </button>
-        </div>
+        <PlanBadge plan={auth.plan} usage={usage} token={auth.token} onCreditPurchase={startCreditPurchase} />
       )}
 
       {/* Header */}
@@ -449,7 +405,7 @@ export default function App() {
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                 {hasResettableState && (
                   <button onClick={handleResetInputs} aria-label="議題・モード・ペルソナをクリア"
-                    title="議題・議論モード・ペルソナを初期化（APIキー・プロフィール・憲法は保持）"
+                    title="今回の入力（議題・議論モード・ペルソナ・文脈）だけ初期化。APIキー・プロフィール・憲法は保持"
                     style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", color:"var(--text3)", fontSize:11, cursor:"pointer" }}>
                     ↺ クリア
                   </button>
@@ -480,6 +436,7 @@ export default function App() {
                 </button>
               ))}
               <button onClick={() => toggleSaveKeys(!saveKeys)} aria-label={`ブラウザ保存 ${saveKeys?"OFF":"ON"}に切り替え`}
+                title={saveKeys ? "APIキー・プロフィールをブラウザに保存中（クリックでOFFに）" : "ONにするとAPIキー・プロフィールをブラウザのlocalStorageに保存"}
                 style={{ padding:"5px 12px", border:`1px solid ${saveKeys?"var(--success)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontFamily:"monospace", background:saveKeys?"var(--success)":"transparent", color:saveKeys?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
                 <span>{saveKeys ? "💾 保存ON" : "💾 保存OFF"}</span>
               </button>
@@ -489,6 +446,9 @@ export default function App() {
                 APIキーとプロフィールをこのブラウザに保存中（localStorage）
               </div>
             )}
+            <HelpHint>
+              保存ON/OFF = APIキーとプロフィールをブラウザに残すかどうか。共用PCではOFF推奨。データは外部に送信されません
+            </HelpHint>
 
             {/* ── 高度な設定（折りたたみ） ── */}
             <details style={{ marginTop:8 }}>
@@ -499,8 +459,9 @@ export default function App() {
                 <div>
                   <div style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em", marginBottom:6 }}>議論モード</div>
                   <div role="radiogroup" aria-label="議論モード" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-                    {DISCUSSION_MODES.map(({id,label}) => (
+                    {DISCUSSION_MODES.map(({id,label,description}) => (
                       <button key={id} role="radio" aria-checked={discussionMode===id} onClick={() => setDiscussionMode(id)}
+                        title={description}
                         style={{ padding:"5px 12px", border:"1px solid var(--border)", borderRadius:20, cursor:"pointer", fontSize:11, fontWeight:600, background:discussionMode===id?"var(--accent)":"transparent", color:discussionMode===id?"#fff":"var(--text2)" }}>
                         {label}
                       </button>
@@ -509,17 +470,31 @@ export default function App() {
                   <div style={{ fontSize:11, color:"var(--text2)", marginTop:4 }}>
                     {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
                   </div>
+                  {help.helpMode && (
+                    <div style={{ fontSize:10, color:"var(--text3)", marginTop:6, padding:"8px 10px", background:"var(--bg)", borderRadius:6, lineHeight:1.7 }}>
+                      💡 モード別の特徴:<br />
+                      ・<b>標準</b>: バランスの取れた議論（迷ったらこれ）<br />
+                      ・<b>ディベート</b>: 各AIが対立しながら論点を掘り下げる。反論・批判が中心<br />
+                      ・<b>ブレスト</b>: 否定せずアイデアを発散。「Yes, and」の姿勢<br />
+                      ・<b>事実検証</b>: 根拠・データ重視で互いの発言を検証<br />
+                      ・<b>結論まとめ</b>: 1つのAIが中立記録者として全体を「合意/相違/結論」に統合
+                    </div>
+                  )}
                   {discussionMode === "conclusion" && (
                     <div style={{ marginTop:8, padding:"8px 10px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:8 }}>
                       <div style={{ fontSize:11, color:"var(--text3)", marginBottom:6 }}>まとめ担当AI（1AIが3者の議論を統合）</div>
                       <div role="radiogroup" aria-label="まとめ担当AI" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
                         {MODELS.map((m) => (
                           <button key={m.id} role="radio" aria-checked={conclusionTarget===m.id} onClick={() => setConclusionTarget(m.id)}
+                            title={`${m.name} が中立記録者として3者の議論を統合`}
                             style={{ padding:"4px 10px", border:`1px solid ${conclusionTarget===m.id?m.color:"var(--border)"}`, borderRadius:16, cursor:"pointer", fontSize:11, fontWeight:600, background:conclusionTarget===m.id?m.bg:"transparent", color:conclusionTarget===m.id?m.color:"var(--text2)" }}>
                             {m.icon} {m.name}
                           </button>
                         ))}
                       </div>
+                      <HelpHint>
+                        結論まとめモードは3AIで議論せず、選んだAIだけが全体を「合意点／相違点／最終結論」にまとめます。実行後は自動で標準モードに戻ります
+                      </HelpHint>
                     </div>
                   )}
                 </div>
@@ -582,6 +557,9 @@ export default function App() {
           <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               <div style={{ fontSize:11, color:"var(--text3)" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
+              <HelpHint>
+                プロフィール = あなた自身の情報。AIが「あなた向け」にカスタマイズした回答をしてくれます。「自己分析・キャリア相談」系の質問では特に効果的
+              </HelpHint>
               <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
                 placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
                 style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
@@ -594,6 +572,9 @@ export default function App() {
           <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               <div style={{ fontSize:11, color:"var(--text3)" }}>あなたの意思決定の基準・価値観を定義してください。議論中、各AIがこの憲法に基づいて推奨・非推奨を明示します。</div>
+              <HelpHint>
+                憲法 = あなたの価値観・判断基準。プロフィールとの違いは「事実」ではなく「ポリシー」。例: 「短期利益より長期の自由度」「破産リスクは絶対NG」など
+              </HelpHint>
               <textarea value={constitution} onChange={(e) => updateConstitution(e.target.value)} maxLength={2000} aria-label="議論の憲法"
                 placeholder={"例:\n- 最小労働・最大成果を優先する\n- 短期利益より長期の自由度を重視\n- リスクは取るが、破産リスクは絶対に避ける\n- 技術的負債は3ヶ月以内に返済する"}
                 rows={5}
@@ -606,6 +587,9 @@ export default function App() {
         {activePanel === "backup" && (
           <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
             <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+              <HelpHint>
+                バックアップ = APIキー・プロフィールをパスワードで暗号化してテキスト化。別端末への移行や、ブラウザデータが消えても復元できる安心機能
+              </HelpHint>
               <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
                 ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
                 パスワードを忘れると復元できません。安全な場所に保管してください。
@@ -680,18 +664,23 @@ export default function App() {
             </div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {discussion.length > 0 && (<>
-                <button onClick={handleExportHtml} aria-label="HTMLエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 HTML</button>
-                <button onClick={handleExportMd} aria-label="Markdownエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 MD</button>
+                <button onClick={handleExportHtml} aria-label="HTMLエクスポート" title="この議論をHTMLファイルとしてダウンロード（印刷・共有用）" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 HTML</button>
+                <button onClick={handleExportMd} aria-label="Markdownエクスポート" title="この議論をMarkdownファイルとしてダウンロード（Notion・Obsidian等に貼付け）" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 MD</button>
                 {auth.isPremium && (
-                  <button onClick={handleShare} aria-label="共有リンクを作成" disabled={running} title="この議論を共有可能なリンクとして公開"
+                  <button onClick={handleShare} aria-label="共有リンクを作成" disabled={running} title="この議論を共有可能なリンクとして公開（URL知っている人だけ閲覧可）"
                     style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--accent-light)", cursor:running?"not-allowed":"pointer", fontSize:12, opacity:running?0.5:1 }}>
                     🔗 共有
                   </button>
                 )}
               </>)}
-              <button onClick={handleReset} style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
+              <button onClick={handleReset} title="この議論を終了して新しい議題を入力する画面に戻る（履歴は自動保存済み）" style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
             </div>
           </div>
+        )}
+        {started && help.helpMode && discussion.length > 0 && (
+          <HelpHint>
+            「リセット」= 議論を終了して新規入力画面へ（履歴は自動保存）／「共有」= URLで他人と共有（個人情報は除外）／「HTML/MD」= ファイル出力
+          </HelpHint>
         )}
 
         {/* Discussion + Side Panel layout */}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { loadHistory, deleteDiscussion } from "../history";
+import HelpHint from "./HelpHint";
 
 function timeAgo(isoStr) {
   const diff = Date.now() - new Date(isoStr).getTime();
@@ -66,9 +67,9 @@ function CloudItem({ item, onLoad, onAddContext, contextIds, onDelete }) {
   const inContext = contextIds.includes(item.id);
   return (
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", marginBottom:4, borderRadius:6, background:"var(--bg)", border:"1px solid var(--border)" }}>
-      <button onClick={() => onLoad(item)} style={{ background:"none", border:"none", cursor:"pointer", textAlign:"left", flex:1, padding:0, color:"var(--text)" }}>
+      <button onClick={() => onLoad(item)} title="クラウドからこの議論を読み込んで再開" style={{ background:"none", border:"none", cursor:"pointer", textAlign:"left", flex:1, padding:0, color:"var(--text)" }}>
         <div style={{ fontSize:13, fontWeight:500, display:"flex", alignItems:"center", gap:6 }}>
-          <span>☁</span>
+          <span title="クラウドに保存されている議論">☁</span>
           <span>{item.topic.slice(0, 50)}{item.topic.length > 50 ? "..." : ""}</span>
         </div>
         <div style={{ fontSize:11, color:"var(--text3)", marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -299,6 +300,11 @@ export default function HistoryPanel({
       {/* Local tab */}
       {activeTab === "local" && (
         <>
+          {history.length > 0 && (
+            <HelpHint style={{ marginBottom: 10 }}>
+              クリック=この議論を再開 ／ 「+ 文脈」=この過去議論の要約を今回の議論に文脈として注入（最大3件・要約のみ送信でトークン爆発を防止）
+            </HelpHint>
+          )}
           {loading && <div style={{ color:"var(--text3)", fontSize:12 }}>読み込み中...</div>}
           {!loading && history.length === 0 && (
             <div style={{ color:"var(--text3)", fontSize:12 }}>保存された議論はありません</div>
@@ -319,6 +325,10 @@ export default function HistoryPanel({
       {/* Cloud tab */}
       {activeTab === "cloud" && cloudHistory && (
         <>
+          <HelpHint style={{ marginBottom: 10 }}>
+            ☁ クラウド = 端末をまたいで同期される議論履歴（Premium限定）。Premium ログイン中は新規議論が自動でアップロードされ、端末を変えても続きを見られます
+          </HelpHint>
+
           {/* Capacity indicator */}
           <div style={{ marginBottom:10, padding:"8px 10px", background:"var(--bg)", borderRadius:6, fontSize:11, color:"var(--text2)", display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:6 }}>
             <span>{cloudHistory.total}/{cloudHistory.limit} 件 · {bytesLabel(cloudHistory.totalBytes)}</span>
@@ -334,6 +344,7 @@ export default function HistoryPanel({
               onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
               placeholder="クラウド全文検索（議題・本文）"
               aria-label="クラウド全文検索"
+              title="議題や AI の発言本文をキーワード検索（クラウドに保存された議論のみ）"
               style={{ flex:1, padding:"6px 10px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, color:"var(--text)", fontSize:12 }}
             />
             <button
@@ -362,6 +373,7 @@ export default function HistoryPanel({
               <button
                 onClick={handleBulkUpload}
                 disabled={bulkUploading}
+                title="端末内の全議論をクラウドに移行（30件ずつ送信、最大300件まで）"
                 style={{ padding:"6px 12px", background:"var(--accent)", border:"none", borderRadius:6, color:"#fff", cursor:bulkUploading?"not-allowed":"pointer", fontSize:11, fontWeight:600 }}
               >
                 {bulkUploading ? "アップロード中..." : "☁ 一括アップロード"}

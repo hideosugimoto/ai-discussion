@@ -1,4 +1,5 @@
 import { MODELS, PERSONA_PRESETS, PERSONA_PACKS } from "../constants";
+import HelpHint from "./HelpHint";
 
 function PersonaCard({ model, persona, onChange }) {
   return (
@@ -40,16 +41,22 @@ export default function PersonaPanel({ personas, onChange }) {
         <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace", letterSpacing:"0.1em" }}>ペルソナ設定 — 各AIに役割を割り当て</span>
         {hasAnyPersona && (
           <button onClick={() => onChange({ claude:"", chatgpt:"", gemini:"" })}
+            title="全ペルソナを一括クリア"
             style={{ background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:10 }}>クリア</button>
         )}
       </div>
+      <HelpHint style={{ marginBottom: 6 }}>
+        ペルソナパック = 3AIに役割を一括設定する会議シミュレーション。例: 「経営会議」ならClaude=CEO / ChatGPT=CFO / Gemini=マーケ責任者
+      </HelpHint>
 
       {/* Pack presets */}
       <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
         {PERSONA_PACKS.map((pack) => {
           const isActive = personas.claude === pack.personas.claude && personas.chatgpt === pack.personas.chatgpt && personas.gemini === pack.personas.gemini;
+          const packTitle = `${pack.label}: ${Object.values(pack.personas).filter(Boolean).join(" / ")}`;
           return (
             <button key={pack.id} onClick={() => handlePackSelect(pack)}
+              title={packTitle}
               style={{ padding:"4px 10px", borderRadius:16, border:"1px solid var(--border)", cursor:"pointer", fontSize:11, fontWeight:500, background:isActive?"var(--accent)":"transparent", color:isActive?"#fff":"var(--text2)" }}>
               {pack.label}
             </button>
