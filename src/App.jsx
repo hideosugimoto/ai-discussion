@@ -18,9 +18,24 @@ import useDiscussion from "./hooks/useDiscussion";
 import useAuth from "./hooks/useAuth";
 import useUsage from "./hooks/useUsage";
 import useCloudHistory from "./hooks/useCloudHistory";
+import useShare from "./hooks/useShare";
+import SharedView from "./components/SharedView";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
+
+  // Detect ?share=ID in URL → enter shared-view mode
+  const [shareViewId, setShareViewId] = useState(() => {
+    const url = new URL(window.location.href);
+    return url.searchParams.get("share");
+  });
+
+  const exitShareView = () => {
+    setShareViewId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("share");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  };
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -30,6 +45,8 @@ export default function App() {
   const auth = useAuth();
   const { usage, fetchUsage } = useUsage(auth.token);
   const cloudHistory = useCloudHistory(auth.isPremium ? auth.token : null);
+  const share = useShare(auth.isPremium ? auth.token : null);
+  const [shareDialog, setShareDialog] = useState(null); // null | "creating" | { url } | { error }
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
@@ -163,6 +180,49 @@ export default function App() {
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
   const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
 
+  const handleShare = async () => {
+    if (!auth.isPremium) {
+      window.alert("共有機能は Premium プラン限定です。");
+      return;
+    }
+    if (!discussion.length) return;
+    const confirmMsg =
+      "この議論を共有リンクで公開します。\n\n" +
+      "共有データに含まれるもの:\n" +
+      "・議題\n" +
+      "・各AIの発言本文\n" +
+      "・ラウンドサマリー（合意/対立/未解決/立場変化）\n\n" +
+      "共有データに含まれないもの:\n" +
+      "・あなたのプロフィール\n" +
+      "・各AIに設定したペルソナ\n" +
+      "・議論の憲法（価値観）\n" +
+      "・司会者として書いた介入文\n" +
+      "・APIキー\n\n" +
+      "URLを知っている人だけがアクセスできます（検索エンジンには載りません）。\n" +
+      "共有しますか？";
+    if (!window.confirm(confirmMsg)) return;
+
+    setShareDialog("creating");
+    try {
+      const dataJson = JSON.stringify({
+        discussion,
+        summaries,
+        mode,
+        discussionMode,
+      });
+      const result = await share.create(topic, dataJson);
+      const url = `${window.location.origin}/?share=${encodeURIComponent(result.id)}`;
+      setShareDialog({ url });
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        // clipboard may not be available; the URL is shown in the dialog anyway
+      }
+    } catch (e) {
+      setShareDialog({ error: e.message });
+    }
+  };
+
   const cm = MODE_MODELS[mode];
   const latestSummary = summaries[summaries.length - 1] ?? null;
 
@@ -179,6 +239,12 @@ export default function App() {
     if (s === "ok") return "var(--success-bg)";
     return "var(--error)";
   };
+
+  // Shared-view mode (?share=ID): show read-only view of someone else's discussion.
+  // Placed here AFTER all hooks to avoid violating React rules of hooks.
+  if (shareViewId) {
+    return <SharedView shareId={shareViewId} onExit={exitShareView} />;
+  }
 
   return (
     <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
@@ -562,10 +628,16 @@ export default function App() {
               <div style={{ fontSize:10, color:"var(--text3)", fontFamily:"monospace", marginBottom:3 }}>議題{profile.trim()?" · 👤":""}</div>
               <div style={{ fontSize:14, color:"var(--accent-light)", fontWeight:500 }}>{topic}</div>
             </div>
-            <div style={{ display:"flex", gap:6 }}>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {discussion.length > 0 && (<>
                 <button onClick={handleExportHtml} aria-label="HTMLエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 HTML</button>
                 <button onClick={handleExportMd} aria-label="Markdownエクスポート" style={{ background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 10px", color:"var(--text2)", cursor:"pointer", fontSize:12 }}>📥 MD</button>
+                {auth.isPremium && (
+                  <button onClick={handleShare} aria-label="共有リンクを作成" disabled={running} title="この議論を共有可能なリンクとして公開"
+                    style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--accent-light)", cursor:running?"not-allowed":"pointer", fontSize:12, opacity:running?0.5:1 }}>
+                    🔗 共有
+                  </button>
+                )}
               </>)}
               <button onClick={handleReset} style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
             </div>
@@ -662,6 +734,63 @@ export default function App() {
           style={{ position:"fixed", right:20, bottom:24, zIndex:100, padding:"12px 18px", background:"var(--accent)", color:"#fff", border:"none", borderRadius:24, fontSize:13, fontWeight:600, cursor:"pointer", boxShadow:"0 4px 14px rgba(0,0,0,0.25)", display:"flex", alignItems:"center", gap:6 }}>
           ↓ 最新へ
         </button>
+      )}
+
+      {/* 共有結果モーダル */}
+      {shareDialog && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="share-dialog-title"
+          onClick={() => shareDialog !== "creating" && setShareDialog(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200, padding:16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:24, maxWidth:540, width:"100%" }}>
+            {shareDialog === "creating" && (
+              <div style={{ textAlign:"center", color:"var(--text2)" }}>
+                <div id="share-dialog-title" style={{ fontSize:14, marginBottom:8 }}>共有リンクを作成中...</div>
+              </div>
+            )}
+            {shareDialog && shareDialog.url && (
+              <>
+                <div id="share-dialog-title" style={{ fontSize:15, fontWeight:700, color:"var(--text)", marginBottom:8 }}>✓ 共有リンクを作成しました</div>
+                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:12 }}>URL はクリップボードにコピー済みです（コピーできない環境では下のテキストをご利用ください）。</div>
+                <input
+                  readOnly
+                  value={shareDialog.url}
+                  onFocus={(e) => e.target.select()}
+                  style={{ width:"100%", padding:"10px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", fontSize:12, fontFamily:"monospace", marginBottom:14 }}
+                />
+                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:14, lineHeight:1.6 }}>
+                  ⚠ このリンクを知っている人は誰でも閲覧できます。検索エンジンには載りません。<br />
+                  共有を取り消すには、議論を再開した状態で「共有」ボタンから管理してください（この機能は次のアップデートで追加予定）。
+                </div>
+                <div style={{ display:"flex", justifyContent:"flex-end", gap:8 }}>
+                  <button
+                    onClick={() => setShareDialog(null)}
+                    style={{ padding:"8px 18px", background:"var(--accent)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontSize:13, fontWeight:600 }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </>
+            )}
+            {shareDialog && shareDialog.error && (
+              <>
+                <div id="share-dialog-title" style={{ fontSize:15, fontWeight:700, color:"var(--error)", marginBottom:8 }}>✗ 共有に失敗しました</div>
+                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:14 }}>{shareDialog.error}</div>
+                <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                  <button
+                    onClick={() => setShareDialog(null)}
+                    style={{ padding:"8px 18px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text2)", cursor:"pointer", fontSize:13 }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
