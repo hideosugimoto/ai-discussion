@@ -2,6 +2,54 @@ import { MODELS } from "./constants";
 
 const QUALITY_GUIDE = "箇条書きではなく文章で回答し、具体例や根拠を含めて論じてください。一般論だけでなく、あなた独自の視点を加えてください。";
 
+const MAX_CONTEXT_DISCUSSIONS = 3;
+const MAX_CONTEXT_TOPIC_LEN = 80;
+const MAX_CONTEXT_ITEMS_PER_SECTION = 3;
+const MAX_CONTEXT_POINT_LEN = 80;
+
+function truncate(str, max) {
+  const s = (str || "").toString().trim();
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+function summariseSummary(summary) {
+  if (!summary || summary.error) return null;
+  const parts = [];
+  if (summary.agreements?.length) {
+    parts.push("合意: " + summary.agreements
+      .slice(0, MAX_CONTEXT_ITEMS_PER_SECTION)
+      .map((a) => truncate(a.point, MAX_CONTEXT_POINT_LEN))
+      .join(" / "));
+  }
+  if (summary.disagreements?.length) {
+    parts.push("対立: " + summary.disagreements
+      .slice(0, MAX_CONTEXT_ITEMS_PER_SECTION)
+      .map((d) => truncate(d.point, MAX_CONTEXT_POINT_LEN))
+      .join(" / "));
+  }
+  if (summary.unresolved?.length) {
+    parts.push("未解決: " + summary.unresolved
+      .slice(0, MAX_CONTEXT_ITEMS_PER_SECTION)
+      .map((u) => truncate(u.point, MAX_CONTEXT_POINT_LEN))
+      .join(" / "));
+  }
+  return parts.length ? parts.join("\n") : null;
+}
+
+function buildContextText(contextDiscussions) {
+  if (!Array.isArray(contextDiscussions) || contextDiscussions.length === 0) return "";
+  const items = contextDiscussions.slice(0, MAX_CONTEXT_DISCUSSIONS).map((d, i) => {
+    const topic = truncate(d?.topic || "(議題不明)", MAX_CONTEXT_TOPIC_LEN);
+    const summaries = Array.isArray(d?.summaries) ? d.summaries : [];
+    const lastSummary = [...summaries].reverse().find((s) => s && !s.error);
+    const summaryText = summariseSummary(lastSummary);
+    return summaryText
+      ? `【過去議論${i + 1}: ${topic}】\n${summaryText}`
+      : `【過去議論${i + 1}: ${topic}】（要約なし）`;
+  });
+  return `\n\n【質問者の過去の関連議論】\n以下は同じユーザーが過去に行った議論の要約です。今回の議論ではこの文脈を踏まえ、矛盾しない・かつ前回からの発展となる発言をしてください。ただし過去の議論に過度に引きずられず、今回の議題に集中してください。\n${items.join("\n\n")}`;
+}
+
 const MODE_INSTRUCTIONS = {
   standard: {
     round1: `議題に対して自分の見解を250〜350字で述べてください。他のAIとの違いが出るよう、あなた自身の視点・特徴を活かして答えてください。${QUALITY_GUIDE}`,
@@ -25,7 +73,7 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -56,8 +104,10 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
     ? MODE_INSTRUCTIONS[modeKey].round1
     : MODE_INSTRUCTIONS[modeKey].roundN;
 
+  const contextText = buildContextText(contextDiscussions);
+
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
-  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}`;
+  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}`;
 
   const histText =
     history.length === 0

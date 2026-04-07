@@ -14,7 +14,7 @@ function timeAgo(isoStr) {
   return new Date(isoStr).toLocaleDateString("ja-JP");
 }
 
-export default function HistoryPanel({ open, onLoad }) {
+export default function HistoryPanel({ open, onLoad, onAddContext, contextIds = [] }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -46,19 +46,44 @@ export default function HistoryPanel({ open, onLoad }) {
       {!loading && history.length === 0 && (
         <div style={{ color:"var(--text3)", fontSize:12 }}>保存された議論はありません</div>
       )}
-      {!loading && history.map((item) => (
-        <div key={item.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", marginBottom:4, borderRadius:6, background:"var(--bg)", border:"1px solid var(--border)" }}>
-          <button onClick={() => onLoad(item)} style={{ background:"none", border:"none", cursor:"pointer", textAlign:"left", flex:1, padding:0, color:"var(--text)" }}>
-            <div style={{ fontSize:13, fontWeight:500 }}>{item.topic.slice(0, 50)}{item.topic.length > 50 ? "..." : ""}</div>
-            <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>
-              {item.roundCount}ラウンド · {timeAgo(item.createdAt)}
-            </div>
-          </button>
-          <button onClick={() => handleDelete(item.id)} aria-label="削除" style={{ background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:14, padding:"4px 8px" }}>
-            ✕
-          </button>
-        </div>
-      ))}
+      {!loading && history.map((item) => {
+        const inContext = contextIds.includes(item.id);
+        return (
+          <div key={item.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", marginBottom:4, borderRadius:6, background:"var(--bg)", border:"1px solid var(--border)" }}>
+            <button onClick={() => onLoad(item)} style={{ background:"none", border:"none", cursor:"pointer", textAlign:"left", flex:1, padding:0, color:"var(--text)" }}>
+              <div style={{ fontSize:13, fontWeight:500 }}>{item.topic.slice(0, 50)}{item.topic.length > 50 ? "..." : ""}</div>
+              <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>
+                {item.roundCount}ラウンド · {timeAgo(item.createdAt)}
+              </div>
+            </button>
+            {onAddContext && (
+              <button
+                onClick={() => onAddContext(item)}
+                disabled={inContext}
+                aria-label={inContext ? "文脈に追加済み" : "文脈に追加"}
+                title={inContext ? "すでに文脈として追加済み" : "今回の議論にこの過去議論を文脈として追加"}
+                style={{
+                  background:"none",
+                  border:`1px solid ${inContext ? "var(--success)" : "var(--accent-bd)"}`,
+                  color:inContext ? "var(--success)" : "var(--accent-light)",
+                  cursor:inContext ? "default" : "pointer",
+                  fontSize:10,
+                  padding:"4px 8px",
+                  borderRadius:6,
+                  marginRight:6,
+                  whiteSpace:"nowrap",
+                  opacity:inContext ? 0.7 : 1,
+                }}
+              >
+                {inContext ? "✓ 文脈" : "+ 文脈"}
+              </button>
+            )}
+            <button onClick={() => handleDelete(item.id)} aria-label="削除" style={{ background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:14, padding:"4px 8px" }}>
+              ✕
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

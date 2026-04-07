@@ -41,6 +41,7 @@ export default function App() {
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [conclusionTarget, setConclusionTarget] = useState("claude");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
+  const [contextDiscussions, setContextDiscussions] = useState([]); // 過去議論コンテキスト（最大3件）
   const [placeholderIdx, setPlaceholderIdx] = useState(() => Math.floor(Math.random() * PLACEHOLDER_ROTATION.length));
   const [topicFocused, setTopicFocused] = useState(false);
 
@@ -52,7 +53,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [topic, topicFocused]);
 
-  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, authToken: auth.token, isPremium: auth.isPremium });
+  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken: auth.token, isPremium: auth.isPremium });
   const { discussion, summaries, detailedAnalyses,
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
@@ -110,14 +111,30 @@ export default function App() {
     setDiscussionMode("standard");
     setConclusionTarget("claude");
     setPersonas({ claude:"", chatgpt:"", gemini:"" });
+    setContextDiscussions([]);
   };
 
   const hasResettableState = !!(
     topic.trim() ||
     discussionMode !== "standard" ||
     conclusionTarget !== "claude" ||
-    personas.claude || personas.chatgpt || personas.gemini
+    personas.claude || personas.chatgpt || personas.gemini ||
+    contextDiscussions.length > 0
   );
+
+  const handleAddContext = (item) => {
+    if (!item?.id) return;
+    setContextDiscussions((prev) => {
+      if (prev.some((d) => d.id === item.id)) return prev; // 重複無視
+      if (prev.length >= 3) return prev; // 最大3件
+      return [...prev, { id: item.id, topic: item.topic, summaries: item.summaries || [] }];
+    });
+    setActivePanel(null);
+  };
+
+  const handleRemoveContext = (id) => {
+    setContextDiscussions((prev) => prev.filter((d) => d.id !== id));
+  };
 
   const handleLoadHistory = (item) => {
     loadFromHistory(item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget);
@@ -249,6 +266,30 @@ export default function App() {
           <div style={{ marginBottom:12, padding:"10px 14px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:10, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }} onClick={() => togglePanel("keys")}>
             <span style={{ color:"var(--warning)", fontSize:13, fontWeight:600 }}>⚠ APIキーを設定してください</span>
             <span style={{ color:"var(--text3)", fontSize:11 }}>— 3つのAIサービスのAPIキーが必要です（またはログインして有料プランをご利用ください）</span>
+          </div>
+        )}
+
+        {/* ── 過去議論コンテキスト ── */}
+        {!started && contextDiscussions.length > 0 && (
+          <div style={{ marginBottom:10, padding:"10px 12px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10 }}>
+            <div style={{ fontSize:11, color:"var(--text3)", marginBottom:6, display:"flex", alignItems:"center", gap:6 }}>
+              <span>📎 文脈に含める過去議論（{contextDiscussions.length}/3）</span>
+              <span style={{ fontSize:10 }}>— 各AIに要約だけ伝わります</span>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              {contextDiscussions.map((d) => (
+                <div key={d.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 10px", background:"var(--bg)", borderRadius:6, fontSize:12 }}>
+                  <span style={{ color:"var(--text)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", flex:1 }}>{d.topic}</span>
+                  <button
+                    onClick={() => handleRemoveContext(d.id)}
+                    aria-label="文脈から外す"
+                    style={{ background:"none", border:"none", color:"var(--text3)", cursor:"pointer", fontSize:14, padding:"0 6px", marginLeft:6 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -495,7 +536,13 @@ export default function App() {
 
         {activePanel === "history" && (
           <div style={{ marginTop:8, marginBottom:10 }}>
-            <HistoryPanel open={true} onToggle={() => togglePanel("history")} onLoad={handleLoadHistory} />
+            <HistoryPanel
+              open={true}
+              onToggle={() => togglePanel("history")}
+              onLoad={handleLoadHistory}
+              onAddContext={!started ? handleAddContext : undefined}
+              contextIds={contextDiscussions.map((d) => d.id)}
+            />
           </div>
         )}
 

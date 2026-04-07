@@ -75,7 +75,7 @@ async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds,
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, authToken, isPremium }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken, isPremium }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -162,7 +162,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -230,7 +230,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         setDiscussionMode("standard");
       }
     }
-  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, runSummary, isPremium, authToken]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
