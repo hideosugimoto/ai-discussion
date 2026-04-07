@@ -7,7 +7,7 @@ function PersonaCard({ model, persona, onChange }) {
         <span>{model.icon}</span> {model.name}
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
-        {PERSONA_PRESETS.slice(0, 6).map(({ label }) => (
+        {PERSONA_PRESETS.slice(0, 8).map(({ label }) => (
           <button key={label} onClick={() => onChange(persona === label ? "" : label)}
             style={{ padding:"2px 8px", borderRadius:12, border:"1px solid var(--border)", cursor:"pointer", fontSize:10, background:persona===label?"var(--accent)":"transparent", color:persona===label?"#fff":"var(--text3)" }}>
             {label}
@@ -15,7 +15,7 @@ function PersonaCard({ model, persona, onChange }) {
         ))}
       </div>
       <input type="text" value={persona} onChange={(e) => onChange(e.target.value)} maxLength={50}
-        placeholder="例: 孫正義の視点で" aria-label={`${model.name}のペルソナ`}
+        placeholder="例: 50代経営者の視点で" aria-label={`${model.name}のペルソナ`}
         style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"6px 8px", color:"var(--text)", fontSize:12 }} />
     </div>
   );
