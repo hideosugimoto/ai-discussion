@@ -1,12 +1,32 @@
-// Create Stripe Checkout session for premium subscription
+// Create Stripe Checkout session for premium / plus subscription
 export async function onRequestPost(context) {
-  const { env, data } = context;
+  const { env, data, request } = context;
   const user = data.user;
 
   if (!user) {
     return new Response(
       JSON.stringify({ error: "Not authenticated" }),
       { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // Parse target plan from body (default 'premium' for backwards compat)
+  let targetPlan = "premium";
+  try {
+    const body = await request.json();
+    if (body && typeof body.plan === "string" && (body.plan === "premium" || body.plan === "plus")) {
+      targetPlan = body.plan;
+    }
+  } catch {
+    // Empty body is OK -- fall through with default
+  }
+
+  // Pick the right Stripe Price ID based on target plan
+  const priceId = targetPlan === "plus" ? env.STRIPE_PRICE_ID_PLUS : env.STRIPE_PRICE_ID;
+  if (!priceId) {
+    return new Response(
+      JSON.stringify({ error: `Stripe price for ${targetPlan} not configured` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
@@ -19,9 +39,9 @@ export async function onRequestPost(context) {
     .bind(user.sub)
     .first();
 
-  if (dbUser?.plan === "premium") {
+  if (dbUser?.plan === targetPlan) {
     return new Response(
-      JSON.stringify({ error: "Already on premium plan" }),
+      JSON.stringify({ error: `Already on ${targetPlan} plan` }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -70,11 +90,14 @@ export async function onRequestPost(context) {
       body: new URLSearchParams({
         customer: customerId,
         mode: "subscription",
-        "line_items[0][price]": env.STRIPE_PRICE_ID,
+        "line_items[0][price]": priceId,
         "line_items[0][quantity]": "1",
         success_url: `${origin}/?checkout=success`,
         cancel_url: `${origin}/?checkout=cancel`,
         "metadata[user_id]": user.sub,
+        "metadata[plan]": targetPlan,
+        "subscription_data[metadata][user_id]": user.sub,
+        "subscription_data[metadata][plan]": targetPlan,
       }),
     }
   );

@@ -1,4 +1,6 @@
 // Usage query API - returns current month's usage and remaining credit
+import { getEffectiveLimitMicro } from "../_lib_billing.js";
+
 export async function onRequestGet(context) {
   const { env, data } = context;
   const user = data.user;
@@ -17,8 +19,9 @@ export async function onRequestGet(context) {
   const currentPlan = dbUser?.plan || "free";
 
   const yearMonth = new Date().toISOString().slice(0, 7);
-  const limitUSD = parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96");
-  const limitMicro = Math.round(limitUSD * 1_000_000);
+  const { base: baseLimitMicro, credits: creditsMicro, effective: limitMicro } =
+    await getEffectiveLimitMicro(env.DB, env, user.sub, currentPlan);
+  const limitUSD = limitMicro / 1_000_000;
 
   // Monthly total (microdollars)
   const monthly = await env.DB.prepare(
@@ -51,6 +54,8 @@ export async function onRequestGet(context) {
       plan: currentPlan,
       yearMonth,
       limit_usd: limitUSD,
+      base_limit_usd: baseLimitMicro / 1_000_000,
+      credits_usd: creditsMicro / 1_000_000,
       used_usd: Math.round(totalUSD * 10000) / 10000,
       remaining_usd: Math.round(remainingUSD * 10000) / 10000,
       usage_percent: Math.round(usagePercent * 10) / 10,

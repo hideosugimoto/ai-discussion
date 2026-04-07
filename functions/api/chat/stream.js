@@ -1,5 +1,7 @@
 // AI proxy: SSE streaming with token usage tracking
 
+import { getEffectiveLimitMicro } from "../_lib_billing.js";
+
 // Model pricing (microdollars per token) - 2026-04 rates
 // 1 microdollar = $0.000001, so $5.00/1M tokens = 5 microdollars/token
 const MODEL_PRICING = {
@@ -46,11 +48,6 @@ function validateRequest(body) {
     return "Invalid message (max 50000 chars)";
   }
   return null;
-}
-
-// Convert USD to microdollars for limit comparison
-function usdToMicro(usd) {
-  return Math.round(usd * 1_000_000);
 }
 
 async function checkUsageLimit(db, userId, limitMicro) {
@@ -187,12 +184,13 @@ export async function onRequestPost(context) {
   const dbUser = await env.DB.prepare("SELECT plan FROM users WHERE id = ?")
     .bind(user.sub)
     .first();
-  if (!dbUser || dbUser.plan !== "premium") {
+  if (!dbUser || dbUser.plan === "free" || !dbUser.plan) {
     return new Response(
       JSON.stringify({ error: "Premium plan required" }),
       { status: 403, headers: { "Content-Type": "application/json" } }
     );
   }
+  const userPlan = dbUser.plan; // 'premium' | 'plus'
 
   // Parse and validate input (Layer 4)
   let body;
@@ -213,8 +211,8 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Check monthly usage limit (in microdollars)
-  const limitMicro = usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96"));
+  // Check monthly usage limit (base + active credits, in microdollars)
+  const { effective: limitMicro } = await getEffectiveLimitMicro(env.DB, env, user.sub, userPlan);
   const usage = await checkUsageLimit(env.DB, user.sub, limitMicro);
   if (usage.exceeded) {
     return new Response(

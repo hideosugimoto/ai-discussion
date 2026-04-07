@@ -27,7 +27,8 @@ export async function requirePremium(env, user) {
   const dbUser = await env.DB.prepare("SELECT plan FROM users WHERE id = ?")
     .bind(user.sub)
     .first();
-  if (!dbUser || dbUser.plan !== "premium") {
+  // Both 'premium' and 'plus' have access to paid features
+  if (!dbUser || dbUser.plan === "free" || !dbUser.plan) {
     return { error: jsonResponse({ error: "Premium plan required" }, 403) };
   }
   return { ok: true };

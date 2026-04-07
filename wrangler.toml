@@ -4,7 +4,11 @@ pages_build_output_dir = "dist"
 
 [vars]
 MONTHLY_COST_LIMIT_USD = "1.96"
+MONTHLY_COST_LIMIT_USD_PLUS = "5.00"
 PLAN_PRICE_JPY = "980"
+PLAN_PRICE_JPY_PLUS = "1980"
+CREDIT_PRICE_JPY = "500"
+CREDIT_AMOUNT_USD = "2.00"
 
 [[d1_databases]]
 binding = "DB"
