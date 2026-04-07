@@ -66,7 +66,7 @@ async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds,
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution, authToken, isPremium }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, authToken, isPremium }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -91,11 +91,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
   const autoSave = useCallback(() => {
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId)
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget)
         .then((id) => { if (!discussionId) setDiscussionId(id); })
         .catch(() => {});
     }
-  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId]);
+  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget]);
 
   useEffect(() => {
     const handler = () => { autoSave(); };
@@ -141,13 +141,18 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setShowIntervention(false);
     setIntervention("");
 
-    const initMessages = MODELS.map((m) => ({ modelId:m.id, text:"", error:null, loading:true }));
-    setDiscussion((d) => [...d, { messages:initMessages, userIntervention }]);
+    const isConclusionRound = discussionMode === "conclusion";
+    const targetModels = isConclusionRound
+      ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
+      : MODELS;
+
+    const initMessages = targetModels.map((m) => ({ modelId:m.id, text:"", error:null, loading:true }));
+    setDiscussion((d) => [...d, { messages:initMessages, userIntervention, isConclusion: isConclusionRound }]);
 
     const models = MODE_MODELS[mode];
 
     const results = await Promise.all(
-      MODELS.map(async (model) => {
+      targetModels.map(async (model) => {
         const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution);
         const tag = models[model.id].tag;
 
@@ -197,15 +202,26 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     if (!controller.signal.aborted) {
       setShowIntervention(true);
-      runSummary(results, roundNum, discussionIdRef.current);
+      // 結論まとめラウンドはサマリー生成をスキップ（3AI前提の機能のため）
+      if (!isConclusionRound) {
+        runSummary(results, roundNum, discussionIdRef.current);
+      } else {
+        // プレースホルダ（インデックス整合性のため）
+        setSummaries((s) => [...s, null]);
+      }
       const curDisc = discussionRef.current;
       const curSummaries = summariesRef.current;
       const curId = discussionIdRef.current;
-      saveDiscussion(topic, curDisc.length > 0 ? [...curDisc.slice(0, -1), { messages: results, userIntervention }] : [{ messages: results, userIntervention }], curSummaries, mode, discussionMode, personas, curId)
+      const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound };
+      saveDiscussion(topic, curDisc.length > 0 ? [...curDisc.slice(0, -1), newRound] : [newRound], curSummaries, mode, discussionMode, personas, curId, conclusionTarget)
         .then((id) => { if (!curId) setDiscussionId(id); })
         .catch(() => {});
+      // 結論ラウンド完了後は自動でstandardモードに戻す
+      if (isConclusionRound && setDiscussionMode) {
+        setDiscussionMode("standard");
+      }
     }
-  }, [mode, keys, topic, profile, discussionMode, personas, constitution, runSummary, isPremium, authToken]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, runSummary, isPremium, authToken]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -226,7 +242,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const handleReset = () => {
     abortRef.current?.abort();
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId).catch(() => {});
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget).catch(() => {});
     }
     setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
@@ -245,12 +261,15 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     }
   };
 
-  const loadFromHistory = (item, setTopic, setDiscussionMode, setPersonas) => {
+  const loadFromHistory = (item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget) => {
     if (!item?.topic || !Array.isArray(item.discussion)) return;
     setTopic(item.topic.slice(0, 2000));
     setDiscussion(item.discussion);
     setSummaries(Array.isArray(item.summaries) ? item.summaries : []);
     setDiscussionMode(item.discussionMode || "standard");
+    if (setConclusionTarget) {
+      setConclusionTarget(["claude", "chatgpt", "gemini"].includes(item.conclusionTarget) ? item.conclusionTarget : "claude");
+    }
     setPersonas(item.personas && typeof item.personas === "object"
       ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" }
       : { claude:"", chatgpt:"", gemini:"" });

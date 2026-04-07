@@ -37,9 +37,10 @@ export default function App() {
   const [activePanel, setActivePanel] = useState(!keys.claude ? "keys" : null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
+  const [conclusionTarget, setConclusionTarget] = useState("claude");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
 
-  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, personas, constitution, authToken: auth.token, isPremium: auth.isPremium });
+  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, authToken: auth.token, isPremium: auth.isPremium });
   const { discussion, summaries, detailedAnalyses,
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
@@ -78,7 +79,7 @@ export default function App() {
   };
 
   const handleLoadHistory = (item) => {
-    loadFromHistory(item, setTopic, setDiscussionMode, setPersonas);
+    loadFromHistory(item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget);
     setActivePanel(null);
   };
 
@@ -272,6 +273,19 @@ export default function App() {
                   <div style={{ fontSize:11, color:"var(--text2)", marginTop:4 }}>
                     {DISCUSSION_MODES.find((m) => m.id === discussionMode)?.description}
                   </div>
+                  {discussionMode === "conclusion" && (
+                    <div style={{ marginTop:8, padding:"8px 10px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:8 }}>
+                      <div style={{ fontSize:11, color:"var(--text3)", marginBottom:6 }}>まとめ担当AI（1AIが3者の議論を統合）</div>
+                      <div role="radiogroup" aria-label="まとめ担当AI" style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                        {MODELS.map((m) => (
+                          <button key={m.id} role="radio" aria-checked={conclusionTarget===m.id} onClick={() => setConclusionTarget(m.id)}
+                            style={{ padding:"4px 10px", border:`1px solid ${conclusionTarget===m.id?m.color:"var(--border)"}`, borderRadius:16, cursor:"pointer", fontSize:11, fontWeight:600, background:conclusionTarget===m.id?m.bg:"transparent", color:conclusionTarget===m.id?m.color:"var(--text2)" }}>
+                            {m.icon} {m.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <PersonaPanel personas={personas} onChange={setPersonas} />
                 <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
@@ -444,7 +458,7 @@ export default function App() {
             {discussion.map((round, i) => (
               <div key={i}>
                 <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} />
-                {!sidePanel && summaries[i] !== undefined && (
+                {!sidePanel && summaries[i] !== undefined && !round.isConclusion && (
                   <SummaryPanel
                     summary={summaries[i]}
                     roundNum={i+1}
@@ -482,9 +496,20 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+                {discussionMode === "conclusion" && (
+                  <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+                    <span style={{ fontSize:10, color:"var(--text3)" }}>まとめ担当:</span>
+                    {MODELS.map((m) => (
+                      <button key={m.id} role="radio" aria-checked={conclusionTarget===m.id} onClick={() => setConclusionTarget(m.id)}
+                        style={{ padding:"3px 9px", border:`1px solid ${conclusionTarget===m.id?m.color:"var(--border)"}`, borderRadius:14, cursor:"pointer", fontSize:10, fontWeight:600, background:conclusionTarget===m.id?m.bg:"transparent", color:conclusionTarget===m.id?m.color:"var(--text3)" }}>
+                        {m.icon} {m.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div style={{ textAlign:"center" }}>
                   <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-                    ↻ 次のラウンドへ（Round {discussion.length+1}）
+                    ↻ {discussionMode === "conclusion" ? `結論まとめを生成（${MODELS.find(m=>m.id===conclusionTarget)?.name}）` : `次のラウンドへ（Round ${discussion.length+1}）`}
                   </button>
                 </div>
               </div>

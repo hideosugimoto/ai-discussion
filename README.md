@@ -137,6 +137,7 @@ npx wrangler pages deploy dist --project-name ai-discussion
 - 3AIへの並列送信・ストリーミング表示
 - 複数ラウンドのディスカッション
 - 5つの議論モード（standard / debate / brainstorm / factcheck / conclusion）
+  - **conclusion（結論まとめ）モード**: 選択した1つのAI（デフォルト Claude）が中立的な記録者として、3者の議論を「合意点 / 相違点 / 最終結論」に統合。実行後は自動的に standard モードに復帰
 - ユーザー介入機能（ラウンド間で司会者として介入可能）
 - ペルソナ設定（各AIに役割を付与）
 - コンスティテューション（AIの行動指針を設定）

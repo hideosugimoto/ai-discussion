@@ -69,21 +69,24 @@ describe("buildPrompt", () => {
     expect(sys).toContain("事実・データ・根拠");
   });
 
-  it("conclusion mode includes 結論 instruction", () => {
+  it("conclusion mode round 1 acts as neutral recorder", () => {
     const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "conclusion");
-    expect(sys).toContain("結論");
-    expect(sys).toContain("論点を整理");
+    expect(sys).toContain("中立的な記録者");
+    expect(sys).toContain("論点");
+    expect(sys).toContain("暫定結論");
   });
 
-  it("conclusion mode round 2 includes 収束 instruction", () => {
+  it("conclusion mode round 2 synthesizes 3 AIs into single conclusion", () => {
     const history = [{ messages: [
-      { modelId: "claude", text: "Claudeの結論" },
-      { modelId: "chatgpt", text: "ChatGPTの結論" },
-      { modelId: "gemini", text: "Geminiの結論" },
+      { modelId: "claude", text: "Claudeの意見" },
+      { modelId: "chatgpt", text: "ChatGPTの意見" },
+      { modelId: "gemini", text: "Geminiの意見" },
     ]}];
     const { sys } = buildPrompt("claude", "テスト", "", history, 2, "", "conclusion");
+    expect(sys).toContain("中立的な記録者");
     expect(sys).toContain("合意できる点");
-    expect(sys).toContain("収束");
+    expect(sys).toContain("意見が分かれる点");
+    expect(sys).toContain("最終結論");
   });
 
   it("unknown discussion mode falls back to standard", () => {

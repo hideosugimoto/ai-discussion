@@ -37,6 +37,7 @@ function validateRound(round) {
     userIntervention: typeof round.userIntervention === "string"
       ? round.userIntervention.slice(0, 1000)
       : "",
+    isConclusion: round.isConclusion === true,
   };
 }
 
@@ -52,6 +53,7 @@ function validateDiscussion(data) {
     summaries: Array.isArray(data.summaries) ? data.summaries : [],
     mode: typeof data.mode === "string" ? data.mode : "best",
     discussionMode: typeof data.discussionMode === "string" ? data.discussionMode : "standard",
+    conclusionTarget: ["claude", "chatgpt", "gemini"].includes(data.conclusionTarget) ? data.conclusionTarget : "claude",
     personas: data.personas && typeof data.personas === "object"
       ? { claude: typeof data.personas.claude === "string" ? data.personas.claude : "", chatgpt: typeof data.personas.chatgpt === "string" ? data.personas.chatgpt : "", gemini: typeof data.personas.gemini === "string" ? data.personas.gemini : "" }
       : { claude: "", chatgpt: "", gemini: "" },
@@ -60,7 +62,7 @@ function validateDiscussion(data) {
   };
 }
 
-export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, existingId) {
+export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, existingId, conclusionTarget) {
   const db = await openDB();
   const id = existingId || crypto.randomUUID();
 
@@ -82,6 +84,7 @@ export async function saveDiscussion(topic, discussion, summaries, mode, discuss
     summaries,
     mode,
     discussionMode,
+    conclusionTarget,
     personas,
     createdAt,
   });
