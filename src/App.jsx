@@ -90,6 +90,20 @@ export default function App() {
     resetDiscussion();
   };
 
+  const handleResetInputs = () => {
+    setTopic("");
+    setDiscussionMode("standard");
+    setConclusionTarget("claude");
+    setPersonas({ claude:"", chatgpt:"", gemini:"" });
+  };
+
+  const hasResettableState = !!(
+    topic.trim() ||
+    discussionMode !== "standard" ||
+    conclusionTarget !== "claude" ||
+    personas.claude || personas.chatgpt || personas.gemini
+  );
+
   const handleLoadHistory = (item) => {
     loadFromHistory(item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget);
     setActivePanel(null);
@@ -231,12 +245,21 @@ export default function App() {
               onFocus={() => setTopicFocused(true)} onBlur={() => setTopicFocused(false)}
               placeholder={`議題を入力... (Ctrl+Enter で開始)\n例: ${PLACEHOLDER_ROTATION[placeholderIdx]}\n💡 下の「おすすめ質問」から選ぶこともできます`} rows={3}
               style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
-            <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
-              <button onClick={handleStart} disabled={!topic.trim()||running||!canStart}
-                style={{ background:canStart&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 20px", color:canStart&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&canStart)?"pointer":"not-allowed", opacity:(topic.trim()&&canStart)?1:0.35 }}>
-                {!canStart?"キーを設定またはログイン":"▶ 開始"}
-              </button>
+              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                {hasResettableState && (
+                  <button onClick={handleResetInputs} aria-label="議題・モード・ペルソナをリセット"
+                    title="議題・議論モード・ペルソナを初期化（APIキー・プロフィール・憲法は保持）"
+                    style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", color:"var(--text3)", fontSize:11, cursor:"pointer" }}>
+                    ↺ リセット
+                  </button>
+                )}
+                <button onClick={handleStart} disabled={!topic.trim()||running||!canStart}
+                  style={{ background:canStart&&topic.trim()?"var(--accent)":"var(--surface)", border:"1px solid var(--border)", borderRadius:8, padding:"8px 20px", color:canStart&&topic.trim()?"#fff":"var(--text3)", fontSize:13, fontWeight:700, cursor:(topic.trim()&&canStart)?"pointer":"not-allowed", opacity:(topic.trim()&&canStart)?1:0.35 }}>
+                  {!canStart?"キーを設定またはログイン":"▶ 開始"}
+                </button>
+              </div>
             </div>
           </div>
         )}
