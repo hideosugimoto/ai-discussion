@@ -107,6 +107,17 @@ const PUBLIC_PATHS = [
   "/api/billing/webhook",
 ];
 
+// Public route prefixes for dynamic paths. Only specific HTTP methods are
+// considered public; others fall through to auth check.
+function isPublicDynamic(method, pathname) {
+  // GET /api/share/[id] is public (unlisted shareable link).
+  // POST/DELETE /api/share/[id] still require auth.
+  if (method === "GET" && /^\/api\/share\/[A-Za-z0-9_-]{16,64}$/.test(pathname)) {
+    return true;
+  }
+  return false;
+}
+
 export async function onRequest(context) {
   try {
   const { request, env } = context;
@@ -143,7 +154,9 @@ export async function onRequest(context) {
   }
 
   // Auth check (Layer 3) - skip for public routes
-  const isPublic = PUBLIC_PATHS.some((p) => url.pathname === p);
+  const isPublic =
+    PUBLIC_PATHS.some((p) => url.pathname === p) ||
+    isPublicDynamic(request.method, url.pathname);
   if (!isPublic) {
     const authHeader = request.headers.get("Authorization");
     const token = authHeader?.startsWith("Bearer ")
