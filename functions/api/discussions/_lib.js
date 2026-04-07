@@ -67,7 +67,13 @@ export function normalizeTags(tags) {
   const seen = new Set();
   for (const t of tags) {
     if (typeof t !== "string") continue;
-    const norm = t.trim().toLowerCase();
+    // Strip commas (CSV separator), control chars, and surrounding whitespace.
+    // Without this, a tag value containing "," would split into multiple
+    // tags when later parsed by split(",").
+    const norm = t
+      .replace(/[,\u0000-\u001f\u007f]/g, "")
+      .trim()
+      .toLowerCase();
     if (norm.length === 0 || norm.length > MAX_TAG_LEN) continue;
     seen.add(norm);
   }

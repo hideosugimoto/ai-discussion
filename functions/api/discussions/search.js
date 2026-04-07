@@ -47,27 +47,30 @@ export async function onRequestGet(context) {
     const ftsQuery = escapeFtsQuery(rawQuery);
     if (!ftsQuery) return jsonResponse({ results: [] });
 
-    // FTS5 + JOIN to get full row metadata. Filter by user_id at FTS layer.
+    // Filter by user_id on the canonical (indexed) discussions table rather
+    // than the UNINDEXED FTS column for better query planning.
     rows = await env.DB.prepare(
       `SELECT d.id, d.topic, d.tags, d.round_count, d.size_bytes, d.created_at, d.updated_at
        FROM discussions_fts f
        JOIN discussions d ON d.id = f.discussion_id
-       WHERE f.user_id = ? AND discussions_fts MATCH ?
+       WHERE d.user_id = ? AND discussions_fts MATCH ?
        ORDER BY rank
        LIMIT ?`
     )
       .bind(userId, ftsQuery, MAX_RESULTS)
       .all();
   } else {
-    // Tag-only filter
+    // Tag-only filter. ESCAPE clause is required because tagFilter could
+    // contain LIKE wildcards (% _) that would otherwise broaden the match.
+    const escapedTag = tagFilter.replace(/[\\%_]/g, "\\$&");
     rows = await env.DB.prepare(
       `SELECT id, topic, tags, round_count, size_bytes, created_at, updated_at
        FROM discussions
-       WHERE user_id = ? AND (',' || tags || ',') LIKE ?
+       WHERE user_id = ? AND (',' || tags || ',') LIKE ? ESCAPE '\\'
        ORDER BY updated_at DESC
        LIMIT ?`
     )
-      .bind(userId, `%,${tagFilter},%`, MAX_RESULTS)
+      .bind(userId, `%,${escapedTag},%`, MAX_RESULTS)
       .all();
   }
 
