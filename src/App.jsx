@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
+import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
+import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
 import ModelBadge from "./components/ModelBadge";
 import RoundSection from "./components/RoundSection";
@@ -39,6 +41,16 @@ export default function App() {
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [conclusionTarget, setConclusionTarget] = useState("claude");
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
+  const [placeholderIdx, setPlaceholderIdx] = useState(() => Math.floor(Math.random() * PLACEHOLDER_ROTATION.length));
+  const [topicFocused, setTopicFocused] = useState(false);
+
+  useEffect(() => {
+    if (topic.trim() || topicFocused) return;
+    const timer = setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % PLACEHOLDER_ROTATION.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [topic, topicFocused]);
 
   const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, authToken: auth.token, isPremium: auth.isPremium });
   const { discussion, summaries, detailedAnalyses,
@@ -216,7 +228,8 @@ export default function App() {
           <div style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, overflow:"hidden", marginBottom:16 }}>
             <textarea value={topic} onChange={(e) => setTopic(e.target.value)} maxLength={2000} aria-label="議題"
               onKeyDown={(e) => { if (e.key==="Enter"&&(e.metaKey||e.ctrlKey)) handleStart(); }}
-              placeholder={"議題を入力...\n例: AIは人間の仕事を奪うか\nCtrl+Enter で開始"} rows={3}
+              onFocus={() => setTopicFocused(true)} onBlur={() => setTopicFocused(false)}
+              placeholder={`議題を入力... (Ctrl+Enter で開始)\n例: ${PLACEHOLDER_ROTATION[placeholderIdx]}\n💡 下の「おすすめ質問」から選ぶこともできます`} rows={3}
               style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
             <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
@@ -235,6 +248,7 @@ export default function App() {
               {[
                 { id:"keys",    label:"🔑 APIキー", badge:allKeysSet?"✓":"⚠" },
                 { id:"profile", label:"👤 プロフィール", badge:profile.trim()?"✓":null },
+                { id:"suggest", label:"💡 おすすめ質問" },
                 { id:"history", label:"📂 履歴" },
               ].map(({id,label,badge}) => (
                 <button key={id} onClick={() => togglePanel(id)}
@@ -427,6 +441,18 @@ export default function App() {
               アップグレード
             </button>
           </div>
+        )}
+
+        {activePanel === "suggest" && (
+          <SuggestedQuestions
+            hasProfile={!!profile.trim()}
+            onSelect={(q) => {
+              setTopic(q.text);
+              setDiscussionMode(q.mode);
+              setActivePanel(null);
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
         )}
 
         {activePanel === "history" && (
