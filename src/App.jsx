@@ -58,7 +58,7 @@ export default function App() {
           sidePanel, setSidePanel,
           actionPlan, actionPlanLoading,
           bottomRef,
-          handleStart: startDiscussion, handleNextRound, handleStop, handleReset: resetDiscussion,
+          handleStart: startDiscussion, handleNextRound, handleStop, handleReset,
           handleGenerateActionPlan, runDetailedAnalysis, loadFromHistory } = disc;
 
   const crypto = useCryptoBackup({
@@ -103,10 +103,6 @@ export default function App() {
   const handleStart = async () => {
     setActivePanel(null);
     await startDiscussion();
-  };
-
-  const handleReset = () => {
-    resetDiscussion();
   };
 
   const handleResetInputs = () => {

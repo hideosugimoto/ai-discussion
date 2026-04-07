@@ -27,9 +27,18 @@ async function generateSummary(apiKey, authToken, isPremium, messages, topic, ro
 
   const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
-  const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg, sessionId, roundNum);
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  const parsed = JSON.parse(cleaned);
+  const tryOnce = async () => {
+    const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg, sessionId, roundNum);
+    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(cleaned);
+  };
+
+  let parsed;
+  try {
+    parsed = await tryOnce();
+  } catch {
+    parsed = await tryOnce();
+  }
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
   return {
     agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
