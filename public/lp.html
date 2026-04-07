@@ -3,14 +3,65 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>3 AI Discussion — 3つのAIが、あなたのために議論する。月980円。</title>
-<meta name="description" content="Claude・ChatGPT・Geminiの3つの最新AIが、あなたの議題を多角的に議論。月額980円、APIキー不要。Google ログインだけで今すぐ始められる。" />
-<meta property="og:title" content="3 AI Discussion — 3つのAIが、あなたのために議論する。" />
-<meta property="og:description" content="Claude Pro + ChatGPT Plus + Gemini Advanced = 月9,000円。このアプリなら ¥980。" />
+<meta name="theme-color" content="#285240" />
+<title>3 AI Discussion — Claude・ChatGPT・Gemini を月980円で同時に使う、AI議論プラットフォーム</title>
+<meta name="description" content="Claude・ChatGPT・Geminiの3つの最新AIが、同じ議題を多角的に議論し、合意点・対立点・結論まで自動でまとめます。月額980円、APIキー不要。Google ログインだけで30秒で開始。" />
+<meta name="keywords" content="AI 議論, Claude, ChatGPT, Gemini, マルチエージェント, 意思決定支援, AI まとめ" />
+<link rel="canonical" href="https://ai-discussion.pages.dev/lp.html" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="3 AI Discussion — Claude・ChatGPT・Gemini を月980円で全部使える" />
+<meta property="og:description" content="3つの最新AIが同じ議題を議論し、合意点・対立点・結論まで自動でまとめます。Claude Pro + ChatGPT Plus + Gemini Advanced を別々に契約すると月9,000円。このアプリなら ¥980。" />
 <meta property="og:type" content="website" />
+<meta property="og:url" content="https://ai-discussion.pages.dev/lp.html" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:site_name" content="3 AI Discussion" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="3 AI Discussion — 3つのAIが、あなたの議題を議論する。月¥980。" />
+<meta name="twitter:description" content="Claude・ChatGPT・Geminiが同じ議題を議論し、結論まで自動でまとめます。APIキー不要。" />
+
+<!-- Favicon -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23c47b1a'/%3E%3Cstop offset='0.5' stop-color='%23285240'/%3E%3Cstop offset='1' stop-color='%232e7db8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3C/svg%3E" />
+
+<!-- Performance: preconnect + preload critical font CSS (web.dev top CWV) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" />
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- Structured data (JSON-LD): SoftwareApplication for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "3 AI Discussion",
+  "description": "Claude・ChatGPT・Geminiの3つの最新AIが同じ議題を議論し、結論まで自動でまとめるプラットフォーム",
+  "applicationCategory": "ProductivityApplication",
+  "operatingSystem": "Web",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free",
+      "price": "0",
+      "priceCurrency": "JPY"
+    },
+    {
+      "@type": "Offer",
+      "name": "Premium",
+      "price": "980",
+      "priceCurrency": "JPY"
+    },
+    {
+      "@type": "Offer",
+      "name": "Plus",
+      "price": "1980",
+      "priceCurrency": "JPY"
+    }
+  ]
+}
+</script>
 <style>
   :root {
     --bg:         #f7f5f2;
@@ -40,13 +91,38 @@
 
   *, *::before, *::after { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
+  /* System font fallback while web fonts load (LCP optimization) */
   body {
-    font-family: 'DM Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'DM Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.7;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+  /* Skip to content link for keyboard / screen reader users (a11y) */
+  .skip-link {
+    position: absolute; top: -40px; left: 12px;
+    background: var(--accent); color: #fff;
+    padding: 8px 14px; border-radius: 6px;
+    font-size: 14px; font-weight: 600;
+    z-index: 100;
+    transition: top .15s;
+  }
+  .skip-link:focus { top: 12px; text-decoration: none; }
+  /* Visible focus for keyboard navigation */
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  /* Reduced motion support (NN/g principle 5) */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
@@ -283,7 +359,7 @@
     position: relative;
   }
   .compare-box.win::before {
-    content: "BEST VALUE";
+    content: "おすすめ · 約 89% OFF";
     position: absolute;
     top: -12px; left: 50%;
     transform: translateX(-50%);
@@ -292,7 +368,8 @@
     font-size: 11px; font-weight: 700;
     padding: 4px 14px;
     border-radius: 999px;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
   }
   .compare-box .label {
     font-size: 12px; color: var(--text3); font-weight: 600;
@@ -548,6 +625,187 @@
   }
   .final-cta .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
 
+  /* ── Hero dialogue extras ────────────────────── */
+  .dialogue-topic {
+    text-align: center;
+    margin-bottom: 18px;
+    display: flex; gap: 10px; justify-content: center; align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .dialogue-topic .topic-label {
+    display: inline-block;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    border-radius: 999px;
+    padding: 3px 12px;
+  }
+  .dialogue-topic .topic-text {
+    font-size: 15px; font-weight: 600; color: var(--text);
+  }
+  .ai-card .name .model {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text3);
+    font-weight: 500;
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  .ai-card .name { display: flex; align-items: center; gap: 6px; }
+  .dialogue-summary {
+    margin-top: 18px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text2);
+    text-align: left;
+    max-width: 720px;
+    margin-left: auto; margin-right: auto;
+  }
+  .dialogue-summary strong { color: var(--accent); }
+
+  /* ── Trust strip ─────────────────────────────── */
+  .trust-strip {
+    padding: 36px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .trust-label {
+    text-align: center;
+    font-size: 11px; font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 0.18em;
+    margin-bottom: 18px;
+  }
+  .trust-row {
+    display: flex; justify-content: center; align-items: center;
+    flex-wrap: wrap; gap: 28px;
+  }
+  .trust-item {
+    display: flex; flex-direction: column; align-items: center;
+    line-height: 1.2;
+  }
+  .trust-item strong {
+    font-size: 14px; color: var(--text);
+    font-weight: 700;
+  }
+  .trust-item span {
+    font-size: 10px; color: var(--text3);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+  }
+  .trust-divider {
+    width: 1px; height: 32px;
+    background: var(--border2);
+  }
+  @media (max-width: 720px) {
+    .trust-row { gap: 18px; }
+    .trust-divider { display: none; }
+  }
+
+  /* ── How it works (steps) ────────────────────── */
+  .how { background: var(--surface); }
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 18px;
+    align-items: stretch;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  @media (max-width: 880px) {
+    .steps { grid-template-columns: 1fr; gap: 14px; }
+    .steps .step-arrow { transform: rotate(90deg); margin: 0 auto; }
+  }
+  .step {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 22px;
+    text-align: center;
+  }
+  .step-num {
+    display: inline-block;
+    font-size: 13px; font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    border-radius: 999px;
+    padding: 4px 14px;
+    margin-bottom: 14px;
+    letter-spacing: 0.06em;
+  }
+  .step h3 {
+    font-size: 17px; font-weight: 700; margin: 0 0 10px;
+  }
+  .step p {
+    font-size: 13.5px; color: var(--text2); margin: 0; line-height: 1.7;
+  }
+  .step-arrow {
+    align-self: center;
+    color: var(--accent);
+    font-size: 28px; font-weight: 700;
+  }
+
+  /* ── Trust & Safety ──────────────────────────── */
+  .trust-safety { background: var(--bg2); }
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  @media (max-width: 880px) { .trust-grid { grid-template-columns: 1fr; } }
+  .trust-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 26px 22px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .trust-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .trust-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .trust-card h4 {
+    font-size: 16px; font-weight: 700; margin: 0 0 8px;
+  }
+  .trust-card p {
+    font-size: 13px; color: var(--text2); margin: 0; line-height: 1.7;
+  }
+  .trust-cta {
+    text-align: center;
+    margin-top: 36px;
+  }
+
+  /* ── Plan footer microcopy (risk reversal) ──── */
+  .plan-foot {
+    margin-top: 12px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── Final CTA microcopy ─────────────────────── */
+  .final-cta-foot {
+    margin-top: 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+  }
+
   /* ── Footer ──────────────────────────────────── */
   footer {
     padding: 48px 0 60px;
@@ -566,58 +824,87 @@
 </head>
 <body>
 
+<a href="#main" class="skip-link">本文へスキップ</a>
+
 <header class="site">
   <div class="inner">
-    <div class="logo">
-      <span class="logo-mark"></span>
+    <a href="#top" class="logo" aria-label="3 AI Discussion トップへ">
+      <span class="logo-mark" aria-hidden="true"></span>
       <span>3 AI Discussion</span>
-    </div>
-    <nav class="nav">
-      <a href="#how">使い方</a>
+    </a>
+    <nav class="nav" aria-label="メインナビゲーション">
+      <a href="#how-it-works">使い方</a>
       <a href="#features">機能</a>
       <a href="#pricing">料金</a>
       <a href="#faq">FAQ</a>
-      <a href="/" class="btn btn-primary">今すぐ始める</a>
+      <a href="/" class="btn btn-primary">Google で始める</a>
     </nav>
   </div>
 </header>
 
+<main id="main">
+
 <!-- ── Hero ─────────────────────────────────────── -->
-<section class="hero">
+<section class="hero" id="top" aria-labelledby="hero-title">
   <div class="container">
-    <span class="hero-eyebrow">Claude · ChatGPT · Gemini を 1つの画面で</span>
-    <h1>
-      ひとりで考える時代は、<br />
-      <span class="accent">終わった。</span>
+    <span class="hero-eyebrow">AI 議論プラットフォーム</span>
+    <h1 id="hero-title">
+      1つの問いに、<br />
+      <span class="accent">3つの最強AI。</span>
     </h1>
     <p class="lead">
-      3つの最新AIが、あなたの議題を本気で議論する。<br />
-      合意点・対立点・最終結論まで、自動でまとめる。
+      Claude・ChatGPT・Gemini が同じ議題を議論し、<br />
+      合意点・対立点・結論まで自動でまとめます。<strong>月¥980。APIキー不要。</strong>
     </p>
     <div class="hero-cta">
-      <a href="/" class="btn btn-primary btn-lg">無料で試す</a>
-      <a href="#pricing" class="btn btn-ghost btn-lg">料金を見る</a>
+      <a href="/" class="btn btn-primary btn-lg">Google アカウントで30秒で始める →</a>
+      <a href="#how-it-works" class="btn btn-ghost btn-lg">使い方を見る</a>
     </div>
     <div class="hero-foot">
-      Google ログインだけで開始 · APIキー不要 · 月980円〜
+      <span aria-hidden="true">✓</span> クレジットカード不要 &nbsp;·&nbsp;
+      <span aria-hidden="true">✓</span> いつでも解約 &nbsp;·&nbsp;
+      <span aria-hidden="true">✓</span> ソースコード公開
     </div>
   </div>
 
   <!-- 3 AI dialogue mock -->
-  <div class="dialogue">
+  <div class="dialogue" aria-label="3つのAIによる議論の例">
+    <div class="dialogue-topic">
+      <span class="topic-label">議題</span>
+      <span class="topic-text">「30代会社員、副業で起業すべきか?」</span>
+    </div>
     <div class="dialogue-grid">
       <div class="ai-card claude">
-        <div class="name"><span class="dot"></span>Claude</div>
+        <div class="name"><span class="dot" aria-hidden="true"></span>Claude<span class="model">opus 4.6</span></div>
         <p>あなたの価値観を踏まえると、起業の方が後悔しないと思う。長期の自由度を最重視している点が決め手です。</p>
       </div>
       <div class="ai-card chatgpt">
-        <div class="name"><span class="dot"></span>ChatGPT</div>
+        <div class="name"><span class="dot" aria-hidden="true"></span>ChatGPT<span class="model">gpt-4o</span></div>
         <p>いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。</p>
       </div>
       <div class="ai-card gemini">
-        <div class="name"><span class="dot"></span>Gemini</div>
+        <div class="name"><span class="dot" aria-hidden="true"></span>Gemini<span class="model">2.5 pro</span></div>
         <p>2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
       </div>
+    </div>
+    <div class="dialogue-summary" role="note">
+      <strong>自動サマリー:</strong> 3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。
+    </div>
+  </div>
+</section>
+
+<!-- ── Trust strip: model authority + tech stack ─── -->
+<section class="trust-strip" aria-label="使用技術">
+  <div class="container">
+    <div class="trust-label">POWERED BY</div>
+    <div class="trust-row">
+      <div class="trust-item"><strong>Claude Opus 4.6</strong><span>Anthropic</span></div>
+      <div class="trust-item"><strong>GPT-4o</strong><span>OpenAI</span></div>
+      <div class="trust-item"><strong>Gemini 2.5 Pro</strong><span>Google</span></div>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-item"><strong>Cloudflare</strong><span>edge</span></div>
+      <div class="trust-item"><strong>Stripe</strong><span>決済</span></div>
+      <div class="trust-item"><strong>OAuth 2.0</strong><span>認証</span></div>
     </div>
   </div>
 </section>
@@ -635,11 +922,39 @@
   </div>
 </section>
 
+<!-- ── How it works (3 steps) ────────────────────── -->
+<section id="how-it-works" class="how">
+  <div class="container">
+    <h2>使い方は、3ステップ。</h2>
+    <p class="sub">登録から議論完了まで、最短2分。<br />むずかしい設定もプロンプトエンジニアリングも不要です。</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3>議題を入力</h3>
+        <p>悩んでいることを1行で。<br />思いつかなければ <strong>50問のテンプレート</strong> から選ぶだけ。</p>
+      </div>
+      <div class="step-arrow" aria-hidden="true">→</div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3>3AIが同時に議論</h3>
+        <p>Claude・ChatGPT・Gemini が並列でストリーミング応答。<br />互いの発言に反応し、複数ラウンド議論が深まります。</p>
+      </div>
+      <div class="step-arrow" aria-hidden="true">→</div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3>結論を自動でまとめる</h3>
+        <p>合意点・対立点・最終結論を自動分析。<br />マインドマップ・アクションプランまでワンクリックで生成。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Pricing compare ──────────────────────────── -->
 <section id="value">
   <div class="container">
     <h2>3社のサブスクを契約する代わりに。</h2>
-    <p class="sub">Claude Pro + ChatGPT Plus + Gemini Advanced を全部契約すると、月およそ9,000円。<br />このアプリなら、月980円で同じモデルを全部使えます。</p>
+    <p class="sub">Claude Pro + ChatGPT Plus + Gemini Advanced を全部契約すると、月およそ9,000円。<br />このアプリなら、月980円で同じモデルを全部使えます。<strong>差額 ¥8,020 / 月の節約。</strong></p>
 
     <div class="compare">
       <div class="compare-box">
@@ -726,7 +1041,7 @@
 </section>
 
 <!-- ── Modes ────────────────────────────────────── -->
-<section class="modes" id="how">
+<section class="modes" id="modes">
   <div class="container">
     <h2>5つのモードで、議論の質をコントロール。</h2>
     <p class="sub">同じ議題でも、モードを変えれば違う答えが出る。目的に応じて使い分けよう。</p>
@@ -807,6 +1122,51 @@
   </div>
 </section>
 
+<!-- ── Trust & Safety ───────────────────────────── -->
+<section class="trust-safety" aria-labelledby="trust-title">
+  <div class="container">
+    <h2 id="trust-title">透明性で、信頼を作る。</h2>
+    <p class="sub">レビューが集まる前のサービスだからこそ、ごまかさず全部見せます。</p>
+
+    <div class="trust-grid">
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>ソースコード全公開</h4>
+        <p>JWT 検証 · Stripe Webhook · LLM プロキシまで、サーバーサイドの全コードが GitHub で読めます。BSL 1.1 ライセンスで、2030年4月に MIT 移行予定。</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>5層の多層防御</h4>
+        <p>CORS・IPレート制限・JWT (HS256, 15分有効)・入力バリデーション・出力サニタイズ。リフレッシュトークンは SHA-256 ハッシュのみDB保存。</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>共有時の個人情報は自動除外</h4>
+        <p>共有リンク作成時、プロフィール・憲法・APIキー・ペルソナ設定は whitelist 方式で完全除外。コードレベルで保証されています。</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>SRI で CDN 改ざん検知</h4>
+        <p>外部ライブラリは Subresource Integrity ハッシュで検証。攻撃者が CDN を侵害してもブラウザが自動ブロックします。</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>解約はワンクリック</h4>
+        <p>Stripe のカスタマーポータルから即解約。電話・メール不要。当月分は最後まで利用可能です。</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon" aria-hidden="true">◇</div>
+        <h4>個人開発・透明な運営</h4>
+        <p>大企業ではなく個人クリエイターによる運営。だからこそ、コードもポリシーも全部見せます。問い合わせは GitHub Issues で公開。</p>
+      </div>
+    </div>
+
+    <div class="trust-cta">
+      <a href="https://github.com/hideosugimoto/ai-discussion" class="btn btn-ghost">GitHub でコードを読む</a>
+    </div>
+  </div>
+</section>
+
 <!-- ── Pricing ──────────────────────────────────── -->
 <section id="pricing">
   <div class="container">
@@ -825,7 +1185,8 @@
           <li>AES-GCM 暗号化バックアップ</li>
           <li>3テーマ切替</li>
         </ul>
-        <a href="/" class="btn btn-ghost">今すぐ始める</a>
+        <a href="/" class="btn btn-ghost">APIキーを持って開始 →</a>
+        <div class="plan-foot">クレジットカード不要</div>
       </div>
 
       <div class="plan featured">
@@ -834,13 +1195,14 @@
         <div class="price">¥980<small> / 月</small></div>
         <ul>
           <li>API キー不要（サーバープロキシ）</li>
-          <li>Google ログインで即利用開始</li>
+          <li>Google ログインで30秒で開始</li>
           <li>クラウド履歴同期 + 全文検索</li>
           <li>共有リンク・公開URL生成</li>
           <li>使用量ダッシュボード</li>
           <li>過去議論の文脈注入</li>
         </ul>
-        <a href="/" class="btn btn-primary">Premium を始める</a>
+        <a href="/" class="btn btn-primary">Premium を ¥980 で始める →</a>
+        <div class="plan-foot">いつでも解約 · 翌月から課金停止</div>
       </div>
 
       <div class="plan">
@@ -853,7 +1215,8 @@
           <li>追加クレジット購入可能（¥500 = +$2）</li>
           <li>優先サポート</li>
         </ul>
-        <a href="/" class="btn btn-ghost">Plus を始める</a>
+        <a href="/" class="btn btn-ghost">Plus を ¥1,980 で始める →</a>
+        <div class="plan-foot">Premium からの切替も自由</div>
       </div>
     </div>
   </div>
@@ -905,15 +1268,18 @@
 </section>
 
 <!-- ── Final CTA ────────────────────────────────── -->
-<section>
+<section aria-labelledby="final-cta-title">
   <div class="container">
     <div class="final-cta">
-      <h2>3つのAIに、最初の議題を投げてみよう。</h2>
-      <p>Google ログインだけで始められます。クレジットカード不要で無料お試しから。</p>
-      <a href="/" class="btn btn-lg">今すぐ始める</a>
+      <h2 id="final-cta-title">最初の議題を投げるまで、30秒。</h2>
+      <p>Google アカウントだけで始められます。クレジットカード不要・いつでも解約・コードはGitHubで全公開。</p>
+      <a href="/" class="btn btn-lg">Google アカウントで今すぐ始める →</a>
+      <div class="final-cta-foot">月¥980 · 試してみて気に入らなければ翌月解約でOK</div>
     </div>
   </div>
 </section>
+
+</main>
 
 <!-- ── Footer ───────────────────────────────────── -->
 <footer>
