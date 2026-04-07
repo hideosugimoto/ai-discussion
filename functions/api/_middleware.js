@@ -112,7 +112,8 @@ const PUBLIC_PATHS = [
 function isPublicDynamic(method, pathname) {
   // GET /api/share/[id] is public (unlisted shareable link).
   // POST/DELETE /api/share/[id] still require auth.
-  if (method === "GET" && /^\/api\/share\/[A-Za-z0-9_-]{16,64}$/.test(pathname)) {
+  // Length is fixed at 22 to match generateShareId() (see share/_lib.js).
+  if (method === "GET" && /^\/api\/share\/[A-Za-z0-9_-]{22}$/.test(pathname)) {
     return true;
   }
   return false;

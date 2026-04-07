@@ -20,6 +20,8 @@ import useUsage from "./hooks/useUsage";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
 import SharedView from "./components/SharedView";
+import ShareDialog from "./components/ShareDialog";
+import PlanPicker from "./components/PlanPicker";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -262,12 +264,17 @@ export default function App() {
     }
   };
 
-  // Refetch usage after credit purchase success redirect
+  // Refetch usage after credit purchase success redirect.
+  // URL cleanup is unconditional so the param doesn't linger across sessions
+  // (e.g. if the user logged out before redirect completed).
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("credit") === "success" && auth.isPremium) {
+    const creditStatus = url.searchParams.get("credit");
+    if (creditStatus) {
       url.searchParams.delete("credit");
       window.history.replaceState({}, "", url.pathname + url.search);
+    }
+    if (creditStatus === "success" && auth.isPremium) {
       // Slight delay so webhook can land
       setTimeout(() => fetchUsage(), 1500);
     }
@@ -635,48 +642,7 @@ export default function App() {
 
         {/* Plan selection (Premium / Plus) */}
         {auth.user && !auth.isPremium && activePanel === "keys" && (
-          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10 }}>
-            <div style={{ fontSize:13, fontWeight:700, color:"var(--accent-light)", marginBottom:10 }}>サブスクリプションプラン</div>
-            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-              <div style={{ flex:"1 1 240px", padding:"12px 14px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8 }}>
-                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:4 }}>ライト</div>
-                <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Premium</div>
-                <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>980円 / 月</div>
-                <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
-                  <li>月間 約15議論（最強3R）</li>
-                  <li>APIキー不要</li>
-                  <li>クラウド同期履歴・全文検索</li>
-                  <li>共有リンク作成</li>
-                </ul>
-                <button
-                  onClick={() => startCheckout("premium")}
-                  style={{ width:"100%", padding:"8px 14px", background:"var(--accent)", border:"none", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600 }}
-                >
-                  Premium にする
-                </button>
-              </div>
-              <div style={{ flex:"1 1 240px", padding:"12px 14px", background:"var(--bg)", border:"1px solid var(--accent)", borderRadius:8, position:"relative" }}>
-                <div style={{ position:"absolute", top:-8, right:10, padding:"2px 8px", background:"var(--accent)", color:"#fff", fontSize:9, borderRadius:4, fontWeight:700 }}>HEAVY</div>
-                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:4 }}>ヘビー</div>
-                <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Plus</div>
-                <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>1,980円 / 月</div>
-                <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
-                  <li>月間 約60〜75議論（最強3R）</li>
-                  <li>Premium の全機能</li>
-                  <li>追加クレジット購入もOK</li>
-                </ul>
-                <button
-                  onClick={() => startCheckout("plus")}
-                  style={{ width:"100%", padding:"8px 14px", background:"var(--accent)", border:"none", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600 }}
-                >
-                  Plus にする
-                </button>
-              </div>
-            </div>
-            <div style={{ marginTop:10, fontSize:10, color:"var(--text3)", lineHeight:1.6 }}>
-              ※ いつでもキャンセル可能。月の途中で Premium → Plus 変更時は Stripe の比例計算で差額のみ請求されます。
-            </div>
-          </div>
+          <PlanPicker onPick={startCheckout} />
         )}
 
         {activePanel === "suggest" && (
@@ -820,62 +786,7 @@ export default function App() {
         </button>
       )}
 
-      {/* 共有結果モーダル */}
-      {shareDialog && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="share-dialog-title"
-          onClick={() => shareDialog !== "creating" && setShareDialog(null)}
-          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:200, padding:16 }}
-        >
-          <div onClick={(e) => e.stopPropagation()} style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:12, padding:24, maxWidth:540, width:"100%" }}>
-            {shareDialog === "creating" && (
-              <div style={{ textAlign:"center", color:"var(--text2)" }}>
-                <div id="share-dialog-title" style={{ fontSize:14, marginBottom:8 }}>共有リンクを作成中...</div>
-              </div>
-            )}
-            {shareDialog && shareDialog.url && (
-              <>
-                <div id="share-dialog-title" style={{ fontSize:15, fontWeight:700, color:"var(--text)", marginBottom:8 }}>✓ 共有リンクを作成しました</div>
-                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:12 }}>URL はクリップボードにコピー済みです（コピーできない環境では下のテキストをご利用ください）。</div>
-                <input
-                  readOnly
-                  value={shareDialog.url}
-                  onFocus={(e) => e.target.select()}
-                  style={{ width:"100%", padding:"10px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", fontSize:12, fontFamily:"monospace", marginBottom:14 }}
-                />
-                <div style={{ fontSize:11, color:"var(--text3)", marginBottom:14, lineHeight:1.6 }}>
-                  ⚠ このリンクを知っている人は誰でも閲覧できます。検索エンジンには載りません。<br />
-                  共有を取り消すには、議論を再開した状態で「共有」ボタンから管理してください（この機能は次のアップデートで追加予定）。
-                </div>
-                <div style={{ display:"flex", justifyContent:"flex-end", gap:8 }}>
-                  <button
-                    onClick={() => setShareDialog(null)}
-                    style={{ padding:"8px 18px", background:"var(--accent)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontSize:13, fontWeight:600 }}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </>
-            )}
-            {shareDialog && shareDialog.error && (
-              <>
-                <div id="share-dialog-title" style={{ fontSize:15, fontWeight:700, color:"var(--error)", marginBottom:8 }}>✗ 共有に失敗しました</div>
-                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:14 }}>{shareDialog.error}</div>
-                <div style={{ display:"flex", justifyContent:"flex-end" }}>
-                  <button
-                    onClick={() => setShareDialog(null)}
-                    style={{ padding:"8px 18px", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text2)", cursor:"pointer", fontSize:13 }}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <ShareDialog state={shareDialog} onClose={() => setShareDialog(null)} />
     </div>
   );
 }

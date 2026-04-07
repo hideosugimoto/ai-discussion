@@ -41,10 +41,12 @@ export function generateShareId() {
     .replace(/=+$/g, "");
 }
 
-// Strict id validation for path parameters
+// Strict id validation for path parameters.
+// Length is fixed at 22 to match generateShareId() output exactly
+// (defense in depth: generator and validator should never disagree).
 export function validateShareId(id) {
   if (typeof id !== "string") return null;
-  if (id.length < 16 || id.length > 64) return null;
+  if (id.length !== 22) return null;
   if (!/^[A-Za-z0-9_-]+$/.test(id)) return null;
   return id;
 }
