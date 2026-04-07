@@ -16,11 +16,16 @@
 <meta property="og:url" content="https://ai-discussion.pages.dev/lp.html" />
 <meta property="og:locale" content="ja_JP" />
 <meta property="og:site_name" content="3 AI Discussion" />
+<meta property="og:image" content="https://ai-discussion.pages.dev/og.svg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="3 AI Discussion — 1つの問いに、3つの最強AI。月¥980。" />
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="3 AI Discussion — 3つのAIが、あなたの議題を議論する。月¥980。" />
 <meta name="twitter:description" content="Claude・ChatGPT・Geminiが同じ議題を議論し、結論まで自動でまとめます。APIキー不要。" />
+<meta name="twitter:image" content="https://ai-discussion.pages.dev/og.svg" />
 
 <!-- Favicon -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23c47b1a'/%3E%3Cstop offset='0.5' stop-color='%23285240'/%3E%3Cstop offset='1' stop-color='%232e7db8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3C/svg%3E" />
@@ -28,8 +33,8 @@
 <!-- Performance: preconnect + preload critical font CSS (web.dev top CWV) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" />
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 
 <!-- Structured data (JSON-LD): SoftwareApplication for SEO -->
 <script type="application/ld+json">
@@ -63,7 +68,8 @@
 }
 </script>
 <style>
-  :root {
+  /* ── Theme: Base (light, default) ──────────────── */
+  :root, [data-theme="base"] {
     --bg:         #f7f5f2;
     --bg2:        #eeebe6;
     --surface:    #ffffff;
@@ -87,6 +93,38 @@
     --shadow-lg:  0 24px 60px rgba(0,0,0,0.12);
     --radius:     12px;
     --radius-lg:  20px;
+    --header-bg:  rgba(247,245,242,0.85);
+  }
+
+  /* ── Theme: Dark ─────────────────────────────── */
+  [data-theme="dark"] {
+    --bg:         #1a1814;
+    --bg2:        #242018;
+    --surface:    #242018;
+    --border:     #3a3530;
+    --border2:    #4a4540;
+    --text:       #f0ece4;
+    --text2:      #b8af9a;
+    --text3:      #8c8478;
+    --accent:     #7c3aed;
+    --accent-light: #a78bfa;
+    --accent-bg:  rgba(124,58,237,.12);
+    --accent-bd:  rgba(124,58,237,.3);
+    --warning:    #d4922a;
+    --warning-bg: rgba(212,146,42,.13);
+    --warning-bd: rgba(212,146,42,.3);
+    --claude:     #f59e0b;
+    --chatgpt:    #10a37f;
+    --gemini:     #60a5fa;
+    --shadow-sm:  0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md:  0 8px 24px rgba(0,0,0,0.4);
+    --shadow-lg:  0 24px 60px rgba(0,0,0,0.5);
+    --header-bg:  rgba(26,24,20,0.85);
+  }
+
+  /* Smooth theme transitions */
+  body, .ai-card, .feature, .step, .trust-card, .plan, .compare-box, .narrative-card, header.site, .trust-strip, .mode {
+    transition: background .25s, color .25s, border-color .25s;
   }
 
   *, *::before, *::after { box-sizing: border-box; }
@@ -134,11 +172,24 @@
   /* ── Header ───────────────────────────────────── */
   header.site {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(247,245,242,0.85);
+    background: var(--header-bg);
     backdrop-filter: saturate(140%) blur(12px);
     -webkit-backdrop-filter: saturate(140%) blur(12px);
     border-bottom: 1px solid var(--border);
   }
+  /* Theme toggle button */
+  .theme-toggle {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text2);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--border2); }
   header.site .inner {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 24px; max-width: 1080px; margin: 0 auto;
@@ -806,6 +857,322 @@
     color: rgba(255,255,255,0.75);
   }
 
+  /* ── Product screenshot mockup ───────────────── */
+  .screenshot-section {
+    padding: 80px 0;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  }
+  .browser-frame {
+    max-width: 1000px;
+    margin: 30px auto 0;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .browser-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+  .browser-dots { display: flex; gap: 6px; }
+  .browser-dots span {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--border2);
+  }
+  .browser-dots span:nth-child(1) { background: #ed6a5e; }
+  .browser-dots span:nth-child(2) { background: #f5bf4f; }
+  .browser-dots span:nth-child(3) { background: #61c454; }
+  .browser-url {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    color: var(--text2);
+    font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    text-align: center;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .browser-actions { color: var(--text3); font-size: 18px; }
+
+  .app-mock {
+    padding: 22px 24px 28px;
+    background: var(--bg);
+    font-size: 13px;
+  }
+  .app-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 18px;
+  }
+  .app-logo-row { display: flex; align-items: center; gap: 8px; }
+  .app-logo-row .logo-mark { width: 22px; height: 22px; border-radius: 6px; }
+  .app-title { font-weight: 700; font-size: 14px; color: var(--text); }
+  .app-user { display: flex; align-items: center; gap: 10px; }
+  .usage-pill {
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    color: var(--accent);
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: 'SFMono-Regular', monospace;
+  }
+  .user-name { font-size: 12px; color: var(--text3); }
+  @media (max-width: 600px) {
+    .user-name { display: none; }
+  }
+
+  .topic-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+  }
+  .topic-row .topic-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    color: var(--accent); background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    padding: 2px 10px; border-radius: 999px;
+  }
+  .topic-row .topic-text {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    flex: 1;
+  }
+  .topic-row .topic-status {
+    font-size: 11px; color: var(--text3);
+    font-family: 'SFMono-Regular', monospace;
+  }
+
+  .mode-row {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .mode-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font-size: 11px; font-weight: 600;
+    color: var(--text2);
+    cursor: default;
+  }
+  .mode-pill.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  .discussion-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 720px) {
+    .discussion-grid { grid-template-columns: 1fr; }
+  }
+  .msg {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px 12px;
+  }
+  .msg header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .msg-name { font-size: 12px; font-weight: 700; }
+  .msg-claude .msg-name  { color: var(--claude); }
+  .msg-chatgpt .msg-name { color: var(--chatgpt); }
+  .msg-gemini .msg-name  { color: var(--gemini); }
+  .msg-model {
+    font-size: 10px; color: var(--text3);
+    font-family: 'SFMono-Regular', monospace;
+  }
+  .msg p {
+    font-size: 12px; color: var(--text);
+    margin: 0 0 6px;
+    line-height: 1.55;
+  }
+  .msg p.msg-fade {
+    color: var(--text3);
+    font-style: italic;
+  }
+
+  .summary-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .summary-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .sum-tab {
+    flex: 0 0 auto;
+    padding: 9px 16px;
+    background: transparent;
+    border: none;
+    font-size: 11px; font-weight: 600;
+    color: var(--text2);
+    cursor: default;
+    border-bottom: 2px solid transparent;
+  }
+  .sum-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    background: var(--surface);
+  }
+  .summary-body { padding: 14px 16px; }
+  .sum-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0;
+    font-size: 12.5px;
+    color: var(--text);
+    border-bottom: 1px dashed var(--border);
+  }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-tag {
+    flex-shrink: 0;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 9px;
+    border-radius: 999px;
+    border: 1px solid;
+  }
+  .sum-tag.agree {
+    color: var(--accent);
+    background: var(--accent-bg);
+    border-color: var(--accent-bd);
+  }
+  .sum-tag.conflict {
+    color: var(--warning);
+    background: var(--warning-bg);
+    border-color: var(--warning-bd);
+  }
+  .sum-tag.open {
+    color: var(--text3);
+    background: var(--bg2);
+    border-color: var(--border);
+  }
+
+  .screenshot-foot {
+    text-align: center;
+    margin-top: 18px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* ── Use Cases ───────────────────────────────── */
+  .usecases { background: var(--bg2); }
+  .usecase-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 22px;
+    max-width: 940px;
+    margin: 0 auto;
+  }
+  @media (max-width: 720px) { .usecase-grid { grid-template-columns: 1fr; } }
+  .usecase {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 30px 28px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .usecase:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .usecase-tag {
+    display: inline-block;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    border-radius: 999px;
+    padding: 3px 12px;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .usecase h3 {
+    font-size: 20px; font-weight: 700; margin: 0 0 12px;
+  }
+  .usecase-quote {
+    font-size: 14px;
+    color: var(--text);
+    font-style: italic;
+    margin: 0 0 16px;
+    padding-left: 14px;
+    border-left: 3px solid var(--accent);
+    line-height: 1.6;
+  }
+  .usecase ul {
+    list-style: none; padding: 0; margin: 0;
+    font-size: 13px; color: var(--text2);
+  }
+  .usecase ul li {
+    padding: 4px 0 4px 18px;
+    position: relative;
+  }
+  .usecase ul li::before {
+    content: "→";
+    position: absolute; left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Sticky mobile CTA ───────────────────────── */
+  .mobile-cta {
+    position: fixed;
+    bottom: 12px; left: 12px; right: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 10px 14px 10px 22px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: var(--shadow-lg);
+    z-index: 60;
+    transform: translateY(120%);
+    transition: transform .3s ease, opacity .3s ease;
+    opacity: 0;
+  }
+  .mobile-cta.visible {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  .mobile-cta-text {
+    display: flex; flex-direction: column; line-height: 1.2;
+  }
+  .mobile-cta-text strong {
+    font-size: 14px; color: var(--text); font-weight: 700;
+  }
+  .mobile-cta-text span {
+    font-size: 10px; color: var(--text3);
+    margin-top: 2px;
+  }
+  .mobile-cta .btn {
+    padding: 9px 18px;
+    font-size: 13px;
+  }
+  @media (max-width: 720px) {
+    .mobile-cta { display: flex; }
+    /* Add bottom padding so footer isn't covered */
+    footer { padding-bottom: 90px; }
+  }
+
   /* ── Footer ──────────────────────────────────── */
   footer {
     padding: 48px 0 60px;
@@ -837,6 +1204,9 @@
       <a href="#features">機能</a>
       <a href="#pricing">料金</a>
       <a href="#faq">FAQ</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="テーマを切り替え" title="ライト / ダーク 切替">
+        <span id="theme-icon" aria-hidden="true">◐</span>
+      </button>
       <a href="/" class="btn btn-primary">Google で始める</a>
     </nav>
   </div>
@@ -890,6 +1260,93 @@
     <div class="dialogue-summary" role="note">
       <strong>自動サマリー:</strong> 3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。
     </div>
+  </div>
+</section>
+
+<!-- ── Product screenshot mockup ──────────────────── -->
+<section class="screenshot-section" aria-labelledby="screenshot-title">
+  <div class="container">
+    <h2 id="screenshot-title">実際の議論画面。</h2>
+    <p class="sub">テキスト・要約・マインドマップが1画面に統合。<br />議論しながら結論をリアルタイムで把握できます。</p>
+
+    <div class="browser-frame">
+      <div class="browser-bar">
+        <div class="browser-dots" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="browser-url">ai-discussion.pages.dev</div>
+        <div class="browser-actions" aria-hidden="true">⋮</div>
+      </div>
+
+      <div class="app-mock">
+        <div class="app-header">
+          <div class="app-logo-row">
+            <span class="logo-mark" aria-hidden="true"></span>
+            <span class="app-title">3 AI Discussion</span>
+          </div>
+          <div class="app-user">
+            <span class="usage-pill">残り 87%</span>
+            <span class="user-name">user@example.com</span>
+          </div>
+        </div>
+
+        <div class="topic-row">
+          <span class="topic-label">議題</span>
+          <span class="topic-text">30代エンジニア、副業で起業すべきか?</span>
+          <span class="topic-status">議論中 · ラウンド 2/3</span>
+        </div>
+
+        <div class="mode-row" role="group" aria-label="議論モード">
+          <button class="mode-pill active" type="button">標準</button>
+          <button class="mode-pill" type="button">ディベート</button>
+          <button class="mode-pill" type="button">ブレスト</button>
+          <button class="mode-pill" type="button">事実検証</button>
+          <button class="mode-pill" type="button">結論まとめ</button>
+        </div>
+
+        <div class="discussion-grid">
+          <article class="msg msg-claude">
+            <header><span class="msg-name">Claude</span><span class="msg-model">opus 4.6</span></header>
+            <p>あなたの価値観を踏まえると、起業の方が後悔しないと思う。長期の自由度を最重視している点が決め手です。</p>
+            <p class="msg-fade">ただし、ChatGPTの指摘した安定性も重要。段階的な独立戦略を提案します...</p>
+          </article>
+          <article class="msg msg-chatgpt">
+            <header><span class="msg-name">ChatGPT</span><span class="msg-model">gpt-4o</span></header>
+            <p>いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。</p>
+            <p class="msg-fade">具体的には、副業を週末に限定して半年運営し、月10万の利益が出てから独立を検討...</p>
+          </article>
+          <article class="msg msg-gemini">
+            <header><span class="msg-name">Gemini</span><span class="msg-model">2.5 pro</span></header>
+            <p>2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
+            <p class="msg-fade">国民健康保険への切替で年間20-40万のコスト増。配偶者の社保扶養なら...</p>
+          </article>
+        </div>
+
+        <div class="summary-box">
+          <div class="summary-tabs" role="tablist">
+            <button class="sum-tab active" role="tab" aria-selected="true" type="button">テキスト</button>
+            <button class="sum-tab" role="tab" aria-selected="false" type="button">サマリーマップ</button>
+            <button class="sum-tab" role="tab" aria-selected="false" type="button">詳細マップ</button>
+          </div>
+          <div class="summary-body">
+            <div class="sum-row">
+              <span class="sum-tag agree">合意</span>
+              <span>段階的な独立戦略が望ましい (3者一致)</span>
+            </div>
+            <div class="sum-row">
+              <span class="sum-tag conflict">対立</span>
+              <span>独立タイミング: 半年 vs 1年 vs 配偶者状況依存</span>
+            </div>
+            <div class="sum-row">
+              <span class="sum-tag open">未解決</span>
+              <span>子育て世帯の場合の追加コスト試算</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="screenshot-foot">※ デモ画面です。実際の応答は議題により異なります。</p>
   </div>
 </section>
 
@@ -1072,6 +1529,60 @@
         <h5>結論まとめ</h5>
         <p>1つのAIが中立記録者として全体を統合。</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Use Cases ────────────────────────────────── -->
+<section class="usecases" aria-labelledby="usecases-title">
+  <div class="container">
+    <h2 id="usecases-title">こんなシーンで使われています。</h2>
+    <p class="sub">ひとりで考えるには複雑すぎる問題を、3つの視点で整理する。</p>
+
+    <div class="usecase-grid">
+      <article class="usecase">
+        <div class="usecase-tag">キャリア</div>
+        <h3>転職・起業の決断</h3>
+        <p class="usecase-quote">「次の一歩を、誰かに本気で議論してほしかった」</p>
+        <ul>
+          <li>あなたの価値観を「憲法」として設定</li>
+          <li>3AIが賛成・反対・第3視点を提示</li>
+          <li>自動でアクションプランまで生成</li>
+        </ul>
+      </article>
+
+      <article class="usecase">
+        <div class="usecase-tag">事業</div>
+        <h3>経営・事業判断</h3>
+        <p class="usecase-quote">「壁打ち相手がいない、個人事業主の孤独に」</p>
+        <ul>
+          <li>ペルソナパックで CEO/CFO/CMO を一括設定</li>
+          <li>ディベートモードで論点を可視化</li>
+          <li>結論をマインドマップで後から共有</li>
+        </ul>
+      </article>
+
+      <article class="usecase">
+        <div class="usecase-tag">ライフ</div>
+        <h3>お金・住まい・家族</h3>
+        <p class="usecase-quote">「FPに払う前に、3AIで賛否を議論したい」</p>
+        <ul>
+          <li>事実検証モードで根拠を厳密に</li>
+          <li>50問のテンプレートから即スタート</li>
+          <li>個人情報は共有時に自動除外</li>
+        </ul>
+      </article>
+
+      <article class="usecase">
+        <div class="usecase-tag">クリエイティブ</div>
+        <h3>執筆・企画・批評</h3>
+        <p class="usecase-quote">「3つの視点から自分の文章を批評させたい」</p>
+        <ul>
+          <li>ブレストモードでアイデアを発散</li>
+          <li>ペルソナで読者層を設定</li>
+          <li>過去議論を文脈として注入</li>
+        </ul>
+      </article>
     </div>
   </div>
 </section>
@@ -1281,6 +1792,15 @@
 
 </main>
 
+<!-- ── Sticky mobile CTA ────────────────────────── -->
+<div class="mobile-cta" id="mobile-cta" aria-hidden="true">
+  <div class="mobile-cta-text">
+    <strong>月¥980</strong>
+    <span>APIキー不要 · 30秒で開始</span>
+  </div>
+  <a href="/" class="btn btn-primary">始める →</a>
+</div>
+
 <!-- ── Footer ───────────────────────────────────── -->
 <footer>
   <div class="inner">
@@ -1301,5 +1821,71 @@
   </div>
 </footer>
 
+<script>
+  // ── Theme toggle (Light / Dark) ─────────────────
+  (function() {
+    var STORAGE_KEY = "lp-theme";
+    var html = document.documentElement;
+    var btn = document.getElementById("theme-toggle");
+    var icon = document.getElementById("theme-icon");
+
+    function readInitial() {
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved === "dark" || saved === "base") return saved;
+      } catch (e) {}
+      var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      return prefersDark ? "dark" : "base";
+    }
+
+    function apply(theme) {
+      html.setAttribute("data-theme", theme);
+      if (icon) icon.textContent = theme === "dark" ? "☾" : "☀";
+      if (btn) btn.setAttribute("aria-label", theme === "dark" ? "ライトモードに切替" : "ダークモードに切替");
+    }
+
+    var current = readInitial();
+    apply(current);
+
+    if (btn) {
+      btn.addEventListener("click", function() {
+        current = current === "dark" ? "base" : "dark";
+        apply(current);
+        try { localStorage.setItem(STORAGE_KEY, current); } catch (e) {}
+      });
+    }
+  })();
+
+  // ── Sticky mobile CTA visibility ────────────────
+  (function() {
+    var cta = document.getElementById("mobile-cta");
+    if (!cta) return;
+    var hero = document.querySelector(".hero");
+    if (!hero) return;
+
+    function update() {
+      var rect = hero.getBoundingClientRect();
+      var heroBottom = rect.bottom;
+      // Show after user scrolls past the hero, hide near the end of page
+      var nearEnd = (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 100);
+      if (heroBottom < 0 && !nearEnd) {
+        cta.classList.add("visible");
+        cta.removeAttribute("aria-hidden");
+      } else {
+        cta.classList.remove("visible");
+        cta.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    var ticking = false;
+    window.addEventListener("scroll", function() {
+      if (!ticking) {
+        window.requestAnimationFrame(function() { update(); ticking = false; });
+        ticking = true;
+      }
+    }, { passive: true });
+    update();
+  })();
+</script>
 </body>
 </html>
