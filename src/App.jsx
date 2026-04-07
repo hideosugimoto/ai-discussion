@@ -268,10 +268,10 @@ export default function App() {
               <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                 {hasResettableState && (
-                  <button onClick={handleResetInputs} aria-label="議題・モード・ペルソナをリセット"
+                  <button onClick={handleResetInputs} aria-label="議題・モード・ペルソナをクリア"
                     title="議題・議論モード・ペルソナを初期化（APIキー・プロフィール・憲法は保持）"
                     style={{ background:"none", border:"1px solid var(--border)", borderRadius:8, padding:"8px 12px", color:"var(--text3)", fontSize:11, cursor:"pointer" }}>
-                    ↺ リセット
+                    ↺ クリア
                   </button>
                 )}
                 <button onClick={handleStart} disabled={!topic.trim()||running||!canStart}
