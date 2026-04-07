@@ -17,6 +17,7 @@ import useCryptoBackup from "./hooks/useCryptoBackup";
 import useDiscussion from "./hooks/useDiscussion";
 import useAuth from "./hooks/useAuth";
 import useUsage from "./hooks/useUsage";
+import useCloudHistory from "./hooks/useCloudHistory";
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -28,6 +29,7 @@ export default function App() {
 
   const auth = useAuth();
   const { usage, fetchUsage } = useUsage(auth.token);
+  const cloudHistory = useCloudHistory(auth.isPremium ? auth.token : null);
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
@@ -53,7 +55,12 @@ export default function App() {
     return () => clearInterval(timer);
   }, [topic, topicFocused]);
 
-  const disc = useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken: auth.token, isPremium: auth.isPremium });
+  const disc = useDiscussion({
+    keys, topic, profile, mode, discussionMode, setDiscussionMode,
+    conclusionTarget, personas, constitution, contextDiscussions,
+    authToken: auth.token, isPremium: auth.isPremium,
+    cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
+  });
   const { discussion, summaries, detailedAnalyses,
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
@@ -542,6 +549,8 @@ export default function App() {
               onLoad={handleLoadHistory}
               onAddContext={!started ? handleAddContext : undefined}
               contextIds={contextDiscussions.map((d) => d.id)}
+              cloudHistory={cloudHistory}
+              isPremium={auth.isPremium}
             />
           </div>
         )}

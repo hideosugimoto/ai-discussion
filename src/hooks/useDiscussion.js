@@ -75,7 +75,26 @@ async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds,
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken, isPremium }) {
+// Build the cloud-sync payload from current discussion state.
+// Intentionally excludes profile, constitution, and API keys — only the
+// discussion artifact itself is uploaded. (Personas are part of the
+// discussion record because they affect the message content.)
+function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget) {
+  return {
+    topic,
+    data_json: JSON.stringify({
+      discussion,
+      summaries,
+      mode,
+      discussionMode,
+      personas,
+      conclusionTarget,
+    }),
+    tags: [],
+  };
+}
+
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken, isPremium, cloudUpsertFn }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -98,13 +117,26 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { discussionIdRef.current = discussionId; }, [discussionId]);
 
+  const cloudUpsertRef = useRef(cloudUpsertFn);
+  useEffect(() => { cloudUpsertRef.current = cloudUpsertFn; }, [cloudUpsertFn]);
+
+  const syncToCloud = useCallback((id, payload) => {
+    const fn = cloudUpsertRef.current;
+    if (!fn || !id || !payload) return;
+    // Best-effort: never block the UI on cloud sync failures
+    Promise.resolve(fn(id, payload)).catch(() => {});
+  }, []);
+
   const autoSave = useCallback(() => {
     if (discussion.length > 0 && topic.trim()) {
       saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget)
-        .then((id) => { if (!discussionId) setDiscussionId(id); })
+        .then((id) => {
+          if (!discussionId) setDiscussionId(id);
+          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget));
+        })
         .catch(() => {});
     }
-  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget]);
+  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget, syncToCloud]);
 
   useEffect(() => {
     const handler = () => { autoSave(); };
@@ -222,15 +254,19 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       const curSummaries = summariesRef.current;
       const curId = discussionIdRef.current;
       const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound };
-      saveDiscussion(topic, curDisc.length > 0 ? [...curDisc.slice(0, -1), newRound] : [newRound], curSummaries, mode, discussionMode, personas, curId, conclusionTarget)
-        .then((id) => { if (!curId) setDiscussionId(id); })
+      const finalDiscussion = curDisc.length > 0 ? [...curDisc.slice(0, -1), newRound] : [newRound];
+      saveDiscussion(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, curId, conclusionTarget)
+        .then((id) => {
+          if (!curId) setDiscussionId(id);
+          syncToCloud(id, buildCloudPayload(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, conclusionTarget));
+        })
         .catch(() => {});
       // 結論ラウンド完了後は自動でstandardモードに戻す
       if (isConclusionRound && setDiscussionMode) {
         setDiscussionMode("standard");
       }
     }
-  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, syncToCloud]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -251,7 +287,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const handleReset = () => {
     abortRef.current?.abort();
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget).catch(() => {});
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget)
+        .then((id) => {
+          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget));
+        })
+        .catch(() => {});
     }
     setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
