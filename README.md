@@ -89,6 +89,8 @@ npx wrangler d1 execute ai-discussion-db --file=functions/schema-v2.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v3.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v4.sql
 npx wrangler d1 execute ai-discussion-db --file=functions/schema-v5.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v6.sql
+npx wrangler d1 execute ai-discussion-db --file=functions/schema-v7.sql
 
 # KVネームスペース作成
 npx wrangler kv namespace create KV
@@ -106,6 +108,9 @@ npx wrangler kv namespace create KV
 | `GOOGLE_AI_API_KEY` | Geminiプロキシ用 |
 | `STRIPE_SECRET_KEY` | 決済 |
 | `STRIPE_WEBHOOK_SECRET` | Webhook検証 |
+| `STRIPE_PRICE_ID` | Premium プラン (980円/月 subscription) の Price ID |
+| `STRIPE_PRICE_ID_PLUS` | Plus プラン (1,980円/月 subscription) の Price ID |
+| `STRIPE_CREDIT_PRICE_ID` | 追加クレジット (500円 one-time) の Price ID |
 
 ## Cloudflare Pagesへのデプロイ
 

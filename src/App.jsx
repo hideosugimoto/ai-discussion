@@ -226,6 +226,53 @@ export default function App() {
   const cm = MODE_MODELS[mode];
   const latestSummary = summaries[summaries.length - 1] ?? null;
 
+  const startCheckout = async (targetPlan) => {
+    try {
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+        body: JSON.stringify({ plan: targetPlan }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      alert("決済ページの取得に失敗しました。再度お試しください。");
+    }
+  };
+
+  const startCreditPurchase = async () => {
+    try {
+      const res = await fetch("/api/billing/credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
+      });
+      if (!res.ok) {
+        let msg = "クレジット購入ページの取得に失敗しました。";
+        try {
+          const d = await res.json();
+          if (d?.error) msg = d.error;
+        } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (e) {
+      alert(e.message || "クレジット購入の開始に失敗しました。");
+    }
+  };
+
+  // Refetch usage after credit purchase success redirect
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("credit") === "success" && auth.isPremium) {
+      url.searchParams.delete("credit");
+      window.history.replaceState({}, "", url.pathname + url.search);
+      // Slight delay so webhook can land
+      setTimeout(() => fetchUsage(), 1500);
+    }
+  }, [auth.isPremium, fetchUsage]);
+
   const keyConfigs = [
     { id:"claude",  label:"Anthropic API Key (Claude)", ph:"sk-ant-...",  link:"https://console.anthropic.com" },
     { id:"chatgpt", label:"OpenAI API Key (ChatGPT)",   ph:"sk-...",      link:"https://platform.openai.com/api-keys" },
@@ -264,6 +311,7 @@ export default function App() {
             {auth.isPremium && usage && (
               <span style={{ fontSize:11, color:"var(--success)", fontFamily:"monospace" }}>
                 残り {usage.usage_percent != null ? `${Math.round(100 - usage.usage_percent)}%` : "---"}
+                {usage.credits_usd > 0 && <span style={{ color:"var(--accent-light)" }}> +C</span>}
               </span>
             )}
             <span style={{ fontSize:12, color:"var(--text2)" }}>{auth.user.name}</span>
@@ -282,8 +330,23 @@ export default function App() {
         </div>
       )}
       {auth.isPremium && !auth.planLoading && (
-        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"6px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", display:"flex", justifyContent:"center", alignItems:"center", gap:12 }}>
-          <span>Premium Plan — APIキー不要・サーバー経由で安全に通信</span>
+        <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"8px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", display:"flex", justifyContent:"center", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <span style={{ fontWeight:600 }}>{auth.plan === "plus" ? "Plus Plan" : "Premium Plan"}</span>
+          {usage && (
+            <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}>
+              {usage.used_usd?.toFixed(2)} / {usage.limit_usd?.toFixed(2)} USD
+              {usage.credits_usd > 0 && (
+                <span style={{ color:"var(--accent-light)" }}> (+{usage.credits_usd.toFixed(2)} クレジット)</span>
+              )}
+            </span>
+          )}
+          <button
+            onClick={startCreditPurchase}
+            title="500円で +$2 分の月内クレジットを追加（購入月末まで有効）"
+            style={{ padding:"3px 10px", border:"1px solid var(--accent-bd)", borderRadius:4, background:"var(--accent-bg)", color:"var(--accent-light)", cursor:"pointer", fontSize:11 }}
+          >
+            ＋クレジット
+          </button>
           <button onClick={async () => {
             try {
               const res = await fetch("/api/billing/portal", {
@@ -296,7 +359,7 @@ export default function App() {
             } catch {
               alert("プラン管理ページの取得に失敗しました。再度お試しください。");
             }
-          }} style={{ padding:"2px 8px", border:"1px solid var(--success, #22c55e)", borderRadius:4, background:"transparent", color:"var(--success, #22c55e)", cursor:"pointer", fontSize:11 }}>
+          }} style={{ padding:"3px 10px", border:"1px solid var(--success, #22c55e)", borderRadius:4, background:"transparent", color:"var(--success, #22c55e)", cursor:"pointer", fontSize:11 }}>
             プラン管理
           </button>
         </div>
@@ -570,28 +633,49 @@ export default function App() {
           </div>
         )}
 
-        {/* Upgrade to Premium */}
+        {/* Plan selection (Premium / Plus) */}
         {auth.user && !auth.isPremium && activePanel === "keys" && (
-          <div style={{ marginBottom:12, padding:"12px 16px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:600, color:"var(--accent-light)" }}>Premium Plan — 月額980円</div>
-              <div style={{ fontSize:11, color:"var(--text3)", marginTop:2 }}>APIキー不要・サーバー経由で安全に通信・使用量ダッシュボード</div>
+          <div style={{ marginBottom:12, padding:"14px 16px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:"var(--accent-light)", marginBottom:10 }}>サブスクリプションプラン</div>
+            <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+              <div style={{ flex:"1 1 240px", padding:"12px 14px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8 }}>
+                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:4 }}>ライト</div>
+                <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Premium</div>
+                <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>980円 / 月</div>
+                <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
+                  <li>月間 約15議論（最強3R）</li>
+                  <li>APIキー不要</li>
+                  <li>クラウド同期履歴・全文検索</li>
+                  <li>共有リンク作成</li>
+                </ul>
+                <button
+                  onClick={() => startCheckout("premium")}
+                  style={{ width:"100%", padding:"8px 14px", background:"var(--accent)", border:"none", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600 }}
+                >
+                  Premium にする
+                </button>
+              </div>
+              <div style={{ flex:"1 1 240px", padding:"12px 14px", background:"var(--bg)", border:"1px solid var(--accent)", borderRadius:8, position:"relative" }}>
+                <div style={{ position:"absolute", top:-8, right:10, padding:"2px 8px", background:"var(--accent)", color:"#fff", fontSize:9, borderRadius:4, fontWeight:700 }}>HEAVY</div>
+                <div style={{ fontSize:12, color:"var(--text3)", marginBottom:4 }}>ヘビー</div>
+                <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Plus</div>
+                <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>1,980円 / 月</div>
+                <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
+                  <li>月間 約60〜75議論（最強3R）</li>
+                  <li>Premium の全機能</li>
+                  <li>追加クレジット購入もOK</li>
+                </ul>
+                <button
+                  onClick={() => startCheckout("plus")}
+                  style={{ width:"100%", padding:"8px 14px", background:"var(--accent)", border:"none", borderRadius:6, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600 }}
+                >
+                  Plus にする
+                </button>
+              </div>
             </div>
-            <button onClick={async () => {
-              try {
-                const res = await fetch("/api/billing/checkout", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-                });
-                if (!res.ok) throw new Error("Request failed");
-                const data = await res.json();
-                if (data.url) window.location.href = data.url;
-              } catch {
-                alert("決済ページの取得に失敗しました。再度お試しください。");
-              }
-            }} style={{ padding:"8px 18px", background:"var(--accent)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontSize:12, fontWeight:600, whiteSpace:"nowrap" }}>
-              アップグレード
-            </button>
+            <div style={{ marginTop:10, fontSize:10, color:"var(--text3)", lineHeight:1.6 }}>
+              ※ いつでもキャンセル可能。月の途中で Premium → Plus 変更時は Stripe の比例計算で差額のみ請求されます。
+            </div>
           </div>
         )}
 
