@@ -14,9 +14,9 @@ export default function HelpHint({ children, inline = false, style = {} }) {
   return (
     <div
       style={{
-        fontSize: 10,
-        color: "var(--text3)",
-        lineHeight: 1.5,
+        fontSize: 11,
+        color: "var(--text2)",
+        lineHeight: 1.6,
         marginTop: inline ? 0 : 4,
         marginLeft: inline ? 6 : 0,
         display: inline ? "inline" : "block",
