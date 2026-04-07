@@ -33,7 +33,7 @@ export async function callClaude(apiKey, model, sys, user, onChunk, signal) {
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model, max_tokens: 1000, stream: true, system: sys,
+      model, max_tokens: 2500, stream: true, system: sys,
       messages: [{ role: "user", content: user }],
     }),
     signal,
@@ -83,7 +83,7 @@ export async function callChatGPT(apiKey, model, sys, user, onChunk, signal) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model, max_tokens: 1000, stream: true,
+      model, max_tokens: 2500, stream: true,
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
     }),
     signal,

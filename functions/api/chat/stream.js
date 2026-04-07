@@ -124,7 +124,7 @@ async function callAnthropic(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1000,
+      max_tokens: 2500,
       stream: true,
       system,
       messages: [{ role: "user", content: message }],
@@ -142,7 +142,7 @@ async function callOpenAI(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1000,
+      max_tokens: 2500,
       stream: true,
       stream_options: { include_usage: true },
       messages: [
