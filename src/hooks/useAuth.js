@@ -196,7 +196,7 @@ export default function useAuth() {
       return;
     }
     setPlanLoading(true);
-    fetchPlanFromServer(token, 1).then((p) => {
+    fetchPlanFromServer(token, 3).then((p) => {
       setPlan(p);
       setPlanLoading(false);
     });
@@ -215,7 +215,7 @@ export default function useAuth() {
     setPlan("free");
   }, []);
 
-  const isPremium = plan === "premium";
+  const isPremium = plan !== "free";
 
   return { user, token, loading, isPremium, plan, planLoading, login, logout };
 }

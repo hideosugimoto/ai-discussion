@@ -56,6 +56,7 @@ export async function onRequest(context) {
 
     return response;
   } catch (e) {
+    console.error("[root/_middleware] Unhandled error:", e?.message || e, e?.stack || "");
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
