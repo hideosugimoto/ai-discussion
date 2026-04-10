@@ -10,7 +10,7 @@ export default function PlanPicker({ onPick }) {
           <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Premium</div>
           <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>980円 / 月</div>
           <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
-            <li>月間 約15議論（最強3R）</li>
+            <li>月間 約8〜40議論（モデル・ラウンド数で変動）</li>
             <li>APIキー不要</li>
             <li>クラウド同期履歴・全文検索</li>
             <li>共有リンク作成</li>
@@ -28,7 +28,7 @@ export default function PlanPicker({ onPick }) {
           <div style={{ fontSize:16, fontWeight:700, color:"var(--text)" }}>Plus</div>
           <div style={{ fontSize:13, color:"var(--text2)", marginBottom:8 }}>1,980円 / 月</div>
           <ul style={{ margin:"0 0 10px 16px", padding:0, fontSize:11, color:"var(--text2)", lineHeight:1.7 }}>
-            <li>月間 約60〜75議論（最強3R）</li>
+            <li>月間 約17〜90議論（モデル・ラウンド数で変動）</li>
             <li>Premium の全機能</li>
             <li>追加クレジット購入もOK</li>
           </ul>

@@ -24,15 +24,12 @@ export default function PlanBadge({ plan, usage, token, onCreditPurchase }) {
         <span style={{ fontWeight:600 }}>{plan === "plus" ? "Plus Plan" : "Premium Plan"}</span>
         {usage && (
           <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}>
-            {usage.used_usd?.toFixed(2)} / {usage.limit_usd?.toFixed(2)} USD
-            {usage.credits_usd > 0 && (
-              <span style={{ color:"var(--accent-light)" }}> (+{usage.credits_usd.toFixed(2)} クレジット)</span>
-            )}
+            使用量: {(usage.usage_percent ?? 0).toFixed(0)}%
           </span>
         )}
         <button
           onClick={onCreditPurchase}
-          title="500円で +$2 分の月内クレジットを追加（購入月末まで有効）"
+          title="500円で月内クレジットを追加（購入月末まで有効）"
           style={{ padding:"3px 10px", border:"1px solid var(--accent-bd)", borderRadius:4, background:"var(--accent-bg)", color:"var(--accent-light)", cursor:"pointer", fontSize:11 }}
         >
           ＋クレジット
@@ -47,7 +44,7 @@ export default function PlanBadge({ plan, usage, token, onCreditPurchase }) {
       </div>
       <div style={{ width:"100%", maxWidth:900, marginBottom:8 }}>
         <HelpHint>
-          「＋クレジット」= 月の上限を超えそうな時に 500円で +$2 分追加（購入月末まで有効）／「プラン管理」= 解約・支払方法・領収書
+          「＋クレジット」= 月の上限を超えそうな時に 500円で追加（購入月末まで有効）／「プラン管理」= 解約・支払方法・領収書
         </HelpHint>
       </div>
     </>

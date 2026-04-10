@@ -12,10 +12,10 @@ export function usdToMicro(usd) {
 // code changes.
 export function basePlanLimitMicro(env, plan) {
   if (plan === "plus") {
-    return usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD_PLUS || "5.00"));
+    return usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD_PLUS || "6.50"));
   }
   // 'premium' (and any unknown paid plan) falls back to standard limit
-  return usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD || "1.96"));
+  return usdToMicro(parseFloat(env.MONTHLY_COST_LIMIT_USD || "3.00"));
 }
 
 // Sum of unexpired one-time credits for the user (microdollars).

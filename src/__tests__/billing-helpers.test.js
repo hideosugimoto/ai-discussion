@@ -37,8 +37,8 @@ describe("basePlanLimitMicro", () => {
   });
 
   it("uses default when env vars are missing", () => {
-    expect(basePlanLimitMicro({}, "premium")).toBe(1_960_000);
-    expect(basePlanLimitMicro({}, "plus")).toBe(5_000_000);
+    expect(basePlanLimitMicro({}, "premium")).toBe(3_000_000);
+    expect(basePlanLimitMicro({}, "plus")).toBe(6_500_000);
   });
 });
 
