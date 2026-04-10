@@ -45,6 +45,7 @@ async function generateSummary(apiKey, authToken, isPremium, messages, topic, ro
     disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
     unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
     positionChanges: Array.isArray(parsed.positionChanges) ? parsed.positionChanges : [],
+    stances: parsed.stances && typeof parsed.stances === "object" ? parsed.stances : {},
   };
 }
 
@@ -194,7 +195,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {

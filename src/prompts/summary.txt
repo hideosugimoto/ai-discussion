@@ -15,7 +15,12 @@
   ],
   "positionChanges": [
     { "ai": "立場を変えたAIのID", "description": "どう変化したか" }
-  ]
+  ],
+  "stances": {
+    "claude": "Claudeの現時点の主張・立場を1〜2文で要約",
+    "chatgpt": "ChatGPTの現時点の主張・立場を1〜2文で要約",
+    "gemini": "Geminiの現時点の主張・立場を1〜2文で要約"
+  }
 }
 ```
 

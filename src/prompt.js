@@ -7,6 +7,9 @@ const MAX_CONTEXT_TOPIC_LEN = 80;
 const MAX_CONTEXT_ITEMS_PER_SECTION = 3;
 const MAX_CONTEXT_POINT_LEN = 80;
 
+const RECENT_FULL_ROUNDS = 2;
+const MIN_ROUNDS_FOR_COMPRESSION = 4;
+
 function truncate(str, max) {
   const s = (str || "").toString().trim();
   return s.length > max ? s.slice(0, max) + "…" : s;
@@ -50,6 +53,74 @@ function buildContextText(contextDiscussions) {
   return `\n\n【質問者の過去の関連議論】\n以下は同じユーザーが過去に行った議論の要約です。今回の議論ではこの文脈を踏まえ、矛盾しない・かつ前回からの発展となる発言をしてください。ただし過去の議論に過度に引きずられず、今回の議題に集中してください。\n${items.join("\n\n")}`;
 }
 
+function formatRoundFull(round, personas) {
+  return round.messages
+    .map((m) => {
+      const n = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+      const p = (personas?.[m.modelId] || "").trim();
+      return `[${p ? `${n}（${p}）` : n}] ${m.text || "(エラー)"}`;
+    })
+    .join("\n");
+}
+
+function formatSummaryForCompression(summary, roundIdx) {
+  const text = summariseSummary(summary);
+  const stancesText = summary?.stances
+    ? Object.entries(summary.stances)
+        .map(([id, stance]) => {
+          const name = MODELS.find((x) => x.id === id)?.name ?? id;
+          return `  ${name}: ${stance}`;
+        })
+        .join("\n")
+    : "";
+  const parts = [];
+  if (text) parts.push(text);
+  if (stancesText) parts.push("立場:\n" + stancesText);
+  return parts.length ? `【Round ${roundIdx + 1} 要約】\n${parts.join("\n")}` : null;
+}
+
+export function compressHistory(history, summaries, personas) {
+  if (!history || history.length === 0) return "";
+
+  const totalRounds = history.length;
+
+  // Below threshold or no summaries: full text (existing behavior)
+  if (totalRounds < MIN_ROUNDS_FOR_COMPRESSION || !summaries?.length) {
+    return "\n\n【これまでの議論】\n" +
+      history.map((r) => formatRoundFull(r, personas)).join("\n\n---\n\n");
+  }
+
+  const recentStart = Math.max(0, totalRounds - RECENT_FULL_ROUNDS);
+  const parts = [];
+
+  // Older rounds: compress with summaries
+  if (recentStart > 0) {
+    const compressedParts = [];
+    for (let i = 0; i < recentStart; i++) {
+      const summary = summaries[i];
+      if (summary && !summary.error) {
+        const formatted = formatSummaryForCompression(summary, i);
+        if (formatted) {
+          compressedParts.push(formatted);
+          continue;
+        }
+      }
+      // Fallback: full text when no usable summary
+      compressedParts.push(`【Round ${i + 1}】\n${formatRoundFull(history[i], personas)}`);
+    }
+    parts.push("【過去の議論（要約）】\n" + compressedParts.join("\n\n"));
+  }
+
+  // Recent rounds: full text
+  const recentParts = [];
+  for (let i = recentStart; i < totalRounds; i++) {
+    recentParts.push(formatRoundFull(history[i], personas));
+  }
+  parts.push("【直近の議論】\n" + recentParts.join("\n\n---\n\n"));
+
+  return "\n\n【これまでの議論】\n" + parts.join("\n\n");
+}
+
 const MODE_INSTRUCTIONS = {
   standard: {
     round1: `議題に対して自分の見解を250〜350字で述べてください。他のAIとの違いが出るよう、あなた自身の視点・特徴を活かして答えてください。${QUALITY_GUIDE}`,
@@ -73,7 +144,7 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -109,21 +180,7 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
   const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}`;
 
-  const histText =
-    history.length === 0
-      ? ""
-      : "\n\n【これまでの議論】\n" +
-        history
-          .map((r) =>
-            r.messages
-              .map((m) => {
-                const n = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-                const p = (personas?.[m.modelId] || "").trim();
-                return `[${p ? `${n}（${p}）` : n}] ${m.text || "(エラー)"}`;
-              })
-              .join("\n")
-          )
-          .join("\n\n---\n\n");
+  const histText = compressHistory(history, summaries, personas);
 
   const safeIntervention = (userIntervention || "").slice(0, 1000);
   const interventionText =
