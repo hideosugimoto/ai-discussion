@@ -59,8 +59,9 @@ async function generateRollingSummary(apiKey, authToken, isPremium, messages, to
     })
     .join("\n\n");
 
-  const prevText = prevRolling && !prevRolling.error
-    ? `【前回までの累積要約】\n${JSON.stringify(prevRolling)}\n\n`
+  const prevJson = prevRolling && !prevRolling.error ? JSON.stringify(prevRolling) : "";
+  const prevText = prevJson && prevJson.length <= 3000
+    ? `【前回までの累積要約】\n${prevJson}\n\n`
     : "";
 
   const userMsg = `${prevText}【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
@@ -186,10 +187,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         next[roundNum - 1] = summary;
         return next;
       });
-      // Update rolling summary (cumulative) - best-effort, non-blocking
+      // Update rolling summary (cumulative) - non-blocking, falls back to per-round on failure
       generateRollingSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId)
         .then((rolling) => setRollingSummary(rolling))
-        .catch(() => {});
+        .catch(() => setRollingSummary((prev) => prev ?? { error: true }));
     } catch {
       setSummaries((s) => {
         const next = [...s];
