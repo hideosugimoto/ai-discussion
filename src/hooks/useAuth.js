@@ -29,18 +29,21 @@ function getJWTExpiry(token) {
 async function fetchPlanFromServer(token, retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch("/api/usage", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const hdrs = { Authorization: `Bearer ${token}` };
+      console.log(`[fetchPlan] attempt ${i + 1}/${retries}, token=${token ? token.slice(0, 20) + "..." : "NULL"}, header=`, hdrs.Authorization?.slice(0, 30));
+      const res = await fetch("/api/usage", { headers: hdrs });
+      console.log(`[fetchPlan] response status=${res.status}`);
       if (res.ok) {
         const data = await res.json();
+        console.log(`[fetchPlan] data.plan=${data.plan}`);
         if (data.plan) return data.plan;
       }
-    } catch {
-      // retry
+    } catch (err) {
+      console.warn(`[fetchPlan] error on attempt ${i + 1}:`, err.message);
     }
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 1500));
   }
+  console.warn("[fetchPlan] all retries failed, returning 'free'");
   return "free";
 }
 
