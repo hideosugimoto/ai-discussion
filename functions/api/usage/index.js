@@ -2,6 +2,7 @@
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
 
 export async function onRequestGet(context) {
+  try {
   const { env, data } = context;
   const user = data.user;
 
@@ -76,4 +77,11 @@ export async function onRequestGet(context) {
       headers: { "Content-Type": "application/json" },
     }
   );
+  } catch (e) {
+    console.error("[api/usage] Error:", e?.message || e, e?.stack || "");
+    return new Response(
+      JSON.stringify({ error: "Usage query failed", detail: e?.message }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }

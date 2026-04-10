@@ -6,10 +6,13 @@
 const APP_CSP =
   "default-src 'self'; " +
   "script-src 'self'; " +
-  "style-src 'self' 'unsafe-inline'; " +
-  "img-src 'self' https:; " +
-  "connect-src 'self' https://accounts.google.com https://api.stripe.com; " +
-  "frame-src https://checkout.stripe.com";
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+  "font-src 'self' https://fonts.gstatic.com; " +
+  "img-src 'self' data: https:; " +
+  "connect-src 'self' https://accounts.google.com https://api.stripe.com https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com; " +
+  "frame-src https://checkout.stripe.com; " +
+  "object-src 'none'; " +
+  "base-uri 'self'";
 
 const LP_CSP =
   "default-src 'self'; " +

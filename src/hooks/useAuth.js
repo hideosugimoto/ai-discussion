@@ -32,7 +32,10 @@ async function fetchPlanFromServer(token, retries = 5) {
       const hdrs = { Authorization: `Bearer ${token}` };
       console.log(`[fetchPlan] attempt ${i + 1}/${retries}, token=${token ? token.slice(0, 20) + "..." : "NULL"}, header=`, hdrs.Authorization?.slice(0, 30));
       const res = await fetch("/api/usage", { headers: hdrs });
-      console.log(`[fetchPlan] response status=${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => "(no body)");
+        console.warn(`[fetchPlan] status=${res.status} body=${errBody}`);
+      }
       if (res.ok) {
         const data = await res.json();
         console.log(`[fetchPlan] data.plan=${data.plan}`);
