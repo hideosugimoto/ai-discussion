@@ -133,7 +133,7 @@ export async function callGemini(apiKey, model, sys, user, onChunk, signal) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: sys }] },
         contents: [{ parts: [{ text: user }] }],
-        generationConfig: { maxOutputTokens: 1500 },
+        generationConfig: { maxOutputTokens: 8192 },
       }),
       signal,
     }
