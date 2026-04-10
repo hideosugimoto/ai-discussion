@@ -7,6 +7,7 @@ import { saveDiscussion } from "../history";
 import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import summaryPromptText from "../prompts/summary.txt?raw";
+import rollingSummaryPromptText from "../prompts/rolling-summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
 async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
@@ -45,6 +46,33 @@ async function generateSummary(apiKey, authToken, isPremium, messages, topic, ro
     disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
     unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
     positionChanges: Array.isArray(parsed.positionChanges) ? parsed.positionChanges : [],
+    stances: parsed.stances && typeof parsed.stances === "object" ? parsed.stances : {},
+  };
+}
+
+async function generateRollingSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, prevRolling, sessionId) {
+  const roundText = messages
+    .map((m) => {
+      const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+      const p = (personas?.[m.modelId] || "").trim();
+      return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
+    })
+    .join("\n\n");
+
+  const prevText = prevRolling && !prevRolling.error
+    ? `【前回までの累積要約】\n${JSON.stringify(prevRolling)}\n\n`
+    : "";
+
+  const userMsg = `${prevText}【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
+
+  const text = await callGPTMini(apiKey, authToken, isPremium, rollingSummaryPromptText, userMsg, sessionId, roundNum);
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  const parsed = JSON.parse(cleaned);
+  if (!parsed || typeof parsed !== "object") throw new Error("Invalid rolling summary format");
+  return {
+    agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
+    disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
+    unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
     stances: parsed.stances && typeof parsed.stances === "object" ? parsed.stances : {},
   };
 }
@@ -107,16 +135,19 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const [actionPlan, setActionPlan] = useState(null);
   const [actionPlanLoading, setActionPlanLoading] = useState(false);
   const [discussionId, setDiscussionId] = useState(null);
+  const [rollingSummary, setRollingSummary] = useState(null);
 
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
   const discussionRef = useRef(discussion);
   const summariesRef = useRef(summaries);
   const discussionIdRef = useRef(discussionId);
+  const rollingSummaryRef = useRef(rollingSummary);
 
   useEffect(() => { discussionRef.current = discussion; }, [discussion]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { discussionIdRef.current = discussionId; }, [discussionId]);
+  useEffect(() => { rollingSummaryRef.current = rollingSummary; }, [rollingSummary]);
 
   const cloudUpsertRef = useRef(cloudUpsertFn);
   useEffect(() => { cloudUpsertRef.current = cloudUpsertFn; }, [cloudUpsertFn]);
@@ -155,6 +186,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         next[roundNum - 1] = summary;
         return next;
       });
+      // Update rolling summary (cumulative) - best-effort, non-blocking
+      generateRollingSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId)
+        .then((rolling) => setRollingSummary(rolling))
+        .catch(() => {});
     } catch {
       setSummaries((s) => {
         const next = [...s];
@@ -195,7 +230,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -274,6 +309,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setDiscussion([]);
     setSummaries([]);
     setDetailedAnalyses([]);
+    setRollingSummary(null);
     setStarted(true);
     await runRound([], 1, "");
   };
@@ -294,7 +330,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         })
         .catch(() => {});
     }
-    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
+    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setRollingSummary(null); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
 
   const handleGenerateActionPlan = async () => {

@@ -218,4 +218,91 @@ describe("buildPrompt with summaries", () => {
     expect(user).toContain("R4Claude");
     expect(user).toContain("R5Gemini");
   });
+
+  it("uses rolling summary when provided", () => {
+    const history = Array.from({ length: 5 }, (_, i) =>
+      makeRound([
+        ["claude", `R${i + 1}Claude`],
+        ["chatgpt", `R${i + 1}GPT`],
+        ["gemini", `R${i + 1}Gemini`],
+      ])
+    );
+    const rolling = {
+      agreements: [{ point: "累積合意点" }],
+      disagreements: [{ point: "累積対立点" }],
+      unresolved: [],
+      stances: {
+        claude: "リモートワーク推進派",
+        chatgpt: "ハイブリッド推奨",
+        gemini: "条件付き賛成",
+      },
+    };
+    const { user } = buildPrompt("claude", "テスト", "", history, 6, "", "standard", null, "", [], [], rolling);
+
+    // Rolling summary should be used instead of per-round summaries
+    expect(user).toContain("累積合意点");
+    expect(user).toContain("累積対立点");
+    expect(user).toContain("リモートワーク推進派");
+    expect(user).toContain("ハイブリッド推奨");
+
+    // Old rounds should NOT appear as full text
+    expect(user).not.toContain("R1Claude");
+    expect(user).not.toContain("R2GPT");
+
+    // Recent rounds should be full text
+    expect(user).toContain("R4Claude");
+    expect(user).toContain("R5Gemini");
+  });
+});
+
+describe("compressHistory with rolling summary", () => {
+  it("prefers rolling summary over per-round summaries", () => {
+    const history = Array.from({ length: 5 }, (_, i) =>
+      makeRound([["claude", `R${i + 1}C`], ["chatgpt", `R${i + 1}G`], ["gemini", `R${i + 1}E`]])
+    );
+    const summaries = [
+      makeSummary({ agreements: ["per-round A1"] }),
+      makeSummary({ agreements: ["per-round A2"] }),
+      makeSummary({ agreements: ["per-round A3"] }),
+      null, null,
+    ];
+    const rolling = {
+      agreements: [{ point: "rolling合意" }],
+      disagreements: [],
+      unresolved: [],
+      stances: { claude: "stance_c", chatgpt: "stance_g", gemini: "stance_e" },
+    };
+    const result = compressHistory(history, summaries, null, rolling);
+
+    // Should use rolling, not per-round
+    expect(result).toContain("rolling合意");
+    expect(result).not.toContain("per-round A1");
+    expect(result).toContain("stance_c");
+  });
+
+  it("falls back to per-round summaries when rolling has error", () => {
+    const history = Array.from({ length: 4 }, (_, i) =>
+      makeRound([["claude", `R${i + 1}C`], ["chatgpt", `R${i + 1}G`], ["gemini", `R${i + 1}E`]])
+    );
+    const summaries = [
+      makeSummary({ agreements: ["fallback合意"] }),
+      makeSummary({ agreements: ["fallback合意2"] }),
+      null, null,
+    ];
+    const rolling = { error: true };
+    const result = compressHistory(history, summaries, null, rolling);
+
+    expect(result).toContain("fallback合意");
+    expect(result).not.toContain("error");
+  });
+
+  it("falls back to full text when neither rolling nor summaries exist", () => {
+    const history = Array.from({ length: 4 }, (_, i) =>
+      makeRound([["claude", `R${i + 1}C`], ["chatgpt", `R${i + 1}G`], ["gemini", `R${i + 1}E`]])
+    );
+    const result = compressHistory(history, null, null, null);
+
+    expect(result).toContain("R1C");
+    expect(result).toContain("R4E");
+  });
 });

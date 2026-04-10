@@ -1,6 +1,6 @@
 import { MODELS } from "./constants";
 
-const QUALITY_GUIDE = "箇条書きではなく文章で回答し、具体例や根拠を含めて論じてください。一般論だけでなく、あなた独自の視点を加えてください。";
+const QUALITY_GUIDE = "箇条書きではなく文章で回答し、具体例や根拠を含めて論じてください。一般論だけでなく、あなた独自の視点を加えてください。【重要】指定された文字数を厳守し、冗長な前置きや繰り返しを避けてください。既出の主張を繰り返す場合は1文以内に留め、新しい論点・反論・譲歩のいずれかを必ず1つ以上含めてください。";
 
 const MAX_CONTEXT_DISCUSSIONS = 3;
 const MAX_CONTEXT_TOPIC_LEN = 80;
@@ -79,13 +79,36 @@ function formatSummaryForCompression(summary, roundIdx) {
   return parts.length ? `【Round ${roundIdx + 1} 要約】\n${parts.join("\n")}` : null;
 }
 
-export function compressHistory(history, summaries, personas) {
+function formatRollingSummary(rolling) {
+  const parts = [];
+  if (rolling.agreements?.length) {
+    parts.push("合意: " + rolling.agreements.map((a) => a.point || a).join(" / "));
+  }
+  if (rolling.disagreements?.length) {
+    parts.push("対立: " + rolling.disagreements.map((d) => d.point || d).join(" / "));
+  }
+  if (rolling.unresolved?.length) {
+    parts.push("未解決: " + rolling.unresolved.map((u) => u.point || u).join(" / "));
+  }
+  if (rolling.stances && typeof rolling.stances === "object") {
+    const stanceLines = Object.entries(rolling.stances)
+      .map(([id, stance]) => {
+        const name = MODELS.find((x) => x.id === id)?.name ?? id;
+        return `  ${name}: ${stance}`;
+      })
+      .join("\n");
+    if (stanceLines) parts.push("各AIの立場:\n" + stanceLines);
+  }
+  return parts.join("\n");
+}
+
+export function compressHistory(history, summaries, personas, rollingSummary) {
   if (!history || history.length === 0) return "";
 
   const totalRounds = history.length;
 
-  // Below threshold or no summaries: full text (existing behavior)
-  if (totalRounds < MIN_ROUNDS_FOR_COMPRESSION || !summaries?.length) {
+  // Below threshold: full text (existing behavior)
+  if (totalRounds < MIN_ROUNDS_FOR_COMPRESSION) {
     return "\n\n【これまでの議論】\n" +
       history.map((r) => formatRoundFull(r, personas)).join("\n\n---\n\n");
   }
@@ -93,22 +116,30 @@ export function compressHistory(history, summaries, personas) {
   const recentStart = Math.max(0, totalRounds - RECENT_FULL_ROUNDS);
   const parts = [];
 
-  // Older rounds: compress with summaries
+  // Older rounds: prefer rolling summary, fallback to per-round summaries
   if (recentStart > 0) {
-    const compressedParts = [];
-    for (let i = 0; i < recentStart; i++) {
-      const summary = summaries[i];
-      if (summary && !summary.error) {
-        const formatted = formatSummaryForCompression(summary, i);
-        if (formatted) {
-          compressedParts.push(formatted);
-          continue;
+    if (rollingSummary && !rollingSummary.error) {
+      parts.push("【過去の議論の状態（Round 1〜" + recentStart + "）】\n" + formatRollingSummary(rollingSummary));
+    } else if (summaries?.length) {
+      const compressedParts = [];
+      for (let i = 0; i < recentStart; i++) {
+        const summary = summaries[i];
+        if (summary && !summary.error) {
+          const formatted = formatSummaryForCompression(summary, i);
+          if (formatted) {
+            compressedParts.push(formatted);
+            continue;
+          }
         }
+        compressedParts.push(`【Round ${i + 1}】\n${formatRoundFull(history[i], personas)}`);
       }
-      // Fallback: full text when no usable summary
-      compressedParts.push(`【Round ${i + 1}】\n${formatRoundFull(history[i], personas)}`);
+      parts.push("【過去の議論（要約）】\n" + compressedParts.join("\n\n"));
+    } else {
+      // No summaries at all: full text fallback
+      for (let i = 0; i < recentStart; i++) {
+        parts.push(formatRoundFull(history[i], personas));
+      }
     }
-    parts.push("【過去の議論（要約）】\n" + compressedParts.join("\n\n"));
   }
 
   // Recent rounds: full text
@@ -144,7 +175,7 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -180,7 +211,7 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
   const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}`;
 
-  const histText = compressHistory(history, summaries, personas);
+  const histText = compressHistory(history, summaries, personas, rollingSummary);
 
   const safeIntervention = (userIntervention || "").slice(0, 1000);
   const interventionText =

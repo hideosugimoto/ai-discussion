@@ -24,8 +24,8 @@ function calcCostMicro(model, inputTokens, outputTokens) {
 function estimateMaxCostMicro(model) {
   const pricing = MODEL_PRICING[model];
   if (!pricing) return 0;
-  // Assume 500 input + 4096 output as max estimate
-  return Math.round(500 * pricing.input + 4096 * pricing.output);
+  // Assume 500 input + 1500 output as max estimate
+  return Math.round(500 * pricing.input + 1500 * pricing.output);
 }
 
 function detectProvider(model) {
@@ -121,9 +121,9 @@ async function callAnthropic(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2500,
+      max_tokens: 1500,
       stream: true,
-      system,
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: message }],
     }),
   });
@@ -139,9 +139,10 @@ async function callOpenAI(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2500,
+      max_tokens: 1500,
       stream: true,
       stream_options: { include_usage: true },
+      // OpenAI auto-caches matching prompt prefixes (50% input cost reduction)
       messages: [
         { role: "system", content: system },
         { role: "user", content: message },
@@ -163,7 +164,7 @@ async function callGoogle(apiKey, model, system, message) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ parts: [{ text: message }] }],
-        generationConfig: { maxOutputTokens: 4096 },
+        generationConfig: { maxOutputTokens: 1500 },
       }),
     }
   );
