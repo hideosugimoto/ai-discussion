@@ -6,5 +6,12 @@ export default defineConfig({
   plugins: [react(), sri()],
   build: {
     outDir: "dist",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+        },
+      },
+    },
   },
 });

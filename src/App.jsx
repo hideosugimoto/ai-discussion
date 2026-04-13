@@ -1,17 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
 import ModelBadge from "./components/ModelBadge";
 import RoundSection from "./components/RoundSection";
-import SecurityPanel from "./components/SecurityPanel";
-import SummaryPanel from "./components/SummaryPanel";
 import useKeyValidation from "./hooks/useKeyValidation";
 import { downloadMarkdown, downloadHtml } from "./export";
-import HistoryPanel from "./components/HistoryPanel";
-import PersonaPanel from "./components/PersonaPanel";
-import ActionPlanView from "./components/ActionPlanView";
 import useSettings from "./hooks/useSettings";
 import useCryptoBackup from "./hooks/useCryptoBackup";
 import useDiscussion from "./hooks/useDiscussion";
@@ -19,13 +14,19 @@ import useAuth from "./hooks/useAuth";
 import useUsage from "./hooks/useUsage";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
-import SharedView from "./components/SharedView";
-import ShareDialog from "./components/ShareDialog";
 import PlanPicker from "./components/PlanPicker";
 import HelpHint from "./components/HelpHint";
 import PlanBadge from "./components/PlanBadge";
 import AuthBar from "./components/AuthBar";
 import { useHelp } from "./hooks/useHelp.jsx";
+
+const SecurityPanel = lazy(() => import("./components/SecurityPanel"));
+const SummaryPanel = lazy(() => import("./components/SummaryPanel"));
+const HistoryPanel = lazy(() => import("./components/HistoryPanel"));
+const PersonaPanel = lazy(() => import("./components/PersonaPanel"));
+const ActionPlanView = lazy(() => import("./components/ActionPlanView"));
+const SharedView = lazy(() => import("./components/SharedView"));
+const ShareDialog = lazy(() => import("./components/ShareDialog"));
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -302,10 +303,11 @@ export default function App() {
   // Shared-view mode (?share=ID): show read-only view of someone else's discussion.
   // Placed here AFTER all hooks to avoid violating React rules of hooks.
   if (shareViewId) {
-    return <SharedView shareId={shareViewId} onExit={exitShareView} />;
+    return <Suspense fallback={null}><SharedView shareId={shareViewId} onExit={exitShareView} /></Suspense>;
   }
 
   return (
+    <Suspense fallback={null}>
     <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
 
       {/* Profile update notice */}
@@ -777,5 +779,6 @@ export default function App() {
 
       <ShareDialog state={shareDialog} onClose={() => setShareDialog(null)} />
     </div>
+    </Suspense>
   );
 }

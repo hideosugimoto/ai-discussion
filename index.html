@@ -6,9 +6,22 @@
   <title>3 AI Discussion</title>
   <meta name="description" content="Claude・ChatGPT・Geminiの3AIが議題について複数ラウンド議論するWebアプリ" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script src="/fonts.js"></script>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <style>
+      .sk{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#1a1814;color:#f0ece4;font-family:system-ui,sans-serif}
+      .sk-logo{display:flex;gap:8px;margin-bottom:16px}
+      .sk-dot{width:12px;height:12px;border-radius:50%;animation:sk-pulse 1.2s ease-in-out infinite}
+      .sk-dot:nth-child(1){background:#f59e0b;animation-delay:0s}
+      .sk-dot:nth-child(2){background:#10a37f;animation-delay:.2s}
+      .sk-dot:nth-child(3){background:#60a5fa;animation-delay:.4s}
+      @keyframes sk-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+    </style>
+    <div class="sk"><div class="sk-logo"><div class="sk-dot"></div><div class="sk-dot"></div><div class="sk-dot"></div></div><small>Loading…</small></div>
+  </div>
+  <script src="/skeleton.js"></script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>
