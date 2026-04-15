@@ -453,9 +453,10 @@ export default function App() {
             </HelpHint>
 
             {/* ── 高度な設定（折りたたみ） ── */}
-            <details style={{ marginTop:8 }}>
-              <summary style={{ fontSize:11, color:"var(--text3)", cursor:"pointer", userSelect:"none", padding:"4px 0" }}>
-                高度な設定 — 議論モード・ペルソナ・憲法・セキュリティ・バックアップ
+            <details style={{ marginTop:12 }}>
+              <summary style={{ fontSize:13, fontWeight:600, color:"var(--text)", cursor:"pointer", userSelect:"none", padding:"8px 12px", border:"1px solid var(--border)", borderRadius:8, background:"var(--bg)", display:"flex", alignItems:"center", gap:6 }}>
+                <span>⚙️ 高度な設定</span>
+                <span style={{ fontSize:11, fontWeight:400, color:"var(--text3)" }}>— 議論モード・ペルソナ・憲法・セキュリティ・バックアップ</span>
               </summary>
               <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:10 }}>
                 <div>
