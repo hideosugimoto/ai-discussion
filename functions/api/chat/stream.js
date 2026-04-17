@@ -84,12 +84,12 @@ async function preDebitUsage(db, userId, model, estimatedMicro) {
 }
 
 // Insert analytics log (non-blocking, best-effort)
-async function insertRequestLog(db, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs) {
+async function insertRequestLog(db, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs, cacheCreationTokens, cacheReadTokens) {
   try {
     await db.prepare(
-      `INSERT INTO llm_request_log (user_id, session_id, turn_number, model, provider, input_tokens, output_tokens, latency_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(userId, sessionId || null, turnNumber || null, model, provider, inputTokens, outputTokens, latencyMs).run();
+      `INSERT INTO llm_request_log (user_id, session_id, turn_number, model, provider, input_tokens, output_tokens, latency_ms, cache_creation_input_tokens, cache_read_input_tokens)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(userId, sessionId || null, turnNumber || null, model, provider, inputTokens, outputTokens, latencyMs, cacheCreationTokens || 0, cacheReadTokens || 0).run();
   } catch {
     // Best-effort: don't fail the request if logging fails
   }
@@ -290,6 +290,8 @@ export async function onRequestPost(context) {
       const reader = upstream.body.getReader();
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheCreationTokens = 0;
+      let cacheReadTokens = 0;
       let buffer = "";
 
       try {
@@ -315,24 +317,30 @@ export async function onRequestPost(context) {
             try {
               const parsed = JSON.parse(jsonStr);
 
-              // Anthropic usage
+              // Anthropic usage (cache tokens live on message_start.usage)
               if (parsed.type === "message_start" && parsed.message?.usage) {
-                inputTokens = parsed.message.usage.input_tokens || 0;
+                const u = parsed.message.usage;
+                inputTokens = u.input_tokens || 0;
+                cacheCreationTokens = u.cache_creation_input_tokens || 0;
+                cacheReadTokens = u.cache_read_input_tokens || 0;
               }
               if (parsed.type === "message_delta" && parsed.usage) {
                 outputTokens = parsed.usage.output_tokens || 0;
               }
 
               // OpenAI usage (stream_options.include_usage)
+              // prompt_tokens_details.cached_tokens is populated when auto-cache hits
               if (parsed.usage && parsed.usage.prompt_tokens) {
                 inputTokens = parsed.usage.prompt_tokens;
                 outputTokens = parsed.usage.completion_tokens || 0;
+                cacheReadTokens = parsed.usage.prompt_tokens_details?.cached_tokens || 0;
               }
 
-              // Gemini usage
+              // Gemini usage (cachedContentTokenCount populated when explicit cache hits)
               if (parsed.usageMetadata) {
                 inputTokens = parsed.usageMetadata.promptTokenCount || 0;
                 outputTokens = parsed.usageMetadata.candidatesTokenCount || 0;
+                cacheReadTokens = parsed.usageMetadata.cachedContentTokenCount || 0;
               }
             } catch {
               // Not valid JSON, skip
@@ -351,7 +359,7 @@ export async function onRequestPost(context) {
       }
 
       // Analytics log (best-effort)
-      await insertRequestLog(env.DB, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs);
+      await insertRequestLog(env.DB, userId, sessionId, turnNumber, model, provider, inputTokens, outputTokens, latencyMs, cacheCreationTokens, cacheReadTokens);
     })()
   );
 
