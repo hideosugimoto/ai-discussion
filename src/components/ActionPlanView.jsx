@@ -19,7 +19,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
           📋 アクションプランを生成
         </button>
         <HelpHint style={{ marginTop: 6 }}>
-          議論を踏まえて「結論／優先度付きアクション／リスク／次に議論すべきテーマ」を自動生成します（GPT-4o-mini 使用、約0.001ドル）
+          議論を踏まえて「結論／優先度付きアクション／リスク／次に議論すべきテーマ」を自動生成します（GPT-5.4 mini 使用、約0.005ドル）
         </HelpHint>
       </div>
     );

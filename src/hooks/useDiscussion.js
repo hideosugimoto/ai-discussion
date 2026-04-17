@@ -12,9 +12,9 @@ import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
 async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
   if (isPremium && authToken) {
-    return await callProxyChatGPT(authToken, "gpt-4o-mini", sys, user, () => {}, undefined, sessionId, turnNumber);
+    return await callProxyChatGPT(authToken, "gpt-5.4-mini", sys, user, () => {}, undefined, sessionId, turnNumber);
   }
-  return await callChatGPT(apiKey, "gpt-4o-mini", sys, user, () => {});
+  return await callChatGPT(apiKey, "gpt-5.4-mini", sys, user, () => {});
 }
 
 async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {

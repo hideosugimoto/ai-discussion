@@ -8,7 +8,7 @@ published: false
 
 ## TL;DR
 
-- 3つのフロンティア AI (Claude Opus 4.6 / GPT-4o / Gemini 2.5 Pro) に**同じ議題を並列で投げて議論させる Web アプリ**を作った
+- 3つのフロンティア AI (Claude Opus 4.7 / GPT-5.4 / Gemini 2.5 Pro) に**同じ議題を並列で投げて議論させる Web アプリ**を作った
 - フルスタック Cloudflare (Pages + Functions + D1 + KV) で個人開発
 - ソースコードは BSL 1.1 で全公開、2030年に MIT 移行
 - 月額 980 円 (Premium) で API キー不要

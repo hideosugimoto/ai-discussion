@@ -84,7 +84,7 @@ export async function callChatGPT(apiKey, model, sys, user, onChunk, signal) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model, max_tokens: 1500, stream: true,
+      model, max_completion_tokens: 8192, stream: true,
       // OpenAI auto-caches matching prompt prefixes (50% input cost reduction)
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
     }),
@@ -112,7 +112,7 @@ export async function validateChatGPT(apiKey) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: "gpt-4o-mini", max_tokens: 1,
+      model: "gpt-5.4-mini", max_completion_tokens: 16,
       messages: [{ role: "user", content: "hi" }],
     }),
   });

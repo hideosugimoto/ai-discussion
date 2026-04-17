@@ -5,10 +5,10 @@ import { getEffectiveLimitMicro } from "../_lib_billing.js";
 // Model pricing (microdollars per token) - 2026-04 rates
 // 1 microdollar = $0.000001, so $5.00/1M tokens = 5 microdollars/token
 const MODEL_PRICING = {
-  "claude-opus-4-6":   { input: 5,    output: 25   },
+  "claude-opus-4-7":   { input: 5,    output: 25   },
   "claude-sonnet-4-6": { input: 3,    output: 15   },
-  "gpt-4o":            { input: 2.5,  output: 10   },
-  "gpt-4o-mini":       { input: 0.15, output: 0.6  },
+  "gpt-5.4":           { input: 2.5,  output: 15   },
+  "gpt-5.4-mini":      { input: 0.75, output: 4.5  },
   "gemini-2.5-pro":    { input: 1.25, output: 10   },
   "gemini-2.5-flash":  { input: 0.30, output: 2.5  },
 };
@@ -139,7 +139,7 @@ async function callOpenAI(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1500,
+      max_completion_tokens: 8192,
       stream: true,
       stream_options: { include_usage: true },
       // OpenAI auto-caches matching prompt prefixes (50% input cost reduction)

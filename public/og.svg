@@ -76,7 +76,7 @@
       <rect width="400" height="116" rx="14" fill="#ffffff" stroke="#e0dcd5"/>
       <circle cx="24" cy="28" r="6" fill="#c47b1a"/>
       <text x="40" y="34" class="h2" font-size="14" fill="#c47b1a">Claude</text>
-      <text x="100" y="34" class="mono" font-size="11" fill="#766b60">opus 4.6</text>
+      <text x="100" y="34" class="mono" font-size="11" fill="#766b60">opus 4.7</text>
       <text x="24" y="62" class="body" font-size="13" fill="#2a2520">あなたの価値観を踏まえると、起業</text>
       <text x="24" y="84" class="body" font-size="13" fill="#2a2520">の方が後悔しないと思う。長期の自</text>
       <text x="24" y="106" class="body" font-size="13" fill="#2a2520">由度を最重視している点が決め手。</text>
@@ -86,7 +86,7 @@
       <rect width="400" height="116" rx="14" fill="#ffffff" stroke="#e0dcd5"/>
       <circle cx="24" cy="28" r="6" fill="#285240"/>
       <text x="40" y="34" class="h2" font-size="14" fill="#285240">ChatGPT</text>
-      <text x="110" y="34" class="mono" font-size="11" fill="#766b60">gpt-4o</text>
+      <text x="110" y="34" class="mono" font-size="11" fill="#766b60">gpt-5.4</text>
       <text x="24" y="62" class="body" font-size="13" fill="#2a2520">いや、収入の安定性を軽視しすぎ</text>
       <text x="24" y="84" class="body" font-size="13" fill="#2a2520">だ。最低6ヶ月の生活防衛資金を確</text>
       <text x="24" y="106" class="body" font-size="13" fill="#2a2520">保した上で判断するべき。</text>

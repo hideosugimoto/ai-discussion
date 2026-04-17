@@ -136,8 +136,8 @@ npx wrangler pages deploy dist --project-name ai-discussion
 ## 使用モデル
 | モード | Claude | ChatGPT | Gemini |
 |--------|--------|---------|--------|
-| 🧠最強 | claude-opus-4-6 | gpt-4o | gemini-2.5-pro |
-| ⚡高速 | claude-sonnet-4-6 | gpt-4o-mini | gemini-2.5-flash |
+| 🧠最強 | claude-opus-4-7 | gpt-5.4 | gemini-2.5-pro |
+| ⚡高速 | claude-sonnet-4-6 | gpt-5.4-mini | gemini-2.5-flash |
 
 ## 機能
 

@@ -1,11 +1,11 @@
 // Model pricing (USD per 1M tokens) - 2026-04 rates
 export const MODEL_PRICING = {
   // Claude
-  "claude-opus-4-6":   { input: 5.00,  output: 25.00 },
+  "claude-opus-4-7":   { input: 5.00,  output: 25.00 },
   "claude-sonnet-4-6": { input: 3.00,  output: 15.00 },
   // OpenAI
-  "gpt-4o":            { input: 2.50,  output: 10.00 },
-  "gpt-4o-mini":       { input: 0.15,  output: 0.60  },
+  "gpt-5.4":           { input: 2.50,  output: 15.00 },
+  "gpt-5.4-mini":      { input: 0.75,  output: 4.50  },
   // Gemini
   "gemini-2.5-pro":    { input: 1.25,  output: 10.00 },
   "gemini-2.5-flash":  { input: 0.30,  output: 2.50  },

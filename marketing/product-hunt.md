@@ -21,7 +21,7 @@
 
 ## Description (260 chars max for the gallery card)
 
-> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.6, GPT-4o, and Gemini 2.5 Pro debate the same topic in parallel — then auto-summarizes the agreements, conflicts, and final conclusion. ¥980/month, no API keys required. Open-source.
+> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.7, GPT-5.4, and Gemini 2.5 Pro debate the same topic in parallel — then auto-summarizes the agreements, conflicts, and final conclusion. ¥980/month, no API keys required. Open-source.
 
 ---
 
