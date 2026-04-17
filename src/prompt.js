@@ -7,8 +7,12 @@ const MAX_CONTEXT_TOPIC_LEN = 80;
 const MAX_CONTEXT_ITEMS_PER_SECTION = 3;
 const MAX_CONTEXT_POINT_LEN = 80;
 
-const RECENT_FULL_ROUNDS = 2;
-const MIN_ROUNDS_FOR_COMPRESSION = 4;
+// Keep only the most recent round in full text; older rounds are summarised.
+// Earlier settings were 2/4 but measurement showed input tokens growing linearly
+// (turn 1: 2k → turn 10: 14k), indicating compression was effectively inactive
+// for typical sessions. 1/2 starts compression from round 2 onward.
+const RECENT_FULL_ROUNDS = 1;
+const MIN_ROUNDS_FOR_COMPRESSION = 2;
 
 function truncate(str, max) {
   const s = (str || "").toString().trim();
