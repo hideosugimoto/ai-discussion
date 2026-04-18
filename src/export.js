@@ -152,26 +152,41 @@ ${rounds}
 </html>`;
 }
 
+function buildFileName(topic, ext) {
+  const cleaned = (topic || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .replace(/[\s\u3000]+/g, "_")
+    .replace(/^[._]+|[._]+$/g, "")
+    .trim();
+  const base = cleaned.slice(0, 40) || "discussion";
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${base}_${date}.${ext}`;
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function downloadHtml(topic, discussion, summaries, personas) {
   const html = exportToHtml(topic, discussion, summaries, personas);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_") || "untitled";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `discussion_${safeName}_${Date.now()}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, buildFileName(topic, "html"));
 }
 
 export function downloadMarkdown(topic, discussion, summaries, personas) {
   const md = exportToMarkdown(topic, discussion, summaries, personas);
   const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const safeName = topic.slice(0, 30).replace(/[/\\?%*:|"<>]/g, "_") || "untitled";
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `discussion_${safeName}_${Date.now()}.md`;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerDownload(blob, buildFileName(topic, "md"));
 }
