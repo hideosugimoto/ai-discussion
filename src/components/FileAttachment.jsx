@@ -3,11 +3,14 @@ import {
   parseFile,
   validateAttachment,
   formatBytes,
+  shouldSummarize,
   MAX_FILES,
   MAX_TOTAL_BYTES,
+  SUMMARY_THRESHOLD_BYTES,
 } from "../lib/fileParser";
 
 function Chip({ attachment, onRemove, disabled }) {
+  const summarised = !!attachment.summary;
   return (
     <span style={{
       display:"inline-flex", alignItems:"center", gap:6,
@@ -18,6 +21,9 @@ function Chip({ attachment, onRemove, disabled }) {
       <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={attachment.name}>
         📄 {attachment.name}
       </span>
+      {summarised && (
+        <span style={{ color:"var(--accent)", fontSize:10 }} title="要約版を送信中">📝</span>
+      )}
       <span style={{ color:"var(--text3)", fontSize:10 }}>{formatBytes(attachment.size)}</span>
       <button
         onClick={() => onRemove(attachment.id)} disabled={disabled}
@@ -32,7 +38,37 @@ function Chip({ attachment, onRemove, disabled }) {
   );
 }
 
-export default function FileAttachment({ attachments, setAttachments, disabled }) {
+function SummaryModeToggle({ value, onChange, disabled }) {
+  const options = [
+    { id: "auto", label: "Auto" },
+    { id: "on",   label: "ON"   },
+    { id: "off",  label: "OFF"  },
+  ];
+  return (
+    <span role="radiogroup" aria-label="要約モード" style={{
+      display:"inline-flex", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden",
+    }}>
+      {options.map((o, i) => (
+        <button
+          key={o.id}
+          role="radio" aria-checked={value === o.id}
+          onClick={() => !disabled && onChange(o.id)}
+          disabled={disabled}
+          style={{
+            border:"none",
+            borderLeft: i === 0 ? "none" : "1px solid var(--border)",
+            background: value === o.id ? "var(--accent)" : "transparent",
+            color: value === o.id ? "#fff" : "var(--text3)",
+            padding:"2px 8px", fontSize:10,
+            cursor: disabled ? "not-allowed" : "pointer",
+          }}
+        >{o.label}</button>
+      ))}
+    </span>
+  );
+}
+
+export default function FileAttachment({ attachments, setAttachments, disabled, summaryMode = "auto", setSummaryMode }) {
   const inputRef = useRef(null);
   const [error, setError]   = useState("");
   const [warn,  setWarn]    = useState("");
@@ -135,6 +171,19 @@ export default function FileAttachment({ attachments, setAttachments, disabled }
       {warn && !error && (
         <div style={{ marginTop:6, fontSize:11, color:"var(--warning, #d97706)" }}>
           ⚠ {warn}
+        </div>
+      )}
+      {attachments.length > 0 && setSummaryMode && (
+        <div style={{ marginTop:6, display:"flex", flexWrap:"wrap", alignItems:"center", gap:6, fontSize:10, color:"var(--text3)" }}>
+          <span>📝 要約モード:</span>
+          <SummaryModeToggle value={summaryMode} onChange={setSummaryMode} disabled={disabled || busy} />
+          {summaryMode === "auto" && (
+            shouldSummarize("auto", attachments)
+              ? <span style={{ color:"var(--accent)" }}>合計 {formatBytes(SUMMARY_THRESHOLD_BYTES)} 超のため自動ON（次のラウンドで要約します）</span>
+              : <span>合計 {formatBytes(SUMMARY_THRESHOLD_BYTES)} 超で自動的に要約に切替</span>
+          )}
+          {summaryMode === "on"  && <span style={{ color:"var(--accent)" }}>常に要約を送信（次のラウンドで要約します）</span>}
+          {summaryMode === "off" && <span>添付を全文送信</span>}
         </div>
       )}
     </div>

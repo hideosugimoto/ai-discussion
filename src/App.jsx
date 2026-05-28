@@ -71,6 +71,7 @@ export default function App() {
   const [personas, setPersonas] = useState({ claude:"", chatgpt:"", gemini:"" });
   const [contextDiscussions, setContextDiscussions] = useState([]); // 過去議論コンテキスト（最大3件）
   const [attachments, setAttachments] = useState([]); // 添付ファイル（議題への追加コンテキスト）
+  const [summaryMode, setSummaryMode] = useState("auto"); // "auto" | "on" | "off" — 添付の要約モード
   const [placeholderIdx, setPlaceholderIdx] = useState(() => Math.floor(Math.random() * PLACEHOLDER_ROTATION.length));
   const [topicFocused, setTopicFocused] = useState(false);
 
@@ -84,7 +85,8 @@ export default function App() {
 
   const disc = useDiscussion({
     keys, topic, profile, mode, discussionMode, setDiscussionMode,
-    conclusionTarget, personas, constitution, contextDiscussions, attachments,
+    conclusionTarget, personas, constitution, contextDiscussions,
+    attachments, setAttachments, summaryMode,
     authToken: auth.token, isPremium: auth.isPremium,
     cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
   });
@@ -406,7 +408,11 @@ export default function App() {
               onFocus={() => setTopicFocused(true)} onBlur={() => setTopicFocused(false)}
               placeholder={`議題を入力... (Ctrl+Enter で開始)\n例: ${PLACEHOLDER_ROTATION[placeholderIdx]}\n💡 下の「おすすめ質問」から選ぶこともできます`} rows={3}
               style={{ width:"100%", background:"transparent", border:"none", padding:14, color:"var(--text)", fontSize:14, lineHeight:1.7, resize:"vertical" }} />
-            <FileAttachment attachments={attachments} setAttachments={setAttachments} disabled={running} />
+            <FileAttachment
+              attachments={attachments} setAttachments={setAttachments}
+              disabled={running}
+              summaryMode={summaryMode} setSummaryMode={setSummaryMode}
+            />
             <div style={{ padding:"8px 12px", borderTop:"1px solid var(--border)", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:11, color:profile.trim()?"var(--success)":"var(--text3)" }}>{profile.trim()?"👤 プロフィールあり":"👤 なし"}</span>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>

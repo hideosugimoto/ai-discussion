@@ -25,7 +25,25 @@ async function readSSE(res, onChunk, signal) {
 
 // ── Claude ────────────────────────────────────────────────────
 
-export async function callClaude(apiKey, model, sys, user, onChunk, signal) {
+// userParts (optional): { cachePrefix, variable } — when provided, the user
+// message is split into a cacheable prefix block (topic + attachments) and a
+// variable suffix (history + intervention). cache_control on the prefix lets
+// Anthropic cache attachment text across rounds (~90% input cost saving once
+// the cache is warm; the first round writes the cache at +25% cost).
+function buildClaudeUserMessages(user, userParts) {
+  if (userParts && userParts.cachePrefix && userParts.variable) {
+    return [{
+      role: "user",
+      content: [
+        { type: "text", text: userParts.cachePrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: userParts.variable },
+      ],
+    }];
+  }
+  return [{ role: "user", content: user }];
+}
+
+export async function callClaude(apiKey, model, sys, user, onChunk, signal, userParts) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -37,7 +55,7 @@ export async function callClaude(apiKey, model, sys, user, onChunk, signal) {
     body: JSON.stringify({
       model, max_tokens: 1500, stream: true,
       system: [{ type: "text", text: sys, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: user }],
+      messages: buildClaudeUserMessages(user, userParts),
     }),
     signal,
   });

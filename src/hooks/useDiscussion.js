@@ -6,16 +6,54 @@ import { callClaude, callChatGPT, callGemini } from "../api";
 import { callProxyClaude, callProxyChatGPT, callProxyGemini } from "../apiProxy";
 import { saveDiscussion } from "../history";
 import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
+import { shouldSummarize } from "../lib/fileParser";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import summaryPromptText from "../prompts/summary.txt?raw";
 import rollingSummaryPromptText from "../prompts/rolling-summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
+
+const ATTACHMENT_SUMMARY_SYSTEM =
+  "あなたは資料を議論用に要約するアシスタントです。重要な数値・固有名詞・主張は省略せず、引用可能な形で簡潔にまとめます。";
+
+function buildAttachmentSummaryUser(name, text) {
+  return `ファイル名: ${name}\n以下の内容を、議論で参照しやすいよう 600〜800字程度で要約してください。重要な数値・固有名詞・主張は省略せず保持してください。元の文書の意図と論点を残してください。\n\n${text}`;
+}
 
 async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
   if (isPremium && authToken) {
     return await callProxyChatGPT(authToken, SUMMARY_MODEL, sys, user, () => {}, undefined, sessionId, turnNumber);
   }
   return await callChatGPT(apiKey, SUMMARY_MODEL, sys, user, () => {});
+}
+
+// Returns a new attachments array with `summary` filled in on any items that
+// were not already summarised. Returns the same reference (===) when nothing
+// changed so callers can avoid extra renders. Falls back to the original
+// attachment on individual summary failures — degraded but never blocking.
+async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, authToken, isPremium, sessionId }) {
+  if (!attachments || attachments.length === 0) return attachments;
+  if (!shouldSummarize(summaryMode, attachments)) return attachments;
+  if (!authToken && !apiKey) return attachments; // can't reach the summary model
+
+  const pending = attachments.some((a) => !a.summary);
+  if (!pending) return attachments;
+
+  let changed = false;
+  const next = await Promise.all(attachments.map(async (a) => {
+    if (a.summary) return a;
+    try {
+      const sys = ATTACHMENT_SUMMARY_SYSTEM;
+      const user = buildAttachmentSummaryUser(a.name, a.text);
+      const summary = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
+      const cleaned = (summary || "").trim();
+      if (!cleaned) return a;
+      changed = true;
+      return { ...a, summary: cleaned };
+    } catch {
+      return a;
+    }
+  }));
+  return changed ? next : attachments;
 }
 
 async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {
@@ -125,7 +163,7 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, authToken, isPremium, cloudUpsertFn }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, cloudUpsertFn }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -146,12 +184,16 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const discussionIdRef = useRef(discussionId);
   const rollingSummaryRef = useRef(rollingSummary);
   const attachmentsRef = useRef(attachments);
+  const summaryModeRef = useRef(summaryMode);
+  const setAttachmentsRef = useRef(setAttachments);
 
   useEffect(() => { discussionRef.current = discussion; }, [discussion]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { discussionIdRef.current = discussionId; }, [discussionId]);
   useEffect(() => { rollingSummaryRef.current = rollingSummary; }, [rollingSummary]);
   useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
+  useEffect(() => { summaryModeRef.current = summaryMode; }, [summaryMode]);
+  useEffect(() => { setAttachmentsRef.current = setAttachments; }, [setAttachments]);
 
   const cloudUpsertRef = useRef(cloudUpsertFn);
   useEffect(() => { cloudUpsertRef.current = cloudUpsertFn; }, [cloudUpsertFn]);
@@ -232,10 +274,31 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const models = MODE_MODELS[mode];
 
+    // Summarise attachments before the round if mode demands it. Sets summary
+    // on the original attachment records so subsequent rounds reuse them and
+    // the UI can show that a file was compressed.
+    const effectiveAttachments = await ensureAttachmentSummaries({
+      attachments: attachmentsRef.current,
+      summaryMode: summaryModeRef.current,
+      apiKey: keys.chatgpt,
+      authToken,
+      isPremium,
+      sessionId: discussionIdRef.current,
+    });
+    if (effectiveAttachments !== attachmentsRef.current && setAttachmentsRef.current) {
+      setAttachmentsRef.current(effectiveAttachments);
+    }
+
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, attachmentsRef.current);
+        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments);
         const tag = models[model.id].tag;
+        // Only pass userParts to Claude when there are attachments — otherwise
+        // the prefix isn't large enough to benefit from cache_control and adds
+        // unnecessary block overhead.
+        const userParts = (effectiveAttachments && effectiveAttachments.length > 0)
+          ? { cachePrefix: userCachePrefix, variable: userVariable }
+          : undefined;
 
         const onChunk = (chunk) => {
           setDiscussion((d) => {
@@ -255,12 +318,12 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
           if (isPremium && authToken) {
             // Premium: server-side proxy (no API keys needed)
             const sid = discussionIdRef.current;
-            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
+            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts);
             if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
             if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
           } else {
             // Free: direct API calls (user's own keys)
-            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig);
+            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts);
             if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig);
             if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig);
           }

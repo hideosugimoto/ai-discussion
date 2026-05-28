@@ -225,6 +225,13 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
       ? `\n\n【司会者（ユーザー）からの介入】\n${safeIntervention.trim()}`
       : "";
 
-  const user = `【議題】${safeTopic}${attachText}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
-  return { sys, user };
+  // Split the user message into a cacheable prefix (topic + attachments — stable
+  // across rounds within a session) and a variable suffix (history + intervention
+  // + closing prompt — changes every round). Anthropic's cache_control hits the
+  // prefix and saves ~90% of input cost on the attachment portion. OpenAI auto-
+  // caches matching prefixes too, so the same split helps both providers.
+  const userCachePrefix = `【議題】${safeTopic}${attachText}`;
+  const userVariable = `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const user = `${userCachePrefix}${userVariable}`;
+  return { sys, user, userCachePrefix, userVariable };
 }

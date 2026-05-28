@@ -233,4 +233,40 @@ describe("buildPrompt", () => {
       expect(c).not.toContain("【添付ファイル】");
     });
   });
+
+  // ── cache-aware user split (Phase 3) ───────────────────────
+  describe("userCachePrefix / userVariable split", () => {
+    it("returns prefix + variable that concatenate to user", () => {
+      const { user, userCachePrefix, userVariable } = buildPrompt(
+        "claude", "議題", "", [], 1, ""
+      );
+      expect(typeof userCachePrefix).toBe("string");
+      expect(typeof userVariable).toBe("string");
+      expect(userCachePrefix + userVariable).toBe(user);
+    });
+
+    it("includes the topic and attachments in the cacheable prefix", () => {
+      const att = [{ id: "1", name: "doc.md", size: 100, ext: "md", text: "添付本文" }];
+      const { userCachePrefix, userVariable } = buildPrompt(
+        "claude", "議題X", "", [], 1, "", "standard", null, "", [], [], null, att
+      );
+      expect(userCachePrefix).toContain("【議題】議題X");
+      expect(userCachePrefix).toContain("【添付ファイル】");
+      expect(userCachePrefix).toContain("添付本文");
+      // History/intervention/closing belong in the variable part
+      expect(userVariable).not.toContain("添付本文");
+      expect(userVariable).toContain("あなた（Claude）");
+    });
+
+    it("keeps history and intervention in the variable suffix", () => {
+      const history = [{ messages: [{ modelId: "claude", text: "R1Claude" }] }];
+      const { userCachePrefix, userVariable } = buildPrompt(
+        "claude", "議題", "", history, 2, "もっと詳しく", "standard"
+      );
+      expect(userCachePrefix).not.toContain("R1Claude");
+      expect(userCachePrefix).not.toContain("司会者");
+      expect(userVariable).toContain("R1Claude");
+      expect(userVariable).toContain("もっと詳しく");
+    });
+  });
 });

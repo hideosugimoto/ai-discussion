@@ -20,6 +20,17 @@ function validateRequest(body) {
   if (typeof body.message !== "string" || body.message.length > 50000) {
     return "Invalid message (max 50000 chars)";
   }
+  if (body.userParts !== undefined) {
+    if (typeof body.userParts !== "object" || body.userParts === null) {
+      return "Invalid userParts";
+    }
+    if (typeof body.userParts.cachePrefix !== "string" || body.userParts.cachePrefix.length > 50000) {
+      return "Invalid userParts.cachePrefix (max 50000 chars)";
+    }
+    if (typeof body.userParts.variable !== "string" || body.userParts.variable.length > 50000) {
+      return "Invalid userParts.variable (max 50000 chars)";
+    }
+  }
   return null;
 }
 
@@ -83,8 +94,25 @@ async function reconcileUsage(db, rowId, inputTokens, outputTokens, actualMicro,
   ]);
 }
 
+// userParts (optional): { cachePrefix, variable } — when provided, split into
+// a cacheable prefix block (topic+attachments) and a variable suffix block
+// (history+intervention). cache_control on the prefix lets Anthropic cache the
+// attachment text across rounds.
+function buildAnthropicUserMessages(message, userParts) {
+  if (userParts && userParts.cachePrefix && userParts.variable) {
+    return [{
+      role: "user",
+      content: [
+        { type: "text", text: userParts.cachePrefix, cache_control: { type: "ephemeral" } },
+        { type: "text", text: userParts.variable },
+      ],
+    }];
+  }
+  return [{ role: "user", content: message }];
+}
+
 // Provider-specific API calls
-async function callAnthropic(apiKey, model, system, message) {
+async function callAnthropic(apiKey, model, system, message, userParts) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -97,7 +125,7 @@ async function callAnthropic(apiKey, model, system, message) {
       max_tokens: 1500,
       stream: true,
       system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: message }],
+      messages: buildAnthropicUserMessages(message, userParts),
     }),
   });
   return res;
@@ -226,7 +254,7 @@ export async function onRequestPost(context) {
   let upstream;
   try {
     if (provider === "anthropic") {
-      upstream = await callAnthropic(apiKey, body.model, body.system, body.message);
+      upstream = await callAnthropic(apiKey, body.model, body.system, body.message, body.userParts);
     } else if (provider === "openai") {
       upstream = await callOpenAI(apiKey, body.model, body.system, body.message);
     } else if (provider === "google") {

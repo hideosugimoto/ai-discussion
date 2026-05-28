@@ -22,14 +22,18 @@ async function readSSE(res, onChunk, signal) {
   }
 }
 
-export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
+export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts) {
+  const body = { model, system: sys, message: user, sessionId, turnNumber };
+  if (userParts && userParts.cachePrefix && userParts.variable) {
+    body.userParts = { cachePrefix: userParts.cachePrefix, variable: userParts.variable };
+  }
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) {

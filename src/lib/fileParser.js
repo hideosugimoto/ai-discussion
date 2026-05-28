@@ -7,6 +7,11 @@ export const MAX_TOTAL_BYTES = 200 * 1024;  // hard cap on the sum of all files
 export const SOFT_LIMIT_BYTES = 80 * 1024;  // warn the user above this size
 export const HARD_LIMIT_BYTES = 150 * 1024; // reject a single file above this size
 
+// Above this total attachment size, "auto" summary mode kicks in and a single
+// gpt-5.4-mini call compresses each file before it's sent to the 3 main models.
+// Keeps long-context cost roughly constant across rounds.
+export const SUMMARY_THRESHOLD_BYTES = 50 * 1024;
+
 const TEXT_EXTENSIONS = new Set([
   "txt", "md", "markdown", "csv", "tsv", "json", "log", "yml", "yaml", "xml", "html", "htm",
 ]);
@@ -144,11 +149,32 @@ export function estimateTokens(text) {
 // Build the attachments block that gets injected into the user prompt.
 // Returns an empty string when there are no attachments so callers can
 // concatenate unconditionally.
+// When an attachment has a `summary` field, that summarised text is used
+// instead of the full body so long files don't blow out the context window.
 export function buildAttachmentsBlock(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return "";
   const sections = attachments.map((a) => {
-    const header = `==== ${a.name} ====`;
-    return `${header}\n${a.text}`;
+    const useSummary = typeof a.summary === "string" && a.summary.length > 0;
+    const header = useSummary
+      ? `==== ${a.name}（要約版） ====`
+      : `==== ${a.name} ====`;
+    const body = useSummary ? a.summary : a.text;
+    return `${header}\n${body}`;
   });
   return `\n\n【添付ファイル】\n${sections.join("\n\n")}`;
+}
+
+// Total attachment size in bytes. Used both for the size-cap UI and for
+// deciding whether "auto" summary mode should engage.
+export function totalAttachmentBytes(attachments) {
+  if (!Array.isArray(attachments)) return 0;
+  return attachments.reduce((s, a) => s + (a.size || 0), 0);
+}
+
+// Resolve the user's summary preference into a concrete on/off decision.
+// "auto" engages once the combined attachment size crosses the threshold.
+export function shouldSummarize(mode, attachments) {
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  return totalAttachmentBytes(attachments) >= SUMMARY_THRESHOLD_BYTES;
 }
