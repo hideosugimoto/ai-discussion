@@ -1,0 +1,59 @@
+name: Check for new AI models
+
+on:
+  schedule:
+    # 毎月1日 00:00 UTC (= 09:00 JST)
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Probe provider /v1/models endpoints
+        id: probe
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        run: |
+          set +e
+          node scripts/check-models.mjs > report.md 2> log.txt
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "----- check-models log -----"
+          cat log.txt
+          if [ "$status" = "2" ]; then
+            echo "----- issue body -----"
+            cat report.md
+          fi
+          if [ "$status" = "1" ]; then exit 1; fi
+          exit 0
+
+      - name: Open issue for new models
+        if: steps.probe.outputs.status == '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_TITLE: "🤖 新しい AI モデルを検出"
+        run: |
+          month=$(date -u +%Y-%m)
+          title="${ISSUE_TITLE} (${month})"
+          existing=$(gh issue list --label "model-update" --state open --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          if [ -n "$existing" ]; then
+            echo "Existing open issue #$existing — appending comment instead of duplicating"
+            gh issue comment "$existing" --body-file report.md
+          else
+            gh label create "model-update" --color "0E8A16" --description "Provider released a new model" 2>/dev/null || true
+            gh issue create --title "$title" --label "model-update" --body-file report.md
+          fi
