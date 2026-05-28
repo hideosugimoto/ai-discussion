@@ -190,4 +190,47 @@ describe("buildPrompt", () => {
       expect(sys).not.toContain("合意3");
     });
   });
+
+  // ── attachments (Phase 2) ──────────────────────────────────
+  describe("attachments injection", () => {
+    const att = [
+      { id: "1", name: "spec.md", size: 100, ext: "md", text: "添付の本文ABC" },
+      { id: "2", name: "data.csv", size: 200, ext: "csv", text: "CSV内容XYZ" },
+    ];
+
+    it("injects attachments block into the user message", () => {
+      const { user } = buildPrompt(
+        "claude", "議題", "", [], 1, "", "standard", null, "", [], [], null, att
+      );
+      expect(user).toContain("【添付ファイル】");
+      expect(user).toContain("==== spec.md ====");
+      expect(user).toContain("添付の本文ABC");
+      expect(user).toContain("==== data.csv ====");
+    });
+
+    it("places attachments between topic and history", () => {
+      const { user } = buildPrompt(
+        "claude", "議題X", "", [], 1, "", "standard", null, "", [], [], null, att
+      );
+      const topicIdx  = user.indexOf("【議題】");
+      const attachIdx = user.indexOf("【添付ファイル】");
+      const promptIdx = user.indexOf("あなた（Claude）");
+      expect(topicIdx).toBeGreaterThanOrEqual(0);
+      expect(attachIdx).toBeGreaterThan(topicIdx);
+      expect(promptIdx).toBeGreaterThan(attachIdx);
+    });
+
+    it("omits attachments block when none provided (backward compatible)", () => {
+      const { user: a } = buildPrompt("claude", "テスト", "", [], 1, "");
+      const { user: b } = buildPrompt(
+        "claude", "テスト", "", [], 1, "", "standard", null, "", [], [], null, []
+      );
+      const { user: c } = buildPrompt(
+        "claude", "テスト", "", [], 1, "", "standard", null, "", [], [], null, undefined
+      );
+      expect(a).not.toContain("【添付ファイル】");
+      expect(b).not.toContain("【添付ファイル】");
+      expect(c).not.toContain("【添付ファイル】");
+    });
+  });
 });

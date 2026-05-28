@@ -125,7 +125,7 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, authToken, isPremium, cloudUpsertFn }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, authToken, isPremium, cloudUpsertFn }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -145,11 +145,13 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const summariesRef = useRef(summaries);
   const discussionIdRef = useRef(discussionId);
   const rollingSummaryRef = useRef(rollingSummary);
+  const attachmentsRef = useRef(attachments);
 
   useEffect(() => { discussionRef.current = discussion; }, [discussion]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
   useEffect(() => { discussionIdRef.current = discussionId; }, [discussionId]);
   useEffect(() => { rollingSummaryRef.current = rollingSummary; }, [rollingSummary]);
+  useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
 
   const cloudUpsertRef = useRef(cloudUpsertFn);
   useEffect(() => { cloudUpsertRef.current = cloudUpsertFn; }, [cloudUpsertFn]);
@@ -232,7 +234,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current);
+        const { sys, user } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, attachmentsRef.current);
         const tag = models[model.id].tag;
 
         const onChunk = (chunk) => {
@@ -349,7 +351,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     }
   };
 
-  const loadFromHistory = (item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget) => {
+  const loadFromHistory = (item, setTopic, setDiscussionMode, setPersonas, setConclusionTarget, setAttachments) => {
     if (!item?.topic || !Array.isArray(item.discussion)) return;
     setTopic(item.topic.slice(0, 2000));
     setDiscussion(item.discussion);
@@ -361,6 +363,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setPersonas(item.personas && typeof item.personas === "object"
       ? { claude: item.personas.claude || "", chatgpt: item.personas.chatgpt || "", gemini: item.personas.gemini || "" }
       : { claude:"", chatgpt:"", gemini:"" });
+    // Attachments are session-scoped (their text is consumed by past rounds
+    // already in the saved discussion). Clear on load so the next round
+    // doesn't re-inject stale file context.
+    if (setAttachments) setAttachments([]);
     setDiscussionId(item.id || null);
     setStarted(true);
     setShowIntervention(true);

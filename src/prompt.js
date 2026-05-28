@@ -1,4 +1,5 @@
 import { MODELS } from "./constants";
+import { buildAttachmentsBlock } from "./lib/fileParser";
 
 const QUALITY_GUIDE = "箇条書きではなく文章で回答し、具体例や根拠を含めて論じてください。一般論だけでなく、あなた独自の視点を加えてください。指定された文字数を目安にしつつ、最低でも200字以上は述べてください。冗長な前置きや同じ主張の繰り返しは避け、新しい論点・反論・譲歩のいずれかを必ず1つ以上含めてください。";
 
@@ -179,7 +180,7 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -216,6 +217,7 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}`;
 
   const histText = compressHistory(history, summaries, personas, rollingSummary);
+  const attachText = buildAttachmentsBlock(attachments);
 
   const safeIntervention = (userIntervention || "").slice(0, 1000);
   const interventionText =
@@ -223,6 +225,6 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
       ? `\n\n【司会者（ユーザー）からの介入】\n${safeIntervention.trim()}`
       : "";
 
-  const user = `【議題】${safeTopic}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const user = `【議題】${safeTopic}${attachText}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   return { sys, user };
 }
