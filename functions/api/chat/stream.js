@@ -1,39 +1,12 @@
 // AI proxy: SSE streaming with token usage tracking
 
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
-
-// Model pricing (microdollars per token) - 2026-04 rates
-// 1 microdollar = $0.000001, so $5.00/1M tokens = 5 microdollars/token
-const MODEL_PRICING = {
-  "claude-opus-4-7":   { input: 5,    output: 25   },
-  "claude-sonnet-4-6": { input: 3,    output: 15   },
-  "gpt-5.4":           { input: 2.5,  output: 15   },
-  "gpt-5.4-mini":      { input: 0.75, output: 4.5  },
-  "gemini-2.5-pro":    { input: 1.25, output: 10   },
-  "gemini-2.5-flash":  { input: 0.30, output: 2.5  },
-};
-
-// Returns cost in microdollars (integer) - no floating point accumulation
-function calcCostMicro(model, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[model];
-  if (!pricing) return 0;
-  return Math.round(inputTokens * pricing.input + outputTokens * pricing.output);
-}
-
-// Estimate max cost for pre-debit (assumes max output tokens)
-function estimateMaxCostMicro(model) {
-  const pricing = MODEL_PRICING[model];
-  if (!pricing) return 0;
-  // Assume 500 input + 1500 output as max estimate
-  return Math.round(500 * pricing.input + 1500 * pricing.output);
-}
-
-function detectProvider(model) {
-  if (model.startsWith("claude")) return "anthropic";
-  if (model.startsWith("gpt")) return "openai";
-  if (model.startsWith("gemini")) return "google";
-  return null;
-}
+import {
+  MODEL_PRICING,
+  detectProvider,
+  calcCostMicro,
+  estimateMaxCostMicro,
+} from "../../../src/models.config.js";
 
 // Layer 4: Input validation
 function validateRequest(body) {

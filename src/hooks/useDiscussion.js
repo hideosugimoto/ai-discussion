@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { MODELS, MODE_MODELS } from "../constants";
+import { SUMMARY_MODEL } from "../models.config";
 import { buildPrompt } from "../prompt";
 import { callClaude, callChatGPT, callGemini } from "../api";
 import { callProxyClaude, callProxyChatGPT, callProxyGemini } from "../apiProxy";
@@ -12,9 +13,9 @@ import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
 async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
   if (isPremium && authToken) {
-    return await callProxyChatGPT(authToken, "gpt-5.4-mini", sys, user, () => {}, undefined, sessionId, turnNumber);
+    return await callProxyChatGPT(authToken, SUMMARY_MODEL, sys, user, () => {}, undefined, sessionId, turnNumber);
   }
-  return await callChatGPT(apiKey, "gpt-5.4-mini", sys, user, () => {});
+  return await callChatGPT(apiKey, SUMMARY_MODEL, sys, user, () => {});
 }
 
 async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {

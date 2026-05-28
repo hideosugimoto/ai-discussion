@@ -1,3 +1,5 @@
+import { VALIDATION_MODELS } from "./models.config";
+
 // ── SSE helper ────────────────────────────────────────────────
 
 async function readSSE(res, onChunk, signal) {
@@ -66,7 +68,7 @@ export async function validateClaude(apiKey) {
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: VALIDATION_MODELS.claude,
       max_tokens: 1,
       messages: [{ role: "user", content: "hi" }],
     }),
@@ -112,7 +114,7 @@ export async function validateChatGPT(apiKey) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: "gpt-5.4-mini", max_completion_tokens: 16,
+      model: VALIDATION_MODELS.chatgpt, max_completion_tokens: 16,
       messages: [{ role: "user", content: "hi" }],
     }),
   });
@@ -157,7 +159,7 @@ export async function callGemini(apiKey, model, sys, user, onChunk, signal) {
 
 export async function validateGemini(apiKey) {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${VALIDATION_MODELS.gemini}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

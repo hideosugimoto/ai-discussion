@@ -1,15 +1,6 @@
-export const MODE_MODELS = {
-  best: {
-    claude:  { tag: "claude-opus-4-7",    label: "Opus 4.7" },
-    chatgpt: { tag: "gpt-5.4",            label: "GPT-5.4" },
-    gemini:  { tag: "gemini-2.5-pro",     label: "2.5 Pro" },
-  },
-  fast: {
-    claude:  { tag: "claude-sonnet-4-6",  label: "Sonnet 4.6" },
-    chatgpt: { tag: "gpt-5.4-mini",       label: "GPT-5.4 mini" },
-    gemini:  { tag: "gemini-2.5-flash",   label: "2.5 Flash" },
-  },
-};
+// Re-exported from the single source of truth (src/models.config.js) so
+// existing `from "./constants"` imports keep working without churn.
+export { MODE_MODELS } from "./models.config";
 
 export const MODELS = [
   { id: "claude",  name: "Claude",  color: "var(--claude-color)",  dimColor: "var(--claude-bd)",  bg: "var(--claude-bg)",  icon: "◆" },
