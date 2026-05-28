@@ -54,14 +54,16 @@ describe("compressHistory", () => {
     ];
     const result = compressHistory(history, summaries);
 
-    // Old rounds (1-2) should be summarized, not full text
+    // Old rounds (1-3) should be summarized, not full text
     expect(result).not.toContain("R1Claude");
     expect(result).not.toContain("R2GPT");
+    expect(result).not.toContain("R3Claude");
     expect(result).toContain("R1合意点");
     expect(result).toContain("R2対立点");
+    expect(result).toContain("R3合意点");
 
-    // Recent rounds (3-4) should be full text
-    expect(result).toContain("R3Claude");
+    // Recent round (4) should be full text
+    expect(result).toContain("R4Claude");
     expect(result).toContain("R4GPT");
     expect(result).toContain("R4Gemini");
   });
@@ -160,7 +162,7 @@ describe("compressHistory", () => {
     expect(result).toContain("社会学者");
   });
 
-  it("recent full rounds section uses correct separator", () => {
+  it("separates compressed and recent sections with headers", () => {
     const history = [
       makeRound([["claude", "R1C"], ["chatgpt", "R1G"], ["gemini", "R1E"]]),
       makeRound([["claude", "R2C"], ["chatgpt", "R2G"], ["gemini", "R2E"]]),
@@ -175,10 +177,10 @@ describe("compressHistory", () => {
     ];
     const result = compressHistory(history, summaries);
 
-    // Recent rounds should be separated by ---
-    expect(result).toContain("---");
-    // Should have section headers
+    // Both sections should be clearly demarcated by their headers
     expect(result).toContain("これまでの議論");
+    expect(result).toContain("【過去の議論");
+    expect(result).toContain("【直近の議論】");
   });
 });
 
@@ -248,9 +250,10 @@ describe("buildPrompt with summaries", () => {
     // Old rounds should NOT appear as full text
     expect(user).not.toContain("R1Claude");
     expect(user).not.toContain("R2GPT");
+    expect(user).not.toContain("R4Claude");
 
-    // Recent rounds should be full text
-    expect(user).toContain("R4Claude");
+    // Recent round (latest only) should be full text
+    expect(user).toContain("R5Claude");
     expect(user).toContain("R5Gemini");
   });
 });
