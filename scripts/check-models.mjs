@@ -42,6 +42,69 @@ function normalizeId(provider, id) {
   return id;
 }
 
+// "YYYYMMDD" or "-YYYY-MM-DD" suffixes — provider-internal snapshot dates that
+// shouldn't be reported as new model launches.
+function isDatedSnapshot(id) {
+  return /-\d{8}$/.test(id) || /-\d{4}-\d{2}-\d{2}$/.test(id);
+}
+
+// Special-purpose variants (search, transcription, TTS, etc.) that aren't the
+// general-purpose chat models we route the discussion through.
+function isVariant(provider, id) {
+  if (provider === "openai") {
+    return /(search-preview|transcribe|tts|realtime|audio|codex|chat-latest|instruct|embedding|moderation|dall-e|whisper|babbage|davinci)/i.test(id);
+  }
+  if (provider === "google") {
+    return /(embedding|tts|live|imagen|veo|aqa|text-bison|chat-bison)/i.test(id);
+  }
+  return false;
+}
+
+// Only the main chat-completion series count as "main": Claude opus/sonnet/haiku,
+// gpt-*, gemini-*. Anything else (Anthropic doesn't expose other series, OpenAI
+// has many side products, Google has gemma/imagen/etc.) is filtered out.
+function isMainSeries(provider, id) {
+  if (provider === "anthropic") return /^claude-(opus|sonnet|haiku)-/.test(id);
+  if (provider === "openai")    return /^gpt-/.test(id) && !isVariant(provider, id);
+  if (provider === "google")    return /^gemini-/.test(id) && !isVariant(provider, id);
+  return false;
+}
+
+// Extract a comparable major.minor version. Returns null when no recognisable
+// version is present (the model is then filtered out, which is what we want
+// for unparseable IDs).
+function extractVersion(id) {
+  if (id.startsWith("claude-")) {
+    const m = id.match(/^claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
+    if (m) return parseFloat(`${m[1]}.${m[2]}`);
+    return null;
+  }
+  if (id.startsWith("gpt-")) {
+    const m = id.match(/^gpt-(\d+(?:\.\d+)?)/);
+    if (m) return parseFloat(m[1]);
+    return null;
+  }
+  if (id.startsWith("gemini-")) {
+    const m = id.match(/^gemini-(\d+(?:\.\d+)?)/);
+    if (m) return parseFloat(m[1]);
+    return null;
+  }
+  return null;
+}
+
+// Highest version we already track per provider. Newer is "new"; same-or-older
+// is a previous generation we deliberately don't list anymore.
+function maxKnownVersionByProvider(known) {
+  const max = { anthropic: 0, openai: 0, google: 0 };
+  for (const id of known) {
+    const fam = familyOf(id);
+    if (!fam) continue;
+    const v = extractVersion(id);
+    if (v !== null && v > max[fam]) max[fam] = v;
+  }
+  return max;
+}
+
 async function fetchAnthropic(apiKey) {
   const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
@@ -75,6 +138,7 @@ const FETCHERS = {
 
 async function collectUnknown() {
   const known = knownIds();
+  const maxKnown = maxKnownVersionByProvider(known);
   const result = { unknown: {}, skipped: [], errors: [] };
 
   for (const [provider, { envKey, fn }] of Object.entries(FETCHERS)) {
@@ -87,12 +151,19 @@ async function collectUnknown() {
       const raw = await fn(apiKey);
       const ids = raw.map((id) => normalizeId(provider, id));
       const unknown = ids
+        // Same provider only
         .filter((id) => familyOf(id) === provider)
+        // Not in our config
         .filter((id) => !known.has(id))
-        // Drop dated snapshots if the base model is already known (e.g.
-        // "gpt-5.4-2026-01" when "gpt-5.4" is known) — they're variants, not
-        // the model launch we care about.
-        .filter((id) => ![...known].some((k) => id.startsWith(k + "-") || id.startsWith(k + ":")));
+        // Main chat series (drops variants like -tts / -search-preview)
+        .filter((id) => isMainSeries(provider, id))
+        // Drop dated snapshots — model release events, not new models
+        .filter((id) => !isDatedSnapshot(id))
+        // Strictly newer generation than what we already track
+        .filter((id) => {
+          const v = extractVersion(id);
+          return v !== null && v > maxKnown[provider];
+        });
       if (unknown.length) result.unknown[provider] = unknown.sort();
     } catch (e) {
       result.errors.push({ provider, message: e.message });
