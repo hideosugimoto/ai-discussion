@@ -55,7 +55,7 @@ function isVariant(provider, id) {
     return /(search-preview|transcribe|tts|realtime|audio|codex|chat-latest|instruct|embedding|moderation|dall-e|whisper|babbage|davinci)/i.test(id);
   }
   if (provider === "google") {
-    return /(embedding|tts|live|imagen|veo|aqa|text-bison|chat-bison)/i.test(id);
+    return /(embedding|tts|live|imagen|veo|aqa|text-bison|chat-bison|image|customtools|vision-only)/i.test(id);
   }
   return false;
 }
