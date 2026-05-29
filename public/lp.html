@@ -1065,6 +1065,148 @@
     font-weight: 500;
   }
 
+  /* ── Trial (ログイン不要お試し) ───────────────── */
+  .trial-launch {
+    text-align: center;
+    margin: 22px auto 0;
+    max-width: 540px;
+  }
+  .trial-launch-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2, #2e7db8));
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 28px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 18px var(--accent-bg);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    font-family: inherit;
+  }
+  .trial-launch-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px var(--accent-bg);
+  }
+  .trial-launch-foot {
+    font-size: 11px; color: var(--text3);
+    margin-top: 10px;
+  }
+  .trial-panel {
+    display: none;
+    margin: 24px auto 0;
+    max-width: 880px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 0 12px 40px var(--accent-bg);
+  }
+  .trial-panel.is-open { display: block; }
+  .trial-panel-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 14px;
+    gap: 12px;
+  }
+  .trial-panel-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 0; }
+  .trial-close-btn {
+    background: none; border: none;
+    color: var(--text3); cursor: pointer;
+    font-size: 18px; line-height: 1;
+    padding: 4px 8px;
+  }
+  .trial-close-btn:hover { color: var(--text); }
+  .trial-topics-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 16px;
+  }
+  .trial-topic-pill {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 12px; font-weight: 600;
+    color: var(--text2); cursor: pointer;
+    transition: all 0.18s ease;
+    font-family: inherit;
+  }
+  .trial-topic-pill:hover {
+    border-color: var(--accent); color: var(--text);
+  }
+  .trial-topic-pill[aria-pressed="true"] {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .trial-run-btn {
+    background: var(--accent); color: #fff;
+    border: none; border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .trial-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .trial-status {
+    margin-top: 14px;
+    font-size: 12px; color: var(--text3);
+    min-height: 18px;
+  }
+  .trial-results {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 16px;
+  }
+  @media (max-width: 720px) { .trial-results { grid-template-columns: 1fr; } }
+  .trial-result {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    min-height: 120px;
+    transition: border-color 0.2s ease, opacity 0.2s ease;
+  }
+  .trial-result.is-waiting { opacity: 0.4; }
+  .trial-result.is-done { border-color: var(--accent); }
+  .trial-result .trial-result-head {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .trial-result .trial-result-head .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .trial-result.claude .dot  { background: #c47b1a; }
+  .trial-result.chatgpt .dot { background: #285240; }
+  .trial-result.gemini .dot  { background: #2e7db8; }
+  .trial-result-body {
+    font-size: 13px; color: var(--text);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    min-height: 80px;
+  }
+  .trial-result-body.placeholder { color: var(--text3); font-style: italic; }
+  .trial-spinner {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: trial-spin 0.8s linear infinite;
+    margin-left: 6px;
+    vertical-align: -1px;
+  }
+  @keyframes trial-spin { to { transform: rotate(360deg); } }
+  .trial-followup {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--border2);
+    text-align: center;
+    display: none;
+  }
+  .trial-followup.is-visible { display: block; }
+  .trial-followup p { margin: 0 0 12px; font-size: 13px; color: var(--text2); }
+  .trial-followup .btn-primary { font-size: 13px; padding: 10px 24px; }
+
   .discussion-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1331,6 +1473,50 @@
       <span aria-hidden="true">✓</span> クレジットカード不要 &nbsp;·&nbsp;
       <span aria-hidden="true">✓</span> いつでも解約 &nbsp;·&nbsp;
       <span aria-hidden="true">✓</span> ソースコード公開
+    </div>
+
+    <!-- ログイン不要お試し -->
+    <div class="trial-launch">
+      <button id="trial-launch-btn" class="trial-launch-btn" type="button" aria-controls="trial-panel" aria-expanded="false">
+        ⚡ ログイン不要で1回だけ試してみる
+      </button>
+      <div class="trial-launch-foot">プリセット議題 × 3AIの議論を、その場で1ラウンドだけ体験できます</div>
+    </div>
+
+    <div id="trial-panel" class="trial-panel" role="region" aria-labelledby="trial-panel-title" aria-hidden="true">
+      <div class="trial-panel-head">
+        <h2 id="trial-panel-title" class="trial-panel-title">議題を選んで「議論開始」を押すだけ</h2>
+        <button id="trial-close-btn" class="trial-close-btn" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="trial-topics-row" role="radiogroup" aria-label="議題を選択">
+        <button class="trial-topic-pill" type="button" role="radio" aria-pressed="true"  data-trial-topic="0">副業で起業</button>
+        <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="1">結婚 vs 同棲</button>
+        <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="2">住宅ローン</button>
+        <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="3">転職判断</button>
+        <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="4">子の教育費</button>
+      </div>
+      <button id="trial-run-btn" class="trial-run-btn" type="button">議論開始 →</button>
+      <div id="trial-status" class="trial-status" aria-live="polite"></div>
+
+      <div class="trial-results" aria-live="polite">
+        <article class="trial-result claude is-waiting" data-trial-slot="claude">
+          <div class="trial-result-head"><span class="dot" aria-hidden="true"></span>Claude (Sonnet 4.6)</div>
+          <div class="trial-result-body placeholder">議題を選んで「議論開始」をクリック</div>
+        </article>
+        <article class="trial-result chatgpt is-waiting" data-trial-slot="chatgpt">
+          <div class="trial-result-head"><span class="dot" aria-hidden="true"></span>ChatGPT (GPT-5.4 mini)</div>
+          <div class="trial-result-body placeholder">議題を選んで「議論開始」をクリック</div>
+        </article>
+        <article class="trial-result gemini is-waiting" data-trial-slot="gemini">
+          <div class="trial-result-head"><span class="dot" aria-hidden="true"></span>Gemini (3.1 Flash-Lite)</div>
+          <div class="trial-result-body placeholder">議題を選んで「議論開始」をクリック</div>
+        </article>
+      </div>
+
+      <div id="trial-followup" class="trial-followup">
+        <p>続きを 3 ラウンド以上で深堀りしたり、Opus 4.8 / GPT-5.5 / Gemini 2.5 Pro の <strong>best モード</strong> を使うには、ログインが必要です。</p>
+        <a href="/" class="btn btn-primary">Google で続きを試す →</a>
+      </div>
     </div>
   </div>
 

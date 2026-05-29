@@ -103,6 +103,152 @@
   });
 })();
 
+// ── Trial: ログイン不要お試し ───────────────────
+(function() {
+  var launchBtn  = document.getElementById("trial-launch-btn");
+  var panel      = document.getElementById("trial-panel");
+  var closeBtn   = document.getElementById("trial-close-btn");
+  var runBtn     = document.getElementById("trial-run-btn");
+  var status     = document.getElementById("trial-status");
+  var followup   = document.getElementById("trial-followup");
+  if (!launchBtn || !panel || !runBtn) return;
+
+  var topicBtns = panel.querySelectorAll(".trial-topic-pill");
+  var slots = {
+    claude:  panel.querySelector('[data-trial-slot="claude"]'),
+    chatgpt: panel.querySelector('[data-trial-slot="chatgpt"]'),
+    gemini:  panel.querySelector('[data-trial-slot="gemini"]'),
+  };
+  var selectedTopic = 0;
+  var running = false;
+
+  function openPanel() {
+    panel.classList.add("is-open");
+    panel.setAttribute("aria-hidden", "false");
+    launchBtn.setAttribute("aria-expanded", "true");
+    // スクロールしてパネルを画面中央へ
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function closePanel() {
+    panel.classList.remove("is-open");
+    panel.setAttribute("aria-hidden", "true");
+    launchBtn.setAttribute("aria-expanded", "false");
+    launchBtn.focus();
+  }
+
+  launchBtn.addEventListener("click", openPanel);
+  closeBtn.addEventListener("click", closePanel);
+
+  topicBtns.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      if (running) return;
+      topicBtns.forEach(function(b) { b.setAttribute("aria-pressed", "false"); });
+      btn.setAttribute("aria-pressed", "true");
+      selectedTopic = parseInt(btn.getAttribute("data-trial-topic"), 10) || 0;
+    });
+  });
+
+  function resetSlots(message) {
+    Object.keys(slots).forEach(function(p) {
+      var slot = slots[p];
+      if (!slot) return;
+      slot.classList.add("is-waiting");
+      slot.classList.remove("is-done");
+      var body = slot.querySelector(".trial-result-body");
+      if (body) {
+        body.textContent = message;
+        body.classList.add("placeholder");
+      }
+    });
+  }
+
+  function setSlotResponse(provider, text, isError) {
+    var slot = slots[provider];
+    if (!slot) return;
+    slot.classList.remove("is-waiting");
+    if (!isError) slot.classList.add("is-done");
+    var body = slot.querySelector(".trial-result-body");
+    if (body) {
+      body.textContent = text;
+      body.classList.remove("placeholder");
+    }
+  }
+
+  async function runTrial() {
+    if (running) return;
+    running = true;
+    runBtn.disabled = true;
+    runBtn.textContent = "議論中…";
+    followup.classList.remove("is-visible");
+    resetSlots("思考中…");
+    status.textContent = "3つのAIに同時に問いを投げています…";
+
+    try {
+      var res = await fetch("/api/trial/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicId: selectedTopic }),
+      });
+
+      if (res.status === 429) {
+        var errJson = await res.json().catch(function() { return {}; });
+        status.textContent = errJson.error || "本日のお試し上限に達しました。";
+        resetSlots("お試し上限に達したため、応答を取得できません。");
+        followup.classList.add("is-visible");
+        return;
+      }
+      if (!res.ok) {
+        status.textContent = "エラーが発生しました（HTTP " + res.status + "）。時間を置いて再度お試しください。";
+        resetSlots("応答取得に失敗しました。");
+        return;
+      }
+      if (!res.body) {
+        status.textContent = "応答ストリームを取得できませんでした。";
+        return;
+      }
+
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
+
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+
+        var lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (!line.startsWith("data: ")) continue;
+          var payloadStr = line.slice(6).trim();
+          if (!payloadStr) continue;
+          try {
+            var payload = JSON.parse(payloadStr);
+            if (payload.type === "start") {
+              status.textContent = "議題: " + payload.topic + " · 残り " + (payload.remaining ?? 0) + " 回";
+            } else if (payload.type === "response") {
+              setSlotResponse(payload.provider, payload.text || "（応答なし）", !!payload.error);
+            } else if (payload.type === "done") {
+              status.textContent = "議論完了。続きはログインで！";
+              followup.classList.add("is-visible");
+            }
+          } catch (_) { /* JSON 不正は無視 */ }
+        }
+      }
+    } catch (e) {
+      status.textContent = "通信エラーが発生しました。時間を置いて再度お試しください。";
+      resetSlots("応答取得に失敗しました。");
+    } finally {
+      running = false;
+      runBtn.disabled = false;
+      runBtn.textContent = "もう一度試す →";
+    }
+  }
+
+  runBtn.addEventListener("click", runTrial);
+})();
+
 // ── Sticky mobile CTA visibility ────────────────
 (function() {
   var cta = document.getElementById("mobile-cta");
