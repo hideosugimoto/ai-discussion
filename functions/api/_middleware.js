@@ -105,6 +105,7 @@ const PUBLIC_PATHS = [
   "/api/auth/exchange",
   "/api/auth/refresh",
   "/api/billing/webhook",
+  "/api/trial/chat",
 ];
 
 // Public route prefixes for dynamic paths. Only specific HTTP methods are
