@@ -31,6 +31,13 @@
 <!-- Favicon -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23c47b1a'/%3E%3Cstop offset='0.5' stop-color='%23285240'/%3E%3Cstop offset='1' stop-color='%232e7db8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3C/svg%3E" />
 
+<!-- Cloudflare Turnstile (bot 抑止・お試しAPI保護)
+     Site Key は public 値。本番運用時は Cloudflare ダッシュボードで作成した実 Site Key
+     ＋ TURNSTILE_SECRET_KEY を Pages 環境変数に設定すること。
+     1x... は Cloudflare 公式の "Always passes" テストキー。 -->
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+<meta name="turnstile-site-key" content="1x00000000000000000000AA" />
+
 <!-- Performance: preconnect + preload critical font CSS (web.dev top CWV) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1495,7 +1502,8 @@
         <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="3">転職判断</button>
         <button class="trial-topic-pill" type="button" role="radio" aria-pressed="false" data-trial-topic="4">子の教育費</button>
       </div>
-      <button id="trial-run-btn" class="trial-run-btn" type="button">議論開始 →</button>
+      <div id="trial-turnstile" class="cf-turnstile" style="margin-bottom:12px;" data-theme="auto" data-size="flexible"></div>
+      <button id="trial-run-btn" class="trial-run-btn" type="button" disabled>議論開始 →</button>
       <div id="trial-status" class="trial-status" aria-live="polite"></div>
 
       <div class="trial-results" aria-live="polite">

@@ -1,16 +1,25 @@
 // ログイン不要お試し API。
 // プリセット議題に対して Claude / ChatGPT / Gemini の fast モードを並列で叩き、
 // 1ラウンドのみの応答を統合SSEで返す。
-// - 認証不要（_middleware.js の PUBLIC_PATHS に登録）
-// - レート制限: IP per 24h で TRIAL_DAILY_LIMIT 回
-// - 議題は topicId 指定のみ受付（任意プロンプト送信を遮断）
-// - usage は trial:counter:* で KV 集計のみ。D1 への記録は行わない
+//
+// セキュリティレイヤ:
+//   1. Cloudflare Turnstile（bot 抑止 / 1IP=1人間チェック）
+//   2. CF-Connecting-IP のみで IP 識別（X-Forwarded-For 等は信用しない）
+//   3. 瞬間レート: 同一 IP / 10sec で 1 回（KV: trial:burst:{ip}）
+//   4. 日次レート: 同一 IP / 24h で 10 回（KV: trial:{ip}:{date}）
+//   5. グローバル日次上限: 全体 / 24h で 2000 回（KV: trial:global:{date}）
+//   6. Content-Length 上限 1KB
+//   7. 上流呼び出しは AbortSignal でクライアント切断と連動
+// 任意プロンプト送信は遮断（topicId のみ受け、本文は server 側 topics.js で確定）
 
 import { topicById } from "./topics.js";
 import { MODE_MODELS, detectProvider } from "../../../src/models.config.js";
 
-const TRIAL_DAILY_LIMIT = 10; // IP あたり 24h で 10 回
-const TRIAL_DAILY_TTL_SEC = 24 * 60 * 60;
+const TRIAL_DAILY_LIMIT        = 10;          // IP per 24h
+const TRIAL_DAILY_TTL_SEC      = 86400;
+const TRIAL_BURST_TTL_SEC      = 10;          // IP per 10s = 1
+const TRIAL_GLOBAL_DAILY_LIMIT = 2000;        // 全体 per 24h（≒ $30/日想定上限）
+const MAX_BODY_BYTES           = 1024;
 
 // 議論モードのプリセット（議題ごとにAIの役割を分けて意見が分かれやすくする）
 const SYSTEM_PROMPTS = {
@@ -28,25 +37,73 @@ const SYSTEM_PROMPTS = {
     "冒頭の前置きは省略し、「視点の盲点」を指摘する立場で答えてください。",
 };
 
-const ipFromRequest = (request) =>
-  request.headers.get("CF-Connecting-IP") ||
-  request.headers.get("X-Forwarded-For") ||
-  "unknown";
+// CF-Connecting-IP は Cloudflare が必ず上書き付与する。クライアント由来の
+// X-Forwarded-For は信用しない。CF 経由でないと null を返して呼び出し側で拒否。
+function ipFromRequest(request) {
+  const ip = request.headers.get("CF-Connecting-IP");
+  return ip && ip.trim() ? ip.trim() : null;
+}
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 async function checkTrialLimit(kv, ip) {
-  const key = `trial:${ip}:${today()}`;
-  const current = parseInt((await kv.get(key)) || "0", 10);
-  if (current >= TRIAL_DAILY_LIMIT) {
-    return { allowed: false, remaining: 0 };
+  const date      = today();
+  const ipKey     = `trial:${ip}:${date}`;
+  const burstKey  = `trial:burst:${ip}`;
+  const globalKey = `trial:global:${date}`;
+
+  // 瞬間バースト (10s = 1)
+  const burst = await kv.get(burstKey);
+  if (burst) return { allowed: false, reason: "burst", remaining: 0 };
+
+  // グローバル上限
+  const globalCurrent = parseInt((await kv.get(globalKey)) || "0", 10);
+  if (globalCurrent >= TRIAL_GLOBAL_DAILY_LIMIT) {
+    return { allowed: false, reason: "global", remaining: 0 };
   }
-  await kv.put(key, String(current + 1), { expirationTtl: TRIAL_DAILY_TTL_SEC });
-  return { allowed: true, remaining: TRIAL_DAILY_LIMIT - current - 1 };
+
+  // IP 日次上限
+  const ipCurrent = parseInt((await kv.get(ipKey)) || "0", 10);
+  if (ipCurrent >= TRIAL_DAILY_LIMIT) {
+    return { allowed: false, reason: "ip", remaining: 0 };
+  }
+
+  // 加算（並列）
+  await Promise.all([
+    kv.put(burstKey,  "1",                  { expirationTtl: TRIAL_BURST_TTL_SEC }),
+    kv.put(ipKey,     String(ipCurrent + 1), { expirationTtl: TRIAL_DAILY_TTL_SEC }),
+    kv.put(globalKey, String(globalCurrent + 1), { expirationTtl: TRIAL_DAILY_TTL_SEC }),
+  ]);
+
+  return { allowed: true, remaining: TRIAL_DAILY_LIMIT - ipCurrent - 1 };
 }
 
-// ── Provider call (non-streaming, fast mode) ──────
-async function callClaudeOnce(apiKey, model, system, message) {
+// Turnstile token を Cloudflare に検証してもらう。
+// 環境変数 TURNSTILE_SECRET_KEY が未設定なら検証スキップ不可（fail closed）。
+async function verifyTurnstile(secret, token, ip) {
+  if (!secret) return { ok: false, reason: "server_misconfigured" };
+  if (!token || typeof token !== "string") return { ok: false, reason: "missing_token" };
+
+  const params = new URLSearchParams();
+  params.append("secret",   secret);
+  params.append("response", token);
+  if (ip) params.append("remoteip", ip);
+
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: params,
+    });
+    if (!res.ok) return { ok: false, reason: "verify_http_error" };
+    const json = await res.json();
+    return { ok: !!json.success, reason: json["error-codes"]?.join(",") || "" };
+  } catch {
+    return { ok: false, reason: "verify_network_error" };
+  }
+}
+
+// ── Provider call (non-streaming, fast mode, abortable) ──
+async function callClaudeOnce(apiKey, model, system, message, signal) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -56,17 +113,18 @@ async function callClaudeOnce(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 600,
+      max_tokens: 400,
       system,
       messages: [{ role: "user", content: message }],
     }),
+    signal,
   });
-  if (!res.ok) throw new Error(`Anthropic ${res.status}`);
+  if (!res.ok) throw new Error(`anthropic_${res.status}`);
   const json = await res.json();
   return json.content?.[0]?.text || "";
 }
 
-async function callOpenAIOnce(apiKey, model, system, message) {
+async function callOpenAIOnce(apiKey, model, system, message, signal) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -75,19 +133,20 @@ async function callOpenAIOnce(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_completion_tokens: 800,
+      max_completion_tokens: 400,
       messages: [
         { role: "system", content: system },
         { role: "user", content: message },
       ],
     }),
+    signal,
   });
-  if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+  if (!res.ok) throw new Error(`openai_${res.status}`);
   const json = await res.json();
   return json.choices?.[0]?.message?.content || "";
 }
 
-async function callGoogleOnce(apiKey, model, system, message) {
+async function callGoogleOnce(apiKey, model, system, message, signal) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
@@ -99,63 +158,96 @@ async function callGoogleOnce(apiKey, model, system, message) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: system }] },
         contents: [{ parts: [{ text: message }] }],
-        generationConfig: { maxOutputTokens: 800 },
+        generationConfig: { maxOutputTokens: 400 },
       }),
+      signal,
     }
   );
-  if (!res.ok) throw new Error(`Google ${res.status}`);
+  if (!res.ok) throw new Error(`google_${res.status}`);
   const json = await res.json();
   return json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
-// fast モードのモデルタグに対応するプロバイダ呼び出し
-async function callProvider(env, providerKey, message) {
+async function callProvider(env, providerKey, message, signal) {
   const { tag } = MODE_MODELS.fast[providerKey];
   const system = SYSTEM_PROMPTS[providerKey];
   const provider = detectProvider(tag);
-  if (provider === "anthropic") return callClaudeOnce(env.ANTHROPIC_API_KEY, tag, system, message);
-  if (provider === "openai")    return callOpenAIOnce(env.OPENAI_API_KEY, tag, system, message);
-  if (provider === "google")    return callGoogleOnce(env.GOOGLE_AI_API_KEY, tag, system, message);
-  throw new Error("Unknown provider");
+  if (provider === "anthropic") return callClaudeOnce(env.ANTHROPIC_API_KEY, tag, system, message, signal);
+  if (provider === "openai")    return callOpenAIOnce(env.OPENAI_API_KEY,    tag, system, message, signal);
+  if (provider === "google")    return callGoogleOnce(env.GOOGLE_AI_API_KEY, tag, system, message, signal);
+  throw new Error("unknown_provider");
 }
 
 function jsonError(status, error) {
   return new Response(JSON.stringify({ error }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!env.KV) return jsonError(503, "Service temporarily unavailable");
+  if (!env.KV) return jsonError(503, "Service unavailable");
   if (!env.ANTHROPIC_API_KEY || !env.OPENAI_API_KEY || !env.GOOGLE_AI_API_KEY) {
-    return jsonError(500, "API keys not configured");
+    return jsonError(503, "Service unavailable");
   }
 
-  // IP 単位の日次レート制限
+  // IP は Cloudflare 由来の CF-Connecting-IP のみ信頼
   const ip = ipFromRequest(request);
-  const limit = await checkTrialLimit(env.KV, ip);
-  if (!limit.allowed) {
-    return jsonError(429, "本日のお試し上限に達しました。続きはログインして体験してください。");
-  }
+  if (!ip) return jsonError(400, "Bad request");
+
+  // Content-Length 上限
+  const contentLength = parseInt(request.headers.get("Content-Length") || "0", 10);
+  if (contentLength > MAX_BODY_BYTES) return jsonError(413, "Payload too large");
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return jsonError(400, "Invalid JSON");
+    return jsonError(400, "Invalid request");
   }
+
   const topic = topicById(body?.topicId);
-  if (!topic) return jsonError(400, "Invalid topicId");
+  if (!topic) return jsonError(400, "Invalid request");
+
+  // Turnstile 検証
+  const turnstile = await verifyTurnstile(env.TURNSTILE_SECRET_KEY, body?.turnstileToken, ip);
+  if (!turnstile.ok) {
+    return jsonError(403, "verification_failed");
+  }
+
+  // レート制限（バースト → グローバル → IP日次）
+  const limit = await checkTrialLimit(env.KV, ip);
+  if (!limit.allowed) {
+    const messageByReason = {
+      burst:  "短時間に連続リクエストがありました。少し待って再試行してください。",
+      global: "本日のお試し総枠が上限に達しました。明日以降か、ログインしてご利用ください。",
+      ip:     "本日のお試し上限に達しました。続きはログインして体験してください。",
+    };
+    return jsonError(429, messageByReason[limit.reason] || "rate_limited");
+  }
+
+  // クライアント切断 → 上流 fetch も abort
+  const abort = new AbortController();
+  request.signal?.addEventListener("abort", () => abort.abort(), { once: true });
 
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
   const encoder = new TextEncoder();
 
   const send = async (obj) => {
-    await writer.write(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+    try {
+      await writer.write(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+    } catch {
+      // クライアント切断時の write 失敗は無視
+    }
+  };
+  const safeClose = async () => {
+    try { await writer.close(); } catch { /* already closed / aborted */ }
   };
 
   context.waitUntil(
@@ -163,9 +255,8 @@ export async function onRequestPost(context) {
       try {
         await send({ type: "start", topic: topic.text, remaining: limit.remaining });
 
-        // 3AI を並列に投げ、応答が来た順にクライアントへ送る
         const calls = ["claude", "chatgpt", "gemini"].map((p) =>
-          callProvider(env, p, topic.text)
+          callProvider(env, p, topic.text, abort.signal)
             .then((text) => send({ type: "response", provider: p, text }))
             .catch(() => send({ type: "response", provider: p, text: "（応答取得に失敗しました）", error: true }))
         );
@@ -173,7 +264,7 @@ export async function onRequestPost(context) {
 
         await send({ type: "done" });
       } finally {
-        await writer.close();
+        await safeClose();
       }
     })()
   );
@@ -182,21 +273,10 @@ export async function onRequestPost(context) {
     status: 200,
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
-}
-
-export async function onRequestOptions() {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Max-Age": "86400",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Content-Type-Options": "nosniff",
+      "X-Accel-Buffering": "no",
     },
   });
 }

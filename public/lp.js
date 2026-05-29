@@ -121,13 +121,63 @@
   };
   var selectedTopic = 0;
   var running = false;
+  var turnstileToken = null;
+  var turnstileWidgetId = null;
+  var turnstileMount = document.getElementById("trial-turnstile");
+
+  function siteKey() {
+    var meta = document.querySelector('meta[name="turnstile-site-key"]');
+    return meta && meta.getAttribute("content");
+  }
+
+  function setRunEnabled(enabled) {
+    runBtn.disabled = !enabled || running;
+  }
+
+  function renderTurnstileIfReady() {
+    if (turnstileWidgetId !== null) return;
+    if (!window.turnstile || !turnstileMount) return;
+    var key = siteKey();
+    if (!key) return;
+    turnstileWidgetId = window.turnstile.render(turnstileMount, {
+      sitekey: key,
+      theme: "auto",
+      callback: function(token) {
+        turnstileToken = token;
+        setRunEnabled(true);
+        status.textContent = "準備完了。議題を選んで「議論開始」をクリックしてください。";
+      },
+      "expired-callback": function() {
+        turnstileToken = null;
+        setRunEnabled(false);
+        status.textContent = "認証が期限切れになりました。再認証中…";
+      },
+      "error-callback": function() {
+        turnstileToken = null;
+        setRunEnabled(false);
+        status.textContent = "認証に失敗しました。ページを更新してお試しください。";
+      },
+    });
+  }
 
   function openPanel() {
     panel.classList.add("is-open");
     panel.setAttribute("aria-hidden", "false");
     launchBtn.setAttribute("aria-expanded", "true");
-    // スクロールしてパネルを画面中央へ
     panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (window.turnstile) {
+      renderTurnstileIfReady();
+    } else {
+      // Turnstile script の読み込みを待つ
+      status.textContent = "認証コンポーネントを読み込み中…";
+      var interval = setInterval(function() {
+        if (window.turnstile) {
+          clearInterval(interval);
+          renderTurnstileIfReady();
+        }
+      }, 100);
+      setTimeout(function() { clearInterval(interval); }, 8000);
+    }
   }
   function closePanel() {
     panel.classList.remove("is-open");
@@ -176,6 +226,10 @@
 
   async function runTrial() {
     if (running) return;
+    if (!turnstileToken) {
+      status.textContent = "認証が完了していません。少々お待ちください。";
+      return;
+    }
     running = true;
     runBtn.disabled = true;
     runBtn.textContent = "議論中…";
@@ -183,11 +237,14 @@
     resetSlots("思考中…");
     status.textContent = "3つのAIに同時に問いを投げています…";
 
+    var tokenForThisRun = turnstileToken;
+    turnstileToken = null; // ワンタイム使い切り
+
     try {
       var res = await fetch("/api/trial/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId: selectedTopic }),
+        body: JSON.stringify({ topicId: selectedTopic, turnstileToken: tokenForThisRun }),
       });
 
       if (res.status === 429) {
@@ -241,8 +298,12 @@
       resetSlots("応答取得に失敗しました。");
     } finally {
       running = false;
-      runBtn.disabled = false;
       runBtn.textContent = "もう一度試す →";
+      // Turnstile を reset してワンタイム新トークンを取得（再認証成功で run ボタン再有効化）
+      if (window.turnstile && turnstileWidgetId !== null) {
+        try { window.turnstile.reset(turnstileWidgetId); } catch (_) {}
+      }
+      setRunEnabled(false); // 新トークン到着までは無効
     }
   }
 

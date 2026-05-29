@@ -31,10 +31,14 @@ function handleCORS(request) {
 
 // Layer 2: KV-based rate limiting
 async function checkRateLimit(request, kv) {
-  const ip =
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For") ||
-    "unknown";
+  // CF-Connecting-IP は Cloudflare が必ず付与する。クライアント由来の
+  // X-Forwarded-For は信用しない（H1 IP偽装対策）。CF経由でない場合は
+  // 全リクエストを共通バケットに落とすのではなく、明示的に拒否する。
+  const ipHeader = request.headers.get("CF-Connecting-IP");
+  if (!ipHeader || !ipHeader.trim()) {
+    return { allowed: false, remaining: 0, resetAt: Math.floor(Date.now() / 1000) + 60 };
+  }
+  const ip = ipHeader.trim();
   const key = `rl:${ip}`;
   const windowSec = 60;
   const maxRequests = 30;
