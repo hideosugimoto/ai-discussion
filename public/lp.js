@@ -32,6 +32,77 @@
   }
 })();
 
+// ── Hero topic switcher (議題切替＋フェード) ────
+(function() {
+  var TOPICS = [
+    {
+      topic:   "「30代会社員、副業で起業すべきか?」",
+      claude:  "あなたの価値観を踏まえると、起業の方が後悔しないと思う。長期の自由度を最重視している点が決め手です。",
+      chatgpt: "いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。",
+      gemini:  "2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。",
+      summary: "3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。"
+    },
+    {
+      topic:   "「5年同棲、結婚すべきか同棲を続けるか?」",
+      claude:  "結婚を推奨。法的保護と社会的信用が5年後10年後に効きます。価値観が合っているなら早い方が得策です。",
+      chatgpt: "急ぐ理由がないなら同棲継続でいい。結婚は「やり直しが難しい契約」。今に不満がないなら現状維持が合理的。",
+      gemini:  "二者択一が論点を狭めています。「事実婚 + 公正証書」「結婚 + 別居婚」など中間解の検討が抜けています。",
+      summary: "Claude=結婚推奨。ChatGPT=現状維持。Gemini=中間解の検討漏れを指摘。価値観で割れる典型例。"
+    },
+    {
+      topic:   "「住宅ローンは固定金利か変動金利か?」",
+      claude:  "あなたの年齢と返済期間なら変動を推奨。過去20年で固定が変動より得だった期間は皆無。期待値で選ぶべきです。",
+      chatgpt: "リスク許容度次第。返済が長く家計に余裕がないなら、固定で「最大支払額を確定」する安心料を払う価値あり。",
+      gemini:  "金利上昇シナリオの定量分析が必要です。日銀の利上げ余地と、あなたの繰上返済余力で答えが変わります。",
+      summary: "Claude=変動。ChatGPT=家計次第で固定。Gemini=シナリオ分析推奨。前提条件の明示が論点。"
+    },
+    {
+      topic:   "「今の会社で昇進待ち vs 転職、どちらが得か?」",
+      claude:  "転職を推奨。社内の昇進は不確実性が高く、市場価値は転職時に最も正確に評価される。タイミングを逃すべきでない。",
+      chatgpt: "現職での昇進待ちの方が合理的。社内評価が高いなら、転職に伴う再評価リスクと年収一時低下を回避できる。",
+      gemini:  "「市場価値の棚卸し」を先に。転職活動だけ進めて内定を取り、現職と比較するのが情報非対称を解消する最短手。",
+      summary: "Claude=転職推奨。ChatGPT=現職継続。Gemini=情報収集の手順を提案。決断より「比較材料の入手」が先。"
+    }
+  ];
+
+  var hero = document.querySelector(".hero");
+  if (!hero) return;
+  var dialogue = hero.querySelector(".dialogue");
+  var tabs = hero.querySelectorAll(".hero-topics .topic-tab");
+  if (!dialogue || !tabs.length) return;
+
+  var slots = {
+    topic:   dialogue.querySelector('[data-slot="topic"]'),
+    claude:  dialogue.querySelector('[data-slot="claude"]'),
+    chatgpt: dialogue.querySelector('[data-slot="chatgpt"]'),
+    gemini:  dialogue.querySelector('[data-slot="gemini"]'),
+    summary: dialogue.querySelector('[data-slot="summary"]')
+  };
+
+  function apply(idx) {
+    var t = TOPICS[idx];
+    if (!t) return;
+    dialogue.classList.add("is-switching");
+    setTimeout(function() {
+      if (slots.topic)   slots.topic.textContent   = t.topic;
+      if (slots.claude)  slots.claude.textContent  = t.claude;
+      if (slots.chatgpt) slots.chatgpt.textContent = t.chatgpt;
+      if (slots.gemini)  slots.gemini.textContent  = t.gemini;
+      if (slots.summary) slots.summary.textContent = t.summary;
+      dialogue.classList.remove("is-switching");
+    }, 150);
+  }
+
+  tabs.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      tabs.forEach(function(b) { b.setAttribute("aria-selected", "false"); });
+      btn.setAttribute("aria-selected", "true");
+      var idx = parseInt(btn.getAttribute("data-topic-idx"), 10);
+      apply(isNaN(idx) ? 0 : idx);
+    });
+  });
+})();
+
 // ── Sticky mobile CTA visibility ────────────────
 (function() {
   var cta = document.getElementById("mobile-cta");

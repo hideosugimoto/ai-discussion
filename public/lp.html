@@ -970,6 +970,45 @@
     border-color: var(--accent);
   }
 
+  /* ── Hero topic tabs (議題切替) ───────────────── */
+  .hero-topics {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center;
+    margin: 0 0 14px;
+  }
+  .topic-tab {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px; font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.18s ease;
+    font-family: inherit;
+  }
+  .topic-tab:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .topic-tab[aria-selected="true"] {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px var(--accent-bg);
+  }
+  .dialogue .dialogue-topic,
+  .dialogue .dialogue-grid,
+  .dialogue .dialogue-summary {
+    transition: opacity 0.15s ease;
+  }
+  .dialogue.is-switching .dialogue-topic,
+  .dialogue.is-switching .dialogue-grid,
+  .dialogue.is-switching .dialogue-summary {
+    opacity: 0;
+  }
+
   .discussion-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1239,28 +1278,36 @@
     </div>
   </div>
 
+  <!-- 議題切替タブ -->
+  <div class="hero-topics" role="tablist" aria-label="議題を選んで議論サンプルを切り替え">
+    <button class="topic-tab" type="button" role="tab" aria-selected="true"  data-topic-idx="0">副業で起業</button>
+    <button class="topic-tab" type="button" role="tab" aria-selected="false" data-topic-idx="1">結婚 vs 同棲</button>
+    <button class="topic-tab" type="button" role="tab" aria-selected="false" data-topic-idx="2">住宅ローン</button>
+    <button class="topic-tab" type="button" role="tab" aria-selected="false" data-topic-idx="3">転職判断</button>
+  </div>
+
   <!-- 3 AI dialogue mock -->
   <div class="dialogue" aria-label="3つのAIによる議論の例">
     <div class="dialogue-topic">
       <span class="topic-label">議題</span>
-      <span class="topic-text">「30代会社員、副業で起業すべきか?」</span>
+      <span class="topic-text" data-slot="topic">「30代会社員、副業で起業すべきか?」</span>
     </div>
     <div class="dialogue-grid">
       <div class="ai-card claude">
         <div class="name"><span class="dot" aria-hidden="true"></span>Claude<span class="model">opus 4.8</span></div>
-        <p>あなたの価値観を踏まえると、起業の方が後悔しないと思う。長期の自由度を最重視している点が決め手です。</p>
+        <p data-slot="claude">あなたの価値観を踏まえると、起業の方が後悔しないと思う。長期の自由度を最重視している点が決め手です。</p>
       </div>
       <div class="ai-card chatgpt">
         <div class="name"><span class="dot" aria-hidden="true"></span>ChatGPT<span class="model">gpt-5.5</span></div>
-        <p>いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。</p>
+        <p data-slot="chatgpt">いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。</p>
       </div>
       <div class="ai-card gemini">
         <div class="name"><span class="dot" aria-hidden="true"></span>Gemini<span class="model">2.5 pro</span></div>
-        <p>2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
+        <p data-slot="gemini">2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
       </div>
     </div>
     <div class="dialogue-summary" role="note">
-      <strong>自動サマリー:</strong> 3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。
+      <strong>自動サマリー:</strong> <span data-slot="summary">3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。</span>
     </div>
   </div>
 </section>
