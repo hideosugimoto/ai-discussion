@@ -7,24 +7,30 @@
 // (USD/1M_tokens × 1_000_000 microdollars/USD ÷ 1_000_000 tokens = identity),
 // so calcCostUSD and calcCostMicro read the same table.
 export const MODEL_PRICING = {
-  "claude-opus-4-7":   { input: 5.00, output: 25.00 },
-  "claude-sonnet-4-6": { input: 3.00, output: 15.00 },
-  "gpt-5.4":           { input: 2.50, output: 15.00 },
-  "gpt-5.4-mini":      { input: 0.75, output: 4.50  },
-  "gemini-2.5-pro":    { input: 1.25, output: 10.00 },
-  "gemini-2.5-flash":  { input: 0.30, output: 2.50  },
+  // Anthropic
+  "claude-opus-4-8":         { input: 5.00, output: 25.00 },
+  "claude-opus-4-7":         { input: 5.00, output: 25.00 },
+  "claude-sonnet-4-6":       { input: 3.00, output: 15.00 },
+  // OpenAI
+  "gpt-5.5":                 { input: 5.00, output: 30.00 },
+  "gpt-5.4":                 { input: 2.50, output: 15.00 },
+  "gpt-5.4-mini":            { input: 0.75, output: 4.50  },
+  // Google
+  "gemini-2.5-pro":          { input: 1.25, output: 10.00 },
+  "gemini-2.5-flash":        { input: 0.30, output: 2.50  },
+  "gemini-3.1-flash-lite":   { input: 0.25, output: 1.50  },
 };
 
 export const MODE_MODELS = {
   best: {
-    claude:  { tag: "claude-opus-4-7",   label: "Opus 4.7" },
-    chatgpt: { tag: "gpt-5.4",           label: "GPT-5.4" },
-    gemini:  { tag: "gemini-2.5-pro",    label: "2.5 Pro" },
+    claude:  { tag: "claude-opus-4-8",        label: "Opus 4.8" },
+    chatgpt: { tag: "gpt-5.5",                label: "GPT-5.5" },
+    gemini:  { tag: "gemini-2.5-pro",         label: "2.5 Pro" },
   },
   fast: {
-    claude:  { tag: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-    chatgpt: { tag: "gpt-5.4-mini",      label: "GPT-5.4 mini" },
-    gemini:  { tag: "gemini-2.5-flash",  label: "2.5 Flash" },
+    claude:  { tag: "claude-sonnet-4-6",      label: "Sonnet 4.6" },
+    chatgpt: { tag: "gpt-5.4-mini",           label: "GPT-5.4 mini" },
+    gemini:  { tag: "gemini-3.1-flash-lite",  label: "3.1 Flash-Lite" },
   },
 };
 
@@ -32,7 +38,7 @@ export const MODE_MODELS = {
 export const VALIDATION_MODELS = {
   claude:  "claude-haiku-4-5-20251001",
   chatgpt: "gpt-5.4-mini",
-  gemini:  "gemini-2.5-flash",
+  gemini:  "gemini-3.1-flash-lite",
 };
 
 // Model used for background summarization (round summary, rolling summary,
