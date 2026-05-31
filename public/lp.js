@@ -176,7 +176,12 @@
           renderTurnstileIfReady();
         }
       }, 100);
-      setTimeout(function() { clearInterval(interval); }, 8000);
+      setTimeout(function() {
+        clearInterval(interval);
+        if (turnstileWidgetId === null) {
+          status.textContent = "認証コンポーネントの読み込みに失敗しました。広告ブロッカーやネットワーク制限を解除してページを再読込してください。";
+        }
+      }, 8000);
     }
   }
   function closePanel() {
