@@ -191,6 +191,10 @@ async function getCachedVariations(kv, topicId) {
   }
 }
 
+// NOTE: Best-effort cache。read→write の間に他リクエストが put すると
+// 後勝ちで踏み潰す可能性があるが、最悪でも「TRIAL_CACHE_MAX + 数件」の
+// 重複生成にとどまりコストは誤差レベル。完全な atomicity が必要になったら
+// Durable Objects への移行で CAS を実装する（現状は不要）。
 async function appendCachedVariation(kv, topicId, responses) {
   const cached = await getCachedVariations(kv, topicId);
   if (cached.length >= TRIAL_CACHE_MAX) return; // 上限到達後は追記しない
@@ -228,49 +232,36 @@ function jsonError(status, error) {
   });
 }
 
-// 未捕捉例外は generic 500 を返し、詳細は Real-time Logs に残す。
-export async function onRequestPost(context) {
-  try {
-    return await handleTrialPost(context);
-  } catch (e) {
-    console.error("[trial/chat] uncaught error:", e?.message, e?.stack);
-    return jsonError(500, "Internal server error");
-  }
-}
-
-async function handleTrialPost(context) {
+// ── リクエスト検証 ──────────────────────────────
+// 環境・IP・サイズ・JSON・topic・Turnstile・レート制限を順に通し、
+// 失敗時は { error: Response } を、成功時は { ip, topic, limit } を返す。
+async function validateAndAuthorize(context) {
   const { request, env } = context;
 
-  if (!env.KV) return jsonError(503, "Service unavailable");
+  if (!env.KV) return { error: jsonError(503, "Service unavailable") };
   if (!env.ANTHROPIC_API_KEY || !env.OPENAI_API_KEY || !env.GOOGLE_AI_API_KEY) {
-    return jsonError(503, "Service unavailable");
+    return { error: jsonError(503, "Service unavailable") };
   }
 
-  // IP は Cloudflare 由来の CF-Connecting-IP のみ信頼
   const ip = ipFromRequest(request);
-  if (!ip) return jsonError(400, "Bad request");
+  if (!ip) return { error: jsonError(400, "Bad request") };
 
-  // Content-Length 上限
   const contentLength = parseInt(request.headers.get("Content-Length") || "0", 10);
-  if (contentLength > MAX_BODY_BYTES) return jsonError(413, "Payload too large");
+  if (contentLength > MAX_BODY_BYTES) return { error: jsonError(413, "Payload too large") };
 
   let body;
   try {
     body = await request.json();
   } catch {
-    return jsonError(400, "Invalid request");
+    return { error: jsonError(400, "Invalid request") };
   }
 
   const topic = topicById(body?.topicId);
-  if (!topic) return jsonError(400, "Invalid request");
+  if (!topic) return { error: jsonError(400, "Invalid request") };
 
-  // Turnstile 検証
   const turnstile = await verifyTurnstile(env.TURNSTILE_SECRET_KEY, body?.turnstileToken, ip);
-  if (!turnstile.ok) {
-    return jsonError(403, "verification_failed");
-  }
+  if (!turnstile.ok) return { error: jsonError(403, "verification_failed") };
 
-  // レート制限（バースト → グローバル → IP日次）
   const limit = await checkTrialLimit(env.KV, ip);
   if (!limit.allowed) {
     const messageByReason = {
@@ -278,12 +269,55 @@ async function handleTrialPost(context) {
       global: "本日のお試し総枠が上限に達しました。明日以降か、ログインしてご利用ください。",
       ip:     "本日のお試し上限に達しました。続きはログインして体験してください。",
     };
-    return jsonError(429, messageByReason[limit.reason] || "rate_limited");
+    return { error: jsonError(429, messageByReason[limit.reason] || "rate_limited") };
   }
 
-  // クライアント切断 → 上流 fetch も abort
+  return { ip, topic, limit };
+}
+
+// ── SSE 配信ループ ──────────────────────────────
+// キャッシュヒット時はランダムバリエーションを送出、未満なら 3AI を並列で叩いて
+// 全成功時のみキャッシュに追記する。
+async function streamRound(env, topic, limit, signal, send) {
+  const cached = await getCachedVariations(env.KV, topic.id);
+  const useCache = cached.length >= TRIAL_CACHE_MAX;
+
+  await send({ type: "start", topic: topic.text, remaining: limit.remaining, cached: useCache });
+
+  if (useCache) {
+    const chosen = pickRandom(cached);
+    for (const r of chosen) {
+      await send({ type: "response", provider: r.provider, text: r.text, error: !!r.error });
+    }
+  } else {
+    const results = { claude: null, chatgpt: null, gemini: null };
+    const calls = ["claude", "chatgpt", "gemini"].map((p) =>
+      callProvider(env, p, topic.text, signal)
+        .then((text) => {
+          results[p] = { provider: p, text };
+          return send({ type: "response", provider: p, text });
+        })
+        .catch(() => {
+          results[p] = { provider: p, text: "（応答取得に失敗しました）", error: true };
+          return send({ type: "response", provider: p, text: results[p].text, error: true });
+        })
+    );
+    await Promise.all(calls);
+
+    const allOk = Object.values(results).every((r) => r && !r.error);
+    if (allOk) {
+      await appendCachedVariation(env.KV, topic.id, [results.claude, results.chatgpt, results.gemini]);
+    }
+  }
+
+  await send({ type: "done" });
+}
+
+// SSE Response を構築し、writer/abort/send/safeClose を内部で管理する。
+// 配信は context.waitUntil でバックグラウンド実行し、即座に Response を返す。
+function buildSSEResponse(context, env, topic, limit) {
   const abort = new AbortController();
-  request.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+  context.request.signal?.addEventListener("abort", () => abort.abort(), { once: true });
 
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
@@ -302,45 +336,8 @@ async function handleTrialPost(context) {
 
   context.waitUntil(
     (async () => {
-      try {
-        // キャッシュ済みバリエーションを確認
-        const cached = await getCachedVariations(env.KV, topic.id);
-        const useCache = cached.length >= TRIAL_CACHE_MAX;
-
-        await send({ type: "start", topic: topic.text, remaining: limit.remaining, cached: useCache });
-
-        if (useCache) {
-          // 上限到達済み: ランダムに 1 バリエーションを選んで返す（API 呼び出しなし）
-          const chosen = pickRandom(cached);
-          for (const r of chosen) {
-            await send({ type: "response", provider: r.provider, text: r.text, error: !!r.error });
-          }
-        } else {
-          // 新規生成: 3AI を並列実行 → 全成功ならキャッシュに追記
-          const results = { claude: null, chatgpt: null, gemini: null };
-          const calls = ["claude", "chatgpt", "gemini"].map((p) =>
-            callProvider(env, p, topic.text, abort.signal)
-              .then((text) => {
-                results[p] = { provider: p, text };
-                return send({ type: "response", provider: p, text });
-              })
-              .catch(() => {
-                results[p] = { provider: p, text: "（応答取得に失敗しました）", error: true };
-                return send({ type: "response", provider: p, text: results[p].text, error: true });
-              })
-          );
-          await Promise.all(calls);
-
-          const allOk = Object.values(results).every((r) => r && !r.error);
-          if (allOk) {
-            await appendCachedVariation(env.KV, topic.id, [results.claude, results.chatgpt, results.gemini]);
-          }
-        }
-
-        await send({ type: "done" });
-      } finally {
-        await safeClose();
-      }
+      try { await streamRound(env, topic, limit, abort.signal, send); }
+      finally { await safeClose(); }
     })()
   );
 
@@ -354,4 +351,16 @@ async function handleTrialPost(context) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+// 未捕捉例外は generic 500 を返し、詳細は Real-time Logs に残す。
+export async function onRequestPost(context) {
+  try {
+    const auth = await validateAndAuthorize(context);
+    if (auth.error) return auth.error;
+    return buildSSEResponse(context, context.env, auth.topic, auth.limit);
+  } catch (e) {
+    console.error("[trial/chat] uncaught error:", e?.message);
+    return jsonError(500, "Internal server error");
+  }
 }

@@ -212,6 +212,28 @@ npm run build          # 本番ビルド（vite）
 
 push 時には pre-push フックで `vite build` と Functions 構文チェックが自動実行されます。
 
+### お試し API のキャッシュ運用
+
+`/api/trial/chat` は議題ごとに最大 3 応答バリエーションを KV にキャッシュし、
+24h 経過で自動失効します（コスト上限保護のため）。万一不適切な応答が
+キャッシュされた場合は、Cloudflare ダッシュボードの **Workers と Pages →
+KV → ai-discussion KV namespace** で以下のキーを手動削除できます:
+
+```
+trial:cache:0   # 副業で起業
+trial:cache:1   # 結婚 vs 同棲
+trial:cache:2   # 住宅ローン
+trial:cache:3   # 転職判断
+trial:cache:4   # 子の教育費
+```
+
+または wrangler CLI で:
+```bash
+npx wrangler kv key delete --binding=KV trial:cache:0 --remote
+```
+
+削除後は次のリクエストで新しい応答が 3 通り再生成されます。
+
 ## ライセンス
 
 Business Source License 1.1 (BSL 1.1)

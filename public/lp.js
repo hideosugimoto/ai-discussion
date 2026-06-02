@@ -229,6 +229,43 @@
     }
   }
 
+  // trial API への POST のみを担う。fetch の生 Response を返す。
+  function postTrial(topicId, token) {
+    return fetch("/api/trial/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topicId: topicId, turnstileToken: token }),
+    });
+  }
+
+  // SSE レスポンスを行単位で解読し、payload を handlers にディスパッチする。
+  // handlers: { onStart(payload), onResponse(payload), onDone(payload) }
+  async function consumeSSE(res, handlers) {
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
+    while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+
+      var lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line.startsWith("data: ")) continue;
+        var payloadStr = line.slice(6).trim();
+        if (!payloadStr) continue;
+        try {
+          var payload = JSON.parse(payloadStr);
+          if (payload.type === "start"    && handlers.onStart)    handlers.onStart(payload);
+          if (payload.type === "response" && handlers.onResponse) handlers.onResponse(payload);
+          if (payload.type === "done"     && handlers.onDone)     handlers.onDone(payload);
+        } catch (_) { /* JSON 不正は無視 */ }
+      }
+    }
+  }
+
   async function runTrial() {
     if (running) return;
     if (!turnstileToken) {
@@ -246,11 +283,7 @@
     turnstileToken = null; // ワンタイム使い切り
 
     try {
-      var res = await fetch("/api/trial/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId: selectedTopic, turnstileToken: tokenForThisRun }),
-      });
+      var res = await postTrial(selectedTopic, tokenForThisRun);
 
       if (res.status === 429) {
         var errJson = await res.json().catch(function() { return {}; });
@@ -269,35 +302,18 @@
         return;
       }
 
-      var reader = res.body.getReader();
-      var decoder = new TextDecoder();
-      var buffer = "";
-
-      while (true) {
-        var chunk = await reader.read();
-        if (chunk.done) break;
-        buffer += decoder.decode(chunk.value, { stream: true });
-
-        var lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i];
-          if (!line.startsWith("data: ")) continue;
-          var payloadStr = line.slice(6).trim();
-          if (!payloadStr) continue;
-          try {
-            var payload = JSON.parse(payloadStr);
-            if (payload.type === "start") {
-              status.textContent = "議題: " + payload.topic + " · 残り " + (payload.remaining ?? 0) + " 回";
-            } else if (payload.type === "response") {
-              setSlotResponse(payload.provider, payload.text || "（応答なし）", !!payload.error);
-            } else if (payload.type === "done") {
-              status.textContent = "議論完了。続きはログインで！";
-              followup.classList.add("is-visible");
-            }
-          } catch (_) { /* JSON 不正は無視 */ }
-        }
-      }
+      await consumeSSE(res, {
+        onStart: function(p) {
+          status.textContent = "議題: " + p.topic + " · 残り " + (p.remaining ?? 0) + " 回";
+        },
+        onResponse: function(p) {
+          setSlotResponse(p.provider, p.text || "（応答なし）", !!p.error);
+        },
+        onDone: function() {
+          status.textContent = "議論完了。続きはログインで！";
+          followup.classList.add("is-visible");
+        },
+      });
     } catch (e) {
       status.textContent = "通信エラーが発生しました。時間を置いて再度お試しください。";
       resetSlots("応答取得に失敗しました。");
