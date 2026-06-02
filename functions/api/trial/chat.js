@@ -17,7 +17,8 @@ import { MODE_MODELS, detectProvider } from "../../../src/models.config.js";
 
 const TRIAL_DAILY_LIMIT        = 10;          // IP per 24h
 const TRIAL_DAILY_TTL_SEC      = 86400;
-const TRIAL_BURST_TTL_SEC      = 10;          // IP per 10s = 1
+const TRIAL_BURST_MS           = 10_000;      // IP per 10s = 1（論理側で expires_at 判定）
+const TRIAL_BURST_TTL_SEC      = 60;          // KV expirationTtl の最小値
 const TRIAL_GLOBAL_DAILY_LIMIT = 2000;        // 全体 per 24h（≒ $30/日想定上限）
 const MAX_BODY_BYTES           = 1024;
 
@@ -53,8 +54,15 @@ async function checkTrialLimit(kv, ip) {
   const globalKey = `trial:global:${date}`;
 
   // 瞬間バースト (10s = 1)
-  const burst = await kv.get(burstKey);
-  if (burst) return { allowed: false, reason: "burst", remaining: 0 };
+  // KV expirationTtl は最小 60 秒のため、値に "拒否期限のミリ秒" を持って
+  // アプリ側で判定する。10s 経過後はキーが残っていても通過する。
+  const burstUntilStr = await kv.get(burstKey);
+  if (burstUntilStr) {
+    const burstUntil = parseInt(burstUntilStr, 10);
+    if (Number.isFinite(burstUntil) && Date.now() < burstUntil) {
+      return { allowed: false, reason: "burst", remaining: 0 };
+    }
+  }
 
   // グローバル上限
   const globalCurrent = parseInt((await kv.get(globalKey)) || "0", 10);
@@ -69,10 +77,11 @@ async function checkTrialLimit(kv, ip) {
   }
 
   // 加算（並列）
+  const burstUntilMs = Date.now() + TRIAL_BURST_MS;
   await Promise.all([
-    kv.put(burstKey,  "1",                  { expirationTtl: TRIAL_BURST_TTL_SEC }),
-    kv.put(ipKey,     String(ipCurrent + 1), { expirationTtl: TRIAL_DAILY_TTL_SEC }),
-    kv.put(globalKey, String(globalCurrent + 1), { expirationTtl: TRIAL_DAILY_TTL_SEC }),
+    kv.put(burstKey,  String(burstUntilMs),       { expirationTtl: TRIAL_BURST_TTL_SEC }),
+    kv.put(ipKey,     String(ipCurrent + 1),      { expirationTtl: TRIAL_DAILY_TTL_SEC }),
+    kv.put(globalKey, String(globalCurrent + 1),  { expirationTtl: TRIAL_DAILY_TTL_SEC }),
   ]);
 
   return { allowed: true, remaining: TRIAL_DAILY_LIMIT - ipCurrent - 1 };
