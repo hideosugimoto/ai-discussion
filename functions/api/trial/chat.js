@@ -197,16 +197,13 @@ function jsonError(status, error) {
   });
 }
 
-// 一時的なデバッグ用ラッパ。本番安定後に削除。
+// 未捕捉例外は generic 500 を返し、詳細は Real-time Logs に残す。
 export async function onRequestPost(context) {
   try {
     return await handleTrialPost(context);
   } catch (e) {
     console.error("[trial/chat] uncaught error:", e?.message, e?.stack);
-    return new Response(
-      JSON.stringify({ error: "trial_internal", detail: String(e?.message || e).slice(0, 200) }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    return jsonError(500, "Internal server error");
   }
 }
 
