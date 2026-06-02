@@ -19,7 +19,9 @@ const TRIAL_DAILY_LIMIT        = 10;          // IP per 24h
 const TRIAL_DAILY_TTL_SEC      = 86400;
 const TRIAL_BURST_MS           = 10_000;      // IP per 10s = 1（論理側で expires_at 判定）
 const TRIAL_BURST_TTL_SEC      = 60;          // KV expirationTtl の最小値
-const TRIAL_GLOBAL_DAILY_LIMIT = 2000;        // 全体 per 24h（≒ $30/日想定上限）
+const TRIAL_GLOBAL_DAILY_LIMIT = 2000;        // 全体 per 24h（最終防衛上限）
+const TRIAL_CACHE_MAX          = 3;           // 議題ごとに保持する応答バリエーション数
+const TRIAL_CACHE_TTL_SEC      = 86400;       // キャッシュ TTL = 24h
 const MAX_BODY_BYTES           = 1024;
 
 // 議論モードのプリセット（議題ごとにAIの役割を分けて意見が分かれやすくする）
@@ -177,6 +179,35 @@ async function callGoogleOnce(apiKey, model, system, message, signal) {
   return json.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
+// ── 応答キャッシュ (議題ごとに最大 3 バリエーション保持) ──
+// 攻撃者が連打してもコストが「議題数 × バリエーション × 1日」で頭打ちになる。
+// 上限到達後はランダムに 1 つ選んで返す（上流 API 呼び出しなし）。
+async function getCachedVariations(kv, topicId) {
+  try {
+    const raw = await kv.get(`trial:cache:${topicId}`, { type: "json" });
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+async function appendCachedVariation(kv, topicId, responses) {
+  const cached = await getCachedVariations(kv, topicId);
+  if (cached.length >= TRIAL_CACHE_MAX) return; // 上限到達後は追記しない
+  cached.push(responses);
+  try {
+    await kv.put(`trial:cache:${topicId}`, JSON.stringify(cached), {
+      expirationTtl: TRIAL_CACHE_TTL_SEC,
+    });
+  } catch (e) {
+    console.error("[trial/chat] cache append failed:", e?.message);
+  }
+}
+
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 async function callProvider(env, providerKey, message, signal) {
   const { tag } = MODE_MODELS.fast[providerKey];
   const system = SYSTEM_PROMPTS[providerKey];
@@ -272,14 +303,39 @@ async function handleTrialPost(context) {
   context.waitUntil(
     (async () => {
       try {
-        await send({ type: "start", topic: topic.text, remaining: limit.remaining });
+        // キャッシュ済みバリエーションを確認
+        const cached = await getCachedVariations(env.KV, topic.id);
+        const useCache = cached.length >= TRIAL_CACHE_MAX;
 
-        const calls = ["claude", "chatgpt", "gemini"].map((p) =>
-          callProvider(env, p, topic.text, abort.signal)
-            .then((text) => send({ type: "response", provider: p, text }))
-            .catch(() => send({ type: "response", provider: p, text: "（応答取得に失敗しました）", error: true }))
-        );
-        await Promise.all(calls);
+        await send({ type: "start", topic: topic.text, remaining: limit.remaining, cached: useCache });
+
+        if (useCache) {
+          // 上限到達済み: ランダムに 1 バリエーションを選んで返す（API 呼び出しなし）
+          const chosen = pickRandom(cached);
+          for (const r of chosen) {
+            await send({ type: "response", provider: r.provider, text: r.text, error: !!r.error });
+          }
+        } else {
+          // 新規生成: 3AI を並列実行 → 全成功ならキャッシュに追記
+          const results = { claude: null, chatgpt: null, gemini: null };
+          const calls = ["claude", "chatgpt", "gemini"].map((p) =>
+            callProvider(env, p, topic.text, abort.signal)
+              .then((text) => {
+                results[p] = { provider: p, text };
+                return send({ type: "response", provider: p, text });
+              })
+              .catch(() => {
+                results[p] = { provider: p, text: "（応答取得に失敗しました）", error: true };
+                return send({ type: "response", provider: p, text: results[p].text, error: true });
+              })
+          );
+          await Promise.all(calls);
+
+          const allOk = Object.values(results).every((r) => r && !r.error);
+          if (allOk) {
+            await appendCachedVariation(env.KV, topic.id, [results.claude, results.chatgpt, results.gemini]);
+          }
+        }
 
         await send({ type: "done" });
       } finally {
