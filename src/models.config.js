@@ -16,6 +16,7 @@ export const MODEL_PRICING = {
   "gpt-5.4":                 { input: 2.50, output: 15.00 },
   "gpt-5.4-mini":            { input: 0.75, output: 4.50  },
   // Google
+  "gemini-3.5-flash":        { input: 1.50, output: 9.00  },
   "gemini-2.5-pro":          { input: 1.25, output: 10.00 },
   "gemini-2.5-flash":        { input: 0.30, output: 2.50  },
   "gemini-3.1-flash-lite":   { input: 0.25, output: 1.50  },
@@ -25,7 +26,7 @@ export const MODE_MODELS = {
   best: {
     claude:  { tag: "claude-opus-4-8",        label: "Opus 4.8" },
     chatgpt: { tag: "gpt-5.5",                label: "GPT-5.5" },
-    gemini:  { tag: "gemini-2.5-pro",         label: "2.5 Pro" },
+    gemini:  { tag: "gemini-3.5-flash",       label: "3.5 Flash" },
   },
   fast: {
     claude:  { tag: "claude-sonnet-4-6",      label: "Sonnet 4.6" },
