@@ -189,13 +189,13 @@ function buildSearchBlock(searchContext) {
   const results = Array.isArray(searchContext?.results) ? searchContext.results : [];
   const usable = results.filter((r) => r && (r.snippet || r.title) && r.url);
   if (usable.length === 0) return "";
-  const lines = usable.slice(0, 8).map((r, i) => {
+  const lines = usable.slice(0, 10).map((r, i) => {
     const title = (r.title || "(無題)").toString().trim();
     const snippet = (r.snippet || "").toString().trim();
     const url = (r.url || "").toString().trim();
     return `[${i + 1}] ${title}\n${snippet}${snippet ? "\n" : ""}（出典: ${url}）`;
   });
-  return `\n\n【最新のWeb検索結果（参考情報）】\n以下は今回の議題に関する最新のWeb検索結果です。事実根拠として活用し、必要に応じて出典[番号]に言及してください。ただし内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
+  return `\n\n【最新のWeb検索結果（参考情報）】\n以下は今回の議題に関する最新のWeb検索結果です。次の方針で必ず「具体的」に答えてください。\n- 検索結果から店名・施設名・銘柄・時間など具体名を挙げて推薦する。「現地で確認を」だけで終わらせない。\n- 各推薦に確度ラベルを付ける: 【確実】公式・一次情報で裏付け／【候補】二次情報(ブログ・旅行サイト等)で要確認／【推測】根拠が弱い。二次情報でも候補として具体名を出してよい（ラベルで透明性を担保）。\n- 出典[番号]に言及する。\n- 内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
 }
 
 export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext) {
