@@ -22,6 +22,29 @@ async function readSSE(res, onChunk, signal) {
   }
 }
 
+// Premium-only web search (Architecture B). Runs one retrieval server-side and
+// returns { provider, query, results: [{title,url,snippet}] }. Non-streaming.
+// Returns { results: [] } on any failure so the discussion never blocks on
+// search — a round just proceeds without injected evidence.
+export async function callProxySearch(token, query, signal, sessionId) {
+  try {
+    const res = await fetch("/api/search/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, sessionId }),
+      signal,
+    });
+    if (!res.ok) return { results: [] };
+    const json = await res.json();
+    return { provider: json?.provider, query: json?.query, results: Array.isArray(json?.results) ? json.results : [] };
+  } catch {
+    return { results: [] };
+  }
+}
+
 export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts) {
   const body = { model, system: sys, message: user, sessionId, turnNumber };
   if (userParts && userParts.cachePrefix && userParts.variable) {
