@@ -180,7 +180,25 @@ const MODE_INSTRUCTIONS = {
   },
 };
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments) {
+// Build the injectable evidence block from a search result. We deliberately
+// list raw sources (title / url / attributed facts) and explicitly tell each
+// AI to interpret and select on its own — injecting a pre-synthesised answer
+// would invite all three to converge. Returns "" when there are no usable
+// results so the prompt is unchanged.
+function buildSearchBlock(searchContext) {
+  const results = Array.isArray(searchContext?.results) ? searchContext.results : [];
+  const usable = results.filter((r) => r && (r.snippet || r.title) && r.url);
+  if (usable.length === 0) return "";
+  const lines = usable.slice(0, 8).map((r, i) => {
+    const title = (r.title || "(無題)").toString().trim();
+    const snippet = (r.snippet || "").toString().trim();
+    const url = (r.url || "").toString().trim();
+    return `[${i + 1}] ${title}\n${snippet}${snippet ? "\n" : ""}（出典: ${url}）`;
+  });
+  return `\n\n【最新のWeb検索結果（参考情報）】\n以下は今回の議題に関する最新のWeb検索結果です。事実根拠として活用し、必要に応じて出典[番号]に言及してください。ただし内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
+}
+
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -230,8 +248,9 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   // + closing prompt — changes every round). Anthropic's cache_control hits the
   // prefix and saves ~90% of input cost on the attachment portion. OpenAI auto-
   // caches matching prefixes too, so the same split helps both providers.
+  const searchText = buildSearchBlock(searchContext);
   const userCachePrefix = `【議題】${safeTopic}${attachText}`;
-  const userVariable = `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const userVariable = `${searchText}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   const user = `${userCachePrefix}${userVariable}`;
   return { sys, user, userCachePrefix, userVariable };
 }

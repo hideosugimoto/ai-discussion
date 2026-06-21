@@ -59,6 +59,7 @@ export default function App() {
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
+          searchEnabled, setSearchEnabled,
           updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
           allKeysSet } = settings;
 
@@ -88,6 +89,7 @@ export default function App() {
     conclusionTarget, personas, constitution, contextDiscussions,
     attachments, setAttachments, summaryMode,
     authToken: auth.token, isPremium: auth.isPremium,
+    searchEnabled: auth.isPremium && searchEnabled,
     cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
   });
   const { discussion, summaries, detailedAnalyses,
@@ -363,6 +365,17 @@ export default function App() {
               <button key={id} role="radio" aria-checked={theme===id} onClick={() => setTheme(id)} style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:theme===id?"var(--accent)":"transparent", color:theme===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
+          {auth.isPremium && (
+            <button
+              onClick={() => setSearchEnabled(!searchEnabled)}
+              role="switch"
+              aria-checked={searchEnabled}
+              aria-label={`Web検索 ${searchEnabled ? "ON" : "OFF"}に切り替え`}
+              title={searchEnabled ? "最新情報をWeb検索して3AIに渡します（クリックでOFF）" : "ONにすると議題に関する最新情報をWeb検索し、3AIに同じ事実を渡して議論させます"}
+              style={{ padding:"6px 12px", border:`1px solid ${searchEnabled?"var(--accent)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:600, background:searchEnabled?"var(--accent)":"transparent", color:searchEnabled?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
+              <span>{searchEnabled ? "🔎 Web検索ON" : "🔎 Web検索OFF"}</span>
+            </button>
+          )}
         </div>
       </div>
 

@@ -46,6 +46,39 @@ export const VALIDATION_MODELS = {
 // detailed analysis, action plan, future file summary). Cost-optimized.
 export const SUMMARY_MODEL = "gpt-5.4-mini";
 
+// --- Web search (grounding) configuration ---------------------------------
+// Phase 1 unified-search architecture: one retrieval per round is injected
+// identically into all three AIs (see functions/api/search/query.js). The
+// provider is pluggable behind an adapter; the active one is chosen by the
+// SEARCH_PROVIDER env var, defaulting to "gemini-grounding".
+//
+// Pricing is per 1,000 searches, in USD. As with MODEL_PRICING, the same
+// number doubles as microdollars per single search
+// (USD/1k_searches × 1_000_000 µ$/USD ÷ 1_000 searches = number × 1000 µ$).
+export const SEARCH_PRICING = {
+  // Gemini "Grounding with Google Search" (3.x): $14 / 1,000 grounded prompts.
+  "gemini-grounding": { per1k: 14.00, freeTierPerMonth: 5000 },
+  // Drop-in alternatives (adapter swap only). Kept here so cost accounting is
+  // correct the moment the provider changes — no code edit needed elsewhere.
+  "serper":           { per1k: 1.00,  freeTierPerMonth: 2500 },
+  "brave":            { per1k: 5.00,  freeTierPerMonth: 0    },
+};
+
+export const DEFAULT_SEARCH_PROVIDER = "gemini-grounding";
+
+// Cost of a single search in microdollars, given how many searches the user
+// has already made this month. Returns 0 while inside the provider's monthly
+// free tier; the per-search price beyond it. priorCount is the number of
+// billable-or-free searches already recorded this month (0-indexed: the call
+// being priced is the (priorCount+1)-th).
+export function calcSearchCostMicro(provider, priorCount) {
+  const p = SEARCH_PRICING[provider];
+  if (!p) return 0;
+  if (priorCount < (p.freeTierPerMonth || 0)) return 0;
+  // per1k USD → microdollars per single search: per1k × 1000
+  return Math.round(p.per1k * 1000);
+}
+
 export function detectProvider(model) {
   if (typeof model !== "string") return null;
   if (model.startsWith("claude")) return "anthropic";

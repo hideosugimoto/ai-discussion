@@ -11,6 +11,16 @@ export default function useSettings() {
   const [profileNotice, setProfileNotice] = useState(false);
   const [constitution, setConstitution] = useState(saved.constitution ?? "");
 
+  // Web search toggle (premium feature). Persisted independently of saveKeys so
+  // the preference survives reloads regardless of key-saving choice. Default OFF.
+  const [searchEnabled, setSearchEnabledState] = useState(() => {
+    try { return localStorage.getItem("search-enabled") === "1"; } catch { return false; }
+  });
+  const setSearchEnabled = (val) => {
+    setSearchEnabledState(!!val);
+    try { localStorage.setItem("search-enabled", val ? "1" : "0"); } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     if (profile.trim() && profileUpdatedAt && !sessionStorage.getItem("profile-notice-dismissed")) {
       const days = Math.floor((Date.now() - new Date(profileUpdatedAt)) / (1000 * 60 * 60 * 24));
@@ -52,6 +62,7 @@ export default function useSettings() {
 
   return {
     keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
+    searchEnabled, setSearchEnabled,
     updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
     allKeysSet,
   };

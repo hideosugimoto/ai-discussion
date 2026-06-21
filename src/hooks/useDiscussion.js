@@ -3,7 +3,7 @@ import { MODELS, MODE_MODELS } from "../constants";
 import { SUMMARY_MODEL } from "../models.config";
 import { buildPrompt } from "../prompt";
 import { callClaude, callChatGPT, callGemini } from "../api";
-import { callProxyClaude, callProxyChatGPT, callProxyGemini } from "../apiProxy";
+import { callProxyClaude, callProxyChatGPT, callProxyGemini, callProxySearch } from "../apiProxy";
 import { saveDiscussion } from "../history";
 import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
 import { shouldSummarize } from "../lib/fileParser";
@@ -54,6 +54,27 @@ async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, aut
     }
   }));
   return changed ? next : attachments;
+}
+
+// Generate one concise search query for this round from the topic, the user's
+// profile, and (round 2+) the most recent intervention so re-searches follow
+// the discussion's evolving focus. Falls back to the raw topic on any failure.
+async function generateSearchQuery(apiKey, authToken, isPremium, topic, profile, intervention, sessionId) {
+  const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題について最新情報を調べるための、簡潔で具体的な日本語の検索クエリを1つだけ出力します。説明・引用符・前置きは不要で、クエリ文字列のみを返してください。";
+  const user = `議題: ${(topic || "").slice(0, 500)}`
+    + (profile ? `\n質問者の背景: ${profile.slice(0, 300)}` : "")
+    + (intervention ? `\n直近の論点: ${intervention.slice(0, 300)}` : "");
+  try {
+    const raw = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
+    const q = (raw || "")
+      .trim()
+      .replace(/^["'「」]+|["'「」]+$/g, "")
+      .split("\n")[0]
+      .slice(0, 300);
+    return q || (topic || "").slice(0, 200);
+  } catch {
+    return (topic || "").slice(0, 200);
+  }
 }
 
 async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {
@@ -163,7 +184,7 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, cloudUpsertFn }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, searchEnabled, cloudUpsertFn }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -269,8 +290,24 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
       : MODELS;
 
+    // Architecture B: run ONE web search for this round and inject the same
+    // evidence into every model below. Premium-only; skipped on the conclusion
+    // round (pure synthesis). Failures degrade gracefully to no search.
+    let searchContext = null;
+    if (searchEnabled && isPremium && authToken && !isConclusionRound) {
+      try {
+        const query = await generateSearchQuery(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
+        if (query && !controller.signal.aborted) {
+          searchContext = await callProxySearch(authToken, query, controller.signal, discussionIdRef.current);
+        }
+      } catch {
+        searchContext = null;
+      }
+    }
+    const searchSources = Array.isArray(searchContext?.results) ? searchContext.results : [];
+
     const initMessages = targetModels.map((m) => ({ modelId:m.id, text:"", error:null, loading:true }));
-    setDiscussion((d) => [...d, { messages:initMessages, userIntervention, isConclusion: isConclusionRound }]);
+    setDiscussion((d) => [...d, { messages:initMessages, userIntervention, isConclusion: isConclusionRound, searchSources }]);
 
     const models = MODE_MODELS[mode];
 
@@ -291,7 +328,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments);
+        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext);
         const tag = models[model.id].tag;
         // Only pass userParts to Claude when there are attachments — otherwise
         // the prefix isn't large enough to benefit from cache_control and adds
@@ -356,7 +393,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       const curDisc = discussionRef.current;
       const curSummaries = summariesRef.current;
       const curId = discussionIdRef.current;
-      const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound };
+      const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound, searchSources };
       const finalDiscussion = curDisc.length > 0 ? [...curDisc.slice(0, -1), newRound] : [newRound];
       saveDiscussion(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, curId, conclusionTarget)
         .then((id) => {
@@ -369,7 +406,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         setDiscussionMode("standard");
       }
     }
-  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, syncToCloud]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, searchEnabled, syncToCloud]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
