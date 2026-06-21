@@ -56,24 +56,27 @@ async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, aut
   return changed ? next : attachments;
 }
 
-// Generate one concise search query for this round from the topic, the user's
+// Generate up to 3 facet sub-queries for this round from the topic, the user's
 // profile, and (round 2+) the most recent intervention so re-searches follow
-// the discussion's evolving focus. Falls back to the raw topic on any failure.
-async function generateSearchQuery(apiKey, authToken, isPremium, topic, profile, intervention, sessionId) {
-  const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題について最新情報を調べるための、簡潔で具体的な日本語の検索クエリを1つだけ出力します。説明・引用符・前置きは不要で、クエリ文字列のみを返してください。";
+// the discussion's evolving focus. Splitting one broad topic (e.g. a trip into
+// 食事 / 酒 / 観光) yields concrete material instead of one shallow result set.
+// Falls back to a single raw-topic query on any failure.
+async function generateSearchQueries(apiKey, authToken, isPremium, topic, profile, intervention, sessionId) {
+  const fallback = [(topic || "").slice(0, 200)].filter(Boolean);
+  const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題で最新情報が必要な観点を最大3つに分け、それぞれを調べるための簡潔で具体的な日本語の検索クエリを作ります。観点が1つで十分なら1つだけでよい。出力はクエリ文字列を1行に1つ、最大3行。説明・番号・引用符・前置きは一切不要。";
   const user = `議題: ${(topic || "").slice(0, 500)}`
     + (profile ? `\n質問者の背景: ${profile.slice(0, 300)}` : "")
-    + (intervention ? `\n直近の論点: ${intervention.slice(0, 300)}` : "");
+    + (intervention ? `\n直近の論点（今回はこの観点を優先）: ${intervention.slice(0, 300)}` : "");
   try {
     const raw = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
-    const q = (raw || "")
-      .trim()
-      .replace(/^["'「」]+|["'「」]+$/g, "")
-      .split("\n")[0]
-      .slice(0, 300);
-    return q || (topic || "").slice(0, 200);
+    const queries = (raw || "")
+      .split("\n")
+      .map((line) => line.replace(/^[\s\d.、)）-]+/, "").replace(/^["'「」]+|["'「」]+$/g, "").trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return queries.length ? queries : fallback;
   } catch {
-    return (topic || "").slice(0, 200);
+    return fallback;
   }
 }
 
@@ -290,15 +293,15 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
       : MODELS;
 
-    // Architecture B: run ONE web search for this round and inject the same
-    // evidence into every model below. Premium-only; skipped on the conclusion
-    // round (pure synthesis). Failures degrade gracefully to no search.
+    // Architecture B: run web search for this round (multiple facet queries,
+    // merged) and inject the same evidence into every model below. Premium-only;
+    // skipped on the conclusion round (pure synthesis). Degrades to no search.
     let searchContext = null;
     if (searchEnabled && isPremium && authToken && !isConclusionRound) {
       try {
-        const query = await generateSearchQuery(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
-        if (query && !controller.signal.aborted) {
-          searchContext = await callProxySearch(authToken, query, controller.signal, discussionIdRef.current);
+        const queries = await generateSearchQueries(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
+        if (queries.length && !controller.signal.aborted) {
+          searchContext = await callProxySearch(authToken, queries, controller.signal, discussionIdRef.current);
         }
       } catch {
         searchContext = null;

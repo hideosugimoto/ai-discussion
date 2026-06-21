@@ -13,6 +13,8 @@ import { calcSearchCostMicro } from "../../../src/models.config.js";
 import { resolveSearchProvider } from "./_providers/index.js";
 
 const MAX_QUERY_LEN = 2000;
+const MAX_QUERIES = 3;   // facet sub-queries per round (bounds search cost)
+const MAX_RESULTS = 10;  // merged sources returned for injection
 
 function json(body, status) {
   return new Response(JSON.stringify(body), {
@@ -65,15 +67,28 @@ async function recordSearch(db, userId, provider, costMicro) {
 }
 
 // Analytics log (best-effort): one row per search, search_requests = 1.
-async function logSearch(db, userId, sessionId, provider, latencyMs) {
+async function logSearch(db, userId, sessionId, provider, latencyMs, searchCount) {
   try {
     await db.prepare(
       `INSERT INTO llm_request_log (user_id, session_id, model, provider, input_tokens, output_tokens, latency_ms, search_requests)
-       VALUES (?, ?, 'web_search', ?, 0, 0, ?, 1)`
-    ).bind(userId, sessionId || null, provider, latencyMs, 1).run();
+       VALUES (?, ?, 'web_search', ?, 0, 0, ?, ?)`
+    ).bind(userId, sessionId || null, provider, latencyMs, searchCount).run();
   } catch {
     // best-effort
   }
+}
+
+// Accept either a single `query` (back-compat) or a `queries` array (multi-facet
+// search). Returns a validated, trimmed, de-duplicated, length-capped list of at
+// most MAX_QUERIES strings.
+function parseQueries(body) {
+  const raw = Array.isArray(body.queries)
+    ? body.queries
+    : (typeof body.query === "string" ? [body.query] : []);
+  const cleaned = raw
+    .filter((q) => typeof q === "string" && q.trim() && q.length <= MAX_QUERY_LEN)
+    .map((q) => q.trim());
+  return [...new Set(cleaned)].slice(0, MAX_QUERIES);
 }
 
 export async function onRequestPost(context) {
@@ -97,10 +112,10 @@ export async function onRequestPost(context) {
   } catch {
     return json({ error: "Invalid JSON" }, 400);
   }
-  if (typeof body.query !== "string" || !body.query.trim() || body.query.length > MAX_QUERY_LEN) {
-    return json({ error: "Invalid query (1-2000 chars)" }, 400);
+  const queries = parseQueries(body);
+  if (queries.length === 0) {
+    return json({ error: "Invalid query (1-2000 chars, max 3)" }, 400);
   }
-  const query = body.query.trim();
   const sessionId = typeof body.sessionId === "string" ? body.sessionId.slice(0, 100) : null;
 
   // Monthly cap check (base + active credits). Same SUM the chat path uses, so
@@ -115,27 +130,48 @@ export async function onRequestPost(context) {
     }, 429);
   }
 
-  // Run the search. Provider errors are not billed.
+  // Run each facet query concurrently. Provider errors per query are tolerated
+  // (that facet just contributes nothing); only an all-fail returns 502.
   const provider = resolveSearchProvider(env);
   const start = Date.now();
-  let result;
-  try {
-    result = await provider.search(query, env);
-  } catch (e) {
+  const settled = await Promise.all(
+    queries.map((q) => provider.search(q, env).catch(() => null))
+  );
+  const ok = settled.filter(Boolean);
+  const latencyMs = Date.now() - start;
+  if (ok.length === 0) {
     return json({ error: "Search provider error" }, 502);
   }
-  const latencyMs = Date.now() - start;
 
-  // Bill on success (free tier → cost 0). Then log (best-effort).
-  const priorCount = await countMonthlySearches(env.DB, user.sub);
-  const costMicro = calcSearchCostMicro(provider.name, priorCount);
-  try {
-    await recordSearch(env.DB, user.sub, provider.name, costMicro);
-  } catch {
-    // If billing write fails, still return results (degraded) — the cap check
-    // above already gated entry, and one unbilled search is acceptable.
+  // Merge + de-duplicate sources across facets. Grounding often attributes the
+  // SAME fact segment to several domains, so dedupe primarily on snippet text
+  // (fall back to title when empty). This collapses near-identical facts and
+  // keeps the 10 injected slots diverse instead of repeating one restaurant.
+  const seen = new Set();
+  const merged = [];
+  for (const r of ok) {
+    for (const s of (r.sources || [])) {
+      const snippet = (s.snippet || "").trim();
+      const key = snippet ? snippet.slice(0, 120) : `title:${(s.title || "").trim()}`;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(s);
+    }
   }
-  await logSearch(env.DB, user.sub, sessionId, provider.name, latencyMs);
+  const results = merged.slice(0, MAX_RESULTS);
 
-  return json({ provider: provider.name, query, results: result.sources || [] }, 200);
+  // Bill one web_search row per SUCCESSFUL grounding call (each is a real fee),
+  // applying the monthly free tier incrementally across this request's calls.
+  const priorCount = await countMonthlySearches(env.DB, user.sub);
+  for (let i = 0; i < ok.length; i++) {
+    const costMicro = calcSearchCostMicro(provider.name, priorCount + i);
+    try {
+      await recordSearch(env.DB, user.sub, provider.name, costMicro);
+    } catch {
+      // Degraded: return results even if a billing write fails (cap already gated).
+    }
+  }
+  await logSearch(env.DB, user.sub, sessionId, provider.name, latencyMs, ok.length);
+
+  return json({ provider: provider.name, queries, results }, 200);
 }
