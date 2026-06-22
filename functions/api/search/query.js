@@ -10,7 +10,7 @@
 
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
 import { calcSearchCostMicro } from "../../../src/models.config.js";
-import { resolveSearchProvider } from "./_providers/index.js";
+import { resolveProviderForType } from "./_providers/index.js";
 
 const MAX_QUERY_LEN = 2000;
 const MAX_QUERIES = 3;   // facet sub-queries per round (bounds search cost)
@@ -78,17 +78,25 @@ async function logSearch(db, userId, sessionId, provider, latencyMs, searchCount
   }
 }
 
-// Accept either a single `query` (back-compat) or a `queries` array (multi-facet
-// search). Returns a validated, trimmed, de-duplicated, length-capped list of at
-// most MAX_QUERIES strings.
+// Accept a single `query` string (back-compat), or a `queries` array whose
+// items are either strings or { q, type } objects. `type` ("place" | "general")
+// routes the query to Maps vs web grounding. Returns a validated, de-duplicated,
+// capped list of { q, type } objects.
 function parseQueries(body) {
   const raw = Array.isArray(body.queries)
     ? body.queries
     : (typeof body.query === "string" ? [body.query] : []);
-  const cleaned = raw
-    .filter((q) => typeof q === "string" && q.trim() && q.length <= MAX_QUERY_LEN)
-    .map((q) => q.trim());
-  return [...new Set(cleaned)].slice(0, MAX_QUERIES);
+  const out = [];
+  const seen = new Set();
+  for (const item of raw) {
+    const q = (typeof item === "string" ? item : item?.q || "").trim();
+    if (!q || q.length > MAX_QUERY_LEN || seen.has(q)) continue;
+    const type = (typeof item === "object" && item?.type === "place") ? "place" : "general";
+    seen.add(q);
+    out.push({ q, type });
+    if (out.length >= MAX_QUERIES) break;
+  }
+  return out;
 }
 
 export async function onRequestPost(context) {
@@ -130,12 +138,16 @@ export async function onRequestPost(context) {
     }, 429);
   }
 
-  // Run each facet query concurrently. Provider errors per query are tolerated
-  // (that facet just contributes nothing); only an all-fail returns 502.
-  const provider = resolveSearchProvider(env);
+  // Run each facet query concurrently, routing by type (place → Maps grounding,
+  // general → web grounding). Provider errors per query are tolerated (that
+  // facet contributes nothing); only an all-fail returns 502. Each result keeps
+  // its provider name (set by the adapter) so billing uses the right rate.
   const start = Date.now();
   const settled = await Promise.all(
-    queries.map((q) => provider.search(q, env).catch(() => null))
+    queries.map(({ q, type }) => {
+      const provider = resolveProviderForType(env, type);
+      return provider.search(q, env).catch(() => null);
+    })
   );
   const ok = settled.filter(Boolean);
   const latencyMs = Date.now() - start;
@@ -160,18 +172,22 @@ export async function onRequestPost(context) {
   }
   const results = merged.slice(0, MAX_RESULTS);
 
-  // Bill one web_search row per SUCCESSFUL grounding call (each is a real fee),
-  // applying the monthly free tier incrementally across this request's calls.
+  // Bill one web_search row per SUCCESSFUL grounding call, priced by THAT call's
+  // provider (Maps and web grounding can differ). The free tier is applied
+  // against the combined monthly search count — at any realistic volume the
+  // combined count is conservative (never undercharges vs the monthly cap).
   const priorCount = await countMonthlySearches(env.DB, user.sub);
   for (let i = 0; i < ok.length; i++) {
-    const costMicro = calcSearchCostMicro(provider.name, priorCount + i);
+    const providerName = ok[i].provider;
+    const costMicro = calcSearchCostMicro(providerName, priorCount + i);
     try {
-      await recordSearch(env.DB, user.sub, provider.name, costMicro);
+      await recordSearch(env.DB, user.sub, providerName, costMicro);
     } catch {
       // Degraded: return results even if a billing write fails (cap already gated).
     }
+    await logSearch(env.DB, user.sub, sessionId, providerName, latencyMs, 1);
   }
-  await logSearch(env.DB, user.sub, sessionId, provider.name, latencyMs, ok.length);
 
-  return json({ provider: provider.name, queries, results }, 200);
+  const providers = [...new Set(ok.map((r) => r.provider))];
+  return json({ providers, queries, results }, 200);
 }

@@ -60,10 +60,12 @@ async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, aut
 // profile, and (round 2+) the most recent intervention so re-searches follow
 // the discussion's evolving focus. Splitting one broad topic (e.g. a trip into
 // 食事 / 酒 / 観光) yields concrete material instead of one shallow result set.
-// Falls back to a single raw-topic query on any failure.
+// Each query is tagged place/general so the backend routes place queries
+// (restaurants/spots/lodging) to Maps grounding. Returns [{q,type}]; falls back
+// to a single general raw-topic query on any failure.
 async function generateSearchQueries(apiKey, authToken, isPremium, topic, profile, intervention, sessionId) {
-  const fallback = [(topic || "").slice(0, 200)].filter(Boolean);
-  const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題で最新情報が必要な観点を最大3つに分け、それぞれを調べるための簡潔で具体的な日本語の検索クエリを作ります。観点が1つで十分なら1つだけでよい。出力はクエリ文字列を1行に1つ、最大3行。説明・番号・引用符・前置きは一切不要。";
+  const fallback = (topic || "").trim() ? [{ q: topic.slice(0, 200), type: "general" }] : [];
+  const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題で最新情報が必要な観点を最大3つに分け、それぞれの簡潔で具体的な日本語検索クエリを作ります。各クエリの先頭に種別を付けます: 店・施設・観光地・宿・場所に関するものは「place:」、それ以外（事実・統計・トレンド・一般情報）は「general:」。観点が1つで十分なら1つだけでよい。出力は1行に1クエリ、最大3行。形式は「place: 〇〇」または「general: 〇〇」。説明・番号・引用符・前置きは不要。";
   const user = `議題: ${(topic || "").slice(0, 500)}`
     + (profile ? `\n質問者の背景: ${profile.slice(0, 300)}` : "")
     + (intervention ? `\n直近の論点（今回はこの観点を優先）: ${intervention.slice(0, 300)}` : "");
@@ -71,8 +73,15 @@ async function generateSearchQueries(apiKey, authToken, isPremium, topic, profil
     const raw = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
     const queries = (raw || "")
       .split("\n")
-      .map((line) => line.replace(/^[\s\d.、)）-]+/, "").replace(/^["'「」]+|["'「」]+$/g, "").trim())
+      .map((line) => line.replace(/^[\s\d.、)）-]+/, "").trim())
       .filter(Boolean)
+      .map((line) => {
+        const m = line.match(/^(place|general)\s*[:：]\s*(.+)$/i);
+        const type = m && m[1].toLowerCase() === "place" ? "place" : "general";
+        const q = (m ? m[2] : line).replace(/^["'「」]+|["'「」]+$/g, "").trim();
+        return { q, type };
+      })
+      .filter((item) => item.q)
       .slice(0, 3);
     return queries.length ? queries : fallback;
   } catch {

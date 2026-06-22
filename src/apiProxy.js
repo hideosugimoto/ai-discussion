@@ -43,7 +43,7 @@ export async function callProxySearch(token, queries, signal, sessionId) {
     });
     if (!res.ok) return { results: [] };
     const json = await res.json();
-    return { provider: json?.provider, results: Array.isArray(json?.results) ? json.results : [] };
+    return { providers: json?.providers || [], results: Array.isArray(json?.results) ? json.results : [] };
   } catch {
     return { results: [] };
   }
