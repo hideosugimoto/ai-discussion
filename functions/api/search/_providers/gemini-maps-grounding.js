@@ -38,6 +38,9 @@ export async function search(query, env) {
           },
         ],
         tools: [{ googleMaps: {} }],
+        // We only keep the place sources, not the prose answer, so cap the
+        // generated output (kept generous so place discovery isn't truncated).
+        generationConfig: { maxOutputTokens: 1024 },
       }),
     }
   );

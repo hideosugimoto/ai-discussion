@@ -189,9 +189,10 @@ function buildSearchBlock(searchContext) {
   const results = Array.isArray(searchContext?.results) ? searchContext.results : [];
   const usable = results.filter((r) => r && (r.snippet || r.title) && r.url);
   if (usable.length === 0) return "";
-  const lines = usable.slice(0, 10).map((r, i) => {
+  const lines = usable.slice(0, 8).map((r, i) => {
     const title = (r.title || "(無題)").toString().trim();
-    const snippet = (r.snippet || "").toString().trim();
+    const rawSnippet = (r.snippet || "").toString().trim();
+    const snippet = rawSnippet.length > 200 ? rawSnippet.slice(0, 200) + "…" : rawSnippet;
     const url = (r.url || "").toString().trim();
     return `[${i + 1}] ${title}\n${snippet}${snippet ? "\n" : ""}（出典: ${url}）`;
   });
@@ -244,14 +245,16 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
       ? `\n\n【司会者（ユーザー）からの介入】\n${safeIntervention.trim()}`
       : "";
 
-  // Split the user message into a cacheable prefix (topic + attachments — stable
-  // across rounds within a session) and a variable suffix (history + intervention
-  // + closing prompt — changes every round). Anthropic's cache_control hits the
-  // prefix and saves ~90% of input cost on the attachment portion. OpenAI auto-
-  // caches matching prefixes too, so the same split helps both providers.
+  // Split the user message into a cacheable prefix (topic + attachments + search
+  // results — stable across rounds within a session, since search is reused on
+  // non-intervention rounds) and a variable suffix (history + intervention +
+  // closing prompt — changes every round). Anthropic's cache_control hits the
+  // prefix and saves ~90% of input cost on it; OpenAI auto-caches matching
+  // prefixes too. Keeping the (large) search block in the prefix avoids
+  // re-paying for it every round.
   const searchText = buildSearchBlock(searchContext);
-  const userCachePrefix = `【議題】${safeTopic}${attachText}`;
-  const userVariable = `${searchText}${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const userCachePrefix = `【議題】${safeTopic}${attachText}${searchText}`;
+  const userVariable = `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   const user = `${userCachePrefix}${userVariable}`;
   return { sys, user, userCachePrefix, userVariable };
 }

@@ -211,6 +211,8 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const [rollingSummary, setRollingSummary] = useState(null);
 
   const abortRef = useRef(null);
+  // Last search results, reused across rounds that don't search fresh (cost opt).
+  const lastSearchSourcesRef = useRef([]);
   const bottomRef = useRef(null);
   const discussionRef = useRef(discussion);
   const summariesRef = useRef(summaries);
@@ -302,18 +304,29 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
       : MODELS;
 
-    // Architecture B: run web search for this round (multiple facet queries,
-    // merged) and inject the same evidence into every model below. Premium-only;
-    // skipped on the conclusion round (pure synthesis). Degrades to no search.
+    // Architecture B: run web search (multiple facet queries, merged) and inject
+    // the same evidence into every model. Premium-only; skipped on conclusion
+    // rounds. Cost optimization: only search fresh on Round 1 and when the user
+    // intervenes (the focus shifts); other rounds REUSE the last results so we
+    // don't re-pay grounding calls + injection every round. The reused block
+    // stays stable, so it also stays in the cacheable prefix (see buildPrompt).
     let searchContext = null;
     if (searchEnabled && isPremium && authToken && !isConclusionRound) {
-      try {
-        const queries = await generateSearchQueries(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
-        if (queries.length && !controller.signal.aborted) {
-          searchContext = await callProxySearch(authToken, queries, controller.signal, discussionIdRef.current);
+      const shouldSearchFresh = roundNum === 1 || !!(userIntervention && userIntervention.trim());
+      if (shouldSearchFresh) {
+        try {
+          const queries = await generateSearchQueries(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
+          if (queries.length && !controller.signal.aborted) {
+            searchContext = await callProxySearch(authToken, queries, controller.signal, discussionIdRef.current);
+          }
+        } catch {
+          searchContext = null;
         }
-      } catch {
-        searchContext = null;
+        if (Array.isArray(searchContext?.results) && searchContext.results.length) {
+          lastSearchSourcesRef.current = searchContext.results;
+        }
+      } else if (lastSearchSourcesRef.current.length) {
+        searchContext = { results: lastSearchSourcesRef.current };
       }
     }
     const searchSources = Array.isArray(searchContext?.results) ? searchContext.results : [];
@@ -342,10 +355,12 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       targetModels.map(async (model) => {
         const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext);
         const tag = models[model.id].tag;
-        // Only pass userParts to Claude when there are attachments — otherwise
-        // the prefix isn't large enough to benefit from cache_control and adds
-        // unnecessary block overhead.
-        const userParts = (effectiveAttachments && effectiveAttachments.length > 0)
+        // Pass userParts to Claude when the cacheable prefix is large enough to
+        // benefit from cache_control: when there are attachments OR injected
+        // search results (both live in the prefix and are stable across reuse
+        // rounds). Otherwise the prefix is too small to be worth a cache block.
+        const hasSearch = Array.isArray(searchSources) && searchSources.length > 0;
+        const userParts = ((effectiveAttachments && effectiveAttachments.length > 0) || hasSearch)
           ? { cachePrefix: userCachePrefix, variable: userVariable }
           : undefined;
 
@@ -426,6 +441,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setSummaries([]);
     setDetailedAnalyses([]);
     setRollingSummary(null);
+    lastSearchSourcesRef.current = [];
     setStarted(true);
     await runRound([], 1, "");
   };
@@ -446,6 +462,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         })
         .catch(() => {});
     }
+    lastSearchSourcesRef.current = [];
     setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setRollingSummary(null); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
 
