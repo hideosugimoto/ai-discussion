@@ -82,10 +82,10 @@ async function logSearch(db, userId, sessionId, provider, latencyMs, searchCount
 // items are either strings or { q, type } objects. `type` ("place" | "general")
 // routes the query to Maps vs web grounding. Returns a validated, de-duplicated,
 // capped list of { q, type } objects.
-function parseQueries(body) {
-  const raw = Array.isArray(body.queries)
+export function parseQueries(body) {
+  const raw = Array.isArray(body?.queries)
     ? body.queries
-    : (typeof body.query === "string" ? [body.query] : []);
+    : (typeof body?.query === "string" ? [body.query] : []);
   const out = [];
   const seen = new Set();
   for (const item of raw) {
@@ -97,6 +97,50 @@ function parseQueries(body) {
     if (out.length >= MAX_QUERIES) break;
   }
   return out;
+}
+
+// Merge + de-duplicate sources across facet results. Grounding often attributes
+// the SAME fact segment to several domains, so dedupe primarily on snippet text
+// (fall back to title when empty), then cap. Pure (no I/O) — unit-tested.
+export function mergeSources(results, max = MAX_RESULTS) {
+  const seen = new Set();
+  const merged = [];
+  for (const r of (results || [])) {
+    for (const s of (r?.sources || [])) {
+      const snippet = (s?.snippet || "").trim();
+      const key = snippet ? snippet.slice(0, 120) : `title:${(s?.title || "").trim()}`;
+      if (key === "title:" || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(s);
+    }
+  }
+  return merged.slice(0, max);
+}
+
+// Run all facet queries concurrently, routing by type. A per-query provider
+// error is tolerated (that facet yields null). Returns { ok, latencyMs }.
+async function runSearches(queries, env) {
+  const start = Date.now();
+  const settled = await Promise.all(
+    queries.map(({ q, type }) => resolveProviderForType(env, type).search(q, env).catch(() => null))
+  );
+  return { ok: settled.filter(Boolean), latencyMs: Date.now() - start };
+}
+
+// Bill one usage row per successful grounding call, priced by that call's
+// provider; free tier applied against the combined monthly count.
+async function billSearches(db, userId, sessionId, ok, latencyMs) {
+  const priorCount = await countMonthlySearches(db, userId);
+  for (let i = 0; i < ok.length; i++) {
+    const providerName = ok[i].provider;
+    const costMicro = calcSearchCostMicro(providerName, priorCount + i);
+    try {
+      await recordSearch(db, userId, providerName, costMicro);
+    } catch {
+      // Degraded: return results even if a billing write fails (cap already gated).
+    }
+    await logSearch(db, userId, sessionId, providerName, latencyMs, 1);
+  }
 }
 
 export async function onRequestPost(context) {
@@ -138,55 +182,14 @@ export async function onRequestPost(context) {
     }, 429);
   }
 
-  // Run each facet query concurrently, routing by type (place → Maps grounding,
-  // general → web grounding). Provider errors per query are tolerated (that
-  // facet contributes nothing); only an all-fail returns 502. Each result keeps
-  // its provider name (set by the adapter) so billing uses the right rate.
-  const start = Date.now();
-  const settled = await Promise.all(
-    queries.map(({ q, type }) => {
-      const provider = resolveProviderForType(env, type);
-      return provider.search(q, env).catch(() => null);
-    })
-  );
-  const ok = settled.filter(Boolean);
-  const latencyMs = Date.now() - start;
+  // Run searches (routed by type), then 502 only if every facet failed.
+  const { ok, latencyMs } = await runSearches(queries, env);
   if (ok.length === 0) {
     return json({ error: "Search provider error" }, 502);
   }
 
-  // Merge + de-duplicate sources across facets. Grounding often attributes the
-  // SAME fact segment to several domains, so dedupe primarily on snippet text
-  // (fall back to title when empty). This collapses near-identical facts and
-  // keeps the 10 injected slots diverse instead of repeating one restaurant.
-  const seen = new Set();
-  const merged = [];
-  for (const r of ok) {
-    for (const s of (r.sources || [])) {
-      const snippet = (s.snippet || "").trim();
-      const key = snippet ? snippet.slice(0, 120) : `title:${(s.title || "").trim()}`;
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      merged.push(s);
-    }
-  }
-  const results = merged.slice(0, MAX_RESULTS);
-
-  // Bill one web_search row per SUCCESSFUL grounding call, priced by THAT call's
-  // provider (Maps and web grounding can differ). The free tier is applied
-  // against the combined monthly search count — at any realistic volume the
-  // combined count is conservative (never undercharges vs the monthly cap).
-  const priorCount = await countMonthlySearches(env.DB, user.sub);
-  for (let i = 0; i < ok.length; i++) {
-    const providerName = ok[i].provider;
-    const costMicro = calcSearchCostMicro(providerName, priorCount + i);
-    try {
-      await recordSearch(env.DB, user.sub, providerName, costMicro);
-    } catch {
-      // Degraded: return results even if a billing write fails (cap already gated).
-    }
-    await logSearch(env.DB, user.sub, sessionId, providerName, latencyMs, 1);
-  }
+  const results = mergeSources(ok);
+  await billSearches(env.DB, user.sub, sessionId, ok, latencyMs);
 
   const providers = [...new Set(ok.map((r) => r.provider))];
   return json({ providers, queries, results }, 200);

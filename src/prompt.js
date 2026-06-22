@@ -185,7 +185,7 @@ const MODE_INSTRUCTIONS = {
 // AI to interpret and select on its own — injecting a pre-synthesised answer
 // would invite all three to converge. Returns "" when there are no usable
 // results so the prompt is unchanged.
-function buildSearchBlock(searchContext) {
+export function buildSearchBlock(searchContext) {
   const results = Array.isArray(searchContext?.results) ? searchContext.results : [];
   const usable = results.filter((r) => r && (r.snippet || r.title) && r.url);
   if (usable.length === 0) return "";
