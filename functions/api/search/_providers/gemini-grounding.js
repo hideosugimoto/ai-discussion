@@ -44,6 +44,9 @@ export async function search(query, env) {
           },
         ],
         tools: [{ google_search: {} }],
+        // We only keep the grounding sources, not the prose answer, so cap the
+        // generated output (kept generous so source discovery isn't truncated).
+        generationConfig: { maxOutputTokens: 1024 },
       }),
     }
   );
