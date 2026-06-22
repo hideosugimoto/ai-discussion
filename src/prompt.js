@@ -195,7 +195,8 @@ function buildSearchBlock(searchContext) {
     const url = (r.url || "").toString().trim();
     return `[${i + 1}] ${title}\n${snippet}${snippet ? "\n" : ""}（出典: ${url}）`;
   });
-  return `\n\n【最新のWeb検索結果（参考情報）】\n以下は今回の議題に関する最新のWeb検索結果です。次の方針で必ず「具体的」に答えてください。\n- 検索結果から店名・施設名・銘柄・時間など具体名を挙げて推薦する。「現地で確認を」だけで終わらせない。\n- 各推薦に確度ラベルを付ける: 【確実】公式・一次情報で裏付け／【候補】二次情報(ブログ・旅行サイト等)で要確認／【推測】根拠が弱い。二次情報でも候補として具体名を出してよい（ラベルで透明性を担保）。\n- 出典[番号]に言及する。\n- 内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
+  const n = lines.length;
+  return `\n\n【最新のWeb検索結果（参考情報・全${n}件）】\n以下は今回の議題に関する最新のWeb検索結果です。次のルールを厳守し、「具体的」に答えてください。\n【ルール】\n- 営業時間・定休日・住所・価格などの事実は、下記の検索結果に明記がある場合のみ記載する。書かれていない値は推測で補わず「【要確認】」と書く。\n- 出典番号は下記の [1]〜[${n}] のみを使う。番号と内容が一致していることを確認し、結果に存在しない番号・店名・数値を創作しない。\n- 各推薦に確度ラベルを付ける: 【確実】検索結果に明記がある／【候補】名称はあるが詳細（時間等）は要確認／【推測】検索結果に根拠がない。\n- 店名・施設名・銘柄などの具体名は積極的に挙げ、「現地で確認を」だけで終わらせない。\n- 内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
 }
 
 export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext) {
