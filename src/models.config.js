@@ -58,6 +58,10 @@ export const SUMMARY_MODEL = "gpt-5.4-mini";
 export const SEARCH_PRICING = {
   // Gemini "Grounding with Google Search" (3.x): $14 / 1,000 grounded prompts.
   "gemini-grounding": { per1k: 14.00, freeTierPerMonth: 5000 },
+  // Gemini "Grounding with Google Maps" (3.x): $14 / 1,000. Free tier is not
+  // publicly confirmed, so freeTierPerMonth is 0 (cap-safe: bill from the first
+  // call rather than risk undercounting against the monthly limit).
+  "gemini-maps-grounding": { per1k: 14.00, freeTierPerMonth: 0 },
   // Drop-in alternatives (adapter swap only). Kept here so cost accounting is
   // correct the moment the provider changes — no code edit needed elsewhere.
   "serper":           { per1k: 1.00,  freeTierPerMonth: 2500 },

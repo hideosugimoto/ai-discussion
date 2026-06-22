@@ -8,10 +8,12 @@
 // it. No discussion-layer code changes.
 
 import { search as geminiGrounding } from "./gemini-grounding.js";
+import { search as geminiMapsGrounding } from "./gemini-maps-grounding.js";
 import { DEFAULT_SEARCH_PROVIDER } from "../../../../src/models.config.js";
 
 const PROVIDERS = {
   "gemini-grounding": geminiGrounding,
+  "gemini-maps-grounding": geminiMapsGrounding,
   // "serper": serperSearch,   // drop-in: add adapter + register here
   // "brave":  braveSearch,
 };
@@ -23,4 +25,16 @@ export function resolveSearchProvider(env) {
   const fn = PROVIDERS[requested] || PROVIDERS[DEFAULT_SEARCH_PROVIDER];
   const name = PROVIDERS[requested] ? requested : DEFAULT_SEARCH_PROVIDER;
   return { name, search: fn };
+}
+
+// Route a query to a provider by its type. "place" (restaurants/spots/lodging)
+// goes to Maps grounding — purpose-built for places; everything else uses the
+// configured general web-grounding provider. SEARCH_MAPS_PROVIDER can override
+// the place provider (e.g. a future Google Places adapter).
+export function resolveProviderForType(env, type) {
+  if (type === "place") {
+    const name = env.SEARCH_MAPS_PROVIDER || "gemini-maps-grounding";
+    if (PROVIDERS[name]) return { name, search: PROVIDERS[name] };
+  }
+  return resolveSearchProvider(env);
 }
