@@ -18,6 +18,7 @@ import useShare from "./hooks/useShare";
 import Onboarding from "./components/Onboarding";
 import HelpHint from "./components/HelpHint";
 import PlanBadge from "./components/PlanBadge";
+import UsagePill from "./components/UsagePill";
 import AuthBar from "./components/AuthBar";
 import FileAttachment from "./components/FileAttachment";
 import { useHelp } from "./hooks/useHelp.jsx";
@@ -128,15 +129,20 @@ export default function App() {
 
   // 自動追従スクロール: ユーザーが上にスクロールしたら停止、下端付近に戻ったら再開
   const [autoFollow, setAutoFollow] = useState(true);
+  // 上部のコスト表示(PlanBadge)を過ぎてスクロールしたら使用量ピルを出す
+  const [scrolledPastTop, setScrolledPastTop] = useState(false);
   useEffect(() => {
     const handleScroll = () => {
       const threshold = 100;
       const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - threshold;
       setAutoFollow(nearBottom);
+      setScrolledPastTop(window.scrollY > 160);
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   useEffect(() => {
     if (autoFollow) bottomRef.current?.scrollIntoView({ behavior:"smooth" });
@@ -834,6 +840,11 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* 使用量ピル: 上部のコスト表示を過ぎてスクロールした有料ユーザーに表示 */}
+      {auth.isPremium && !auth.planLoading && usage && scrolledPastTop && (
+        <UsagePill usage={usage} estimate={roundEstimate} onClick={scrollToTop} />
+      )}
 
       {/* フローティング「↓ 最新へ」ボタン: 自動追従OFF時のみ表示 */}
       {!autoFollow && started && discussion.length > 0 && (
