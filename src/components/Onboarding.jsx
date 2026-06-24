@@ -5,7 +5,7 @@ import PlanPicker from "./PlanPicker";
 // clear explanation of what the product does and two paths to start:
 //   1) Login → Premium (no keys, the monetised path) — promoted as primary.
 //   2) Bring your own API keys (free app, user pays providers) — secondary.
-export default function Onboarding({ isLoggedIn, onLogin, onUseKeys, onPickPlan }) {
+export default function Onboarding({ isLoggedIn, onLogin, onUseKeys, onPickPlan, onTryDemo }) {
   return (
     <div style={{ marginBottom:16, padding:"18px 18px 16px", background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:12 }}>
       <div style={{ fontSize:16, fontWeight:700, color:"var(--text)", marginBottom:6, lineHeight:1.5 }}>
@@ -15,12 +15,21 @@ export default function Onboarding({ isLoggedIn, onLogin, onUseKeys, onPickPlan 
         ChatGPT・Claude・Gemini が同じ議題を多角的に議論。<b style={{ color:"var(--text)" }}>合意点・対立点・最終結論</b>まで整理して提示します。AIを1つずつ試して比べる必要はもうありません。
       </div>
 
-      <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--text2)", marginBottom:16 }}>
+      <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--text2)", marginBottom:14 }}>
         <span>🔭 多角的な視点</span>
         <span>🤝 合意・対立を可視化</span>
         <span>📋 結論・アクションプラン</span>
         <span>📂 履歴・共有</span>
       </div>
+
+      {onTryDemo && (
+        <button
+          onClick={onTryDemo}
+          style={{ marginBottom:14, padding:"9px 18px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:10, color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:700 }}
+        >
+          👀 まずはサンプルの議論を見る（登録不要）
+        </button>
+      )}
 
       {!isLoggedIn ? (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>

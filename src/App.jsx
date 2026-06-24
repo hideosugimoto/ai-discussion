@@ -29,6 +29,7 @@ const PersonaPanel = lazy(() => import("./components/PersonaPanel"));
 const ActionPlanView = lazy(() => import("./components/ActionPlanView"));
 const SharedView = lazy(() => import("./components/SharedView"));
 const ShareDialog = lazy(() => import("./components/ShareDialog"));
+const DemoView = lazy(() => import("./components/DemoView"));
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -38,6 +39,9 @@ export default function App() {
     const url = new URL(window.location.href);
     return url.searchParams.get("share");
   });
+
+  // Read-only sample-discussion preview ("try before you buy").
+  const [showDemo, setShowDemo] = useState(false);
 
   const exitShareView = () => {
     setShareViewId(null);
@@ -331,6 +335,10 @@ export default function App() {
     return <Suspense fallback={null}><SharedView shareId={shareViewId} onExit={exitShareView} /></Suspense>;
   }
 
+  if (showDemo) {
+    return <Suspense fallback={null}><DemoView onExit={() => setShowDemo(false)} onStart={() => setShowDemo(false)} /></Suspense>;
+  }
+
   return (
     <Suspense fallback={null}>
     <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
@@ -421,6 +429,7 @@ export default function App() {
             onLogin={auth.login}
             onUseKeys={() => togglePanel("keys")}
             onPickPlan={startCheckout}
+            onTryDemo={() => setShowDemo(true)}
           />
         )}
 
