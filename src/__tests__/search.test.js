@@ -137,16 +137,24 @@ describe("buildSearchBlock", () => {
     expect(block).toContain("https://e.com");
     expect(block).toContain("全1件");
   });
-  it("caps at 8 sources", () => {
+  it("caps at 6 sources (leaner per-round input; sources still rich)", () => {
     const results = Array.from({ length: 12 }, (_, i) => ({ title: `t${i}`, url: `https://e.com/${i}`, snippet: `s${i}` }));
     const block = buildSearchBlock({ results });
-    expect(block).toContain("[8]");
-    expect(block).not.toContain("[9]");
-    expect(block).toContain("全8件");
+    expect(block).toContain("[6]");
+    expect(block).not.toContain("[7]");
+    expect(block).toContain("全6件");
   });
-  it("truncates long snippets", () => {
+  it("truncates long snippets at 160 chars", () => {
     const block = buildSearchBlock({ results: [{ title: "T", url: "https://e.com", snippet: "あ".repeat(400) }] });
     expect(block).toContain("…");
-    expect(block).not.toContain("あ".repeat(250));
+    expect(block).not.toContain("あ".repeat(200));
+  });
+  it("keeps the quality-critical rules (confidence labels, citation discipline)", () => {
+    const block = buildSearchBlock({ results: [{ title: "T", url: "https://e.com", snippet: "S" }] });
+    expect(block).toContain("【確実】");
+    expect(block).toContain("【候補】");
+    expect(block).toContain("【推測】");
+    expect(block).toContain("【要確認】");
+    expect(block).toContain("創作しない");
   });
 });
