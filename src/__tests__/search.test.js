@@ -1,7 +1,13 @@
 // Tests for pure helpers in the web-search subsystem.
 import { describe, it, expect } from "vitest";
 import { parseQueries, mergeSources } from "../../functions/api/search/query.js";
-import { calcSearchCostMicro, SEARCH_PRICING, nativeSearchPricingKey } from "../models.config.js";
+import {
+  calcSearchCostMicro,
+  SEARCH_PRICING,
+  nativeSearchPricingKey,
+  calcAnthropicCacheCostMicro,
+  MODEL_PRICING,
+} from "../models.config.js";
 import { buildSearchBlock } from "../prompt.js";
 
 describe("parseQueries", () => {
@@ -75,6 +81,30 @@ describe("calcSearchCostMicro", () => {
     // The native billing path always passes priorCount=0, so Gemini grounding
     // stays inside its free tier — confirms the pre-launch simplification.
     expect(calcSearchCostMicro(nativeSearchPricingKey("google"), 0)).toBe(0);
+  });
+});
+
+describe("calcAnthropicCacheCostMicro", () => {
+  const inRate = MODEL_PRICING["claude-opus-4-8"].input; // µ$/token
+
+  it("bills cache writes at 1.25x and reads at 0.1x of base input", () => {
+    // 20513 write + 2672 read on opus-4-8 (the measured native-search case)
+    const expected = Math.round(20513 * inRate * 1.25 + 2672 * inRate * 0.1);
+    expect(calcAnthropicCacheCostMicro("claude-opus-4-8", 20513, 2672)).toBe(expected);
+    expect(expected).toBe(129_542); // 128206 (write) + 1336 (read)
+  });
+
+  it("is 0 when there are no cache tokens", () => {
+    expect(calcAnthropicCacheCostMicro("claude-opus-4-8", 0, 0)).toBe(0);
+  });
+
+  it("tolerates missing/undefined token counts", () => {
+    expect(calcAnthropicCacheCostMicro("claude-opus-4-8")).toBe(0);
+    expect(calcAnthropicCacheCostMicro("claude-opus-4-8", undefined, 100)).toBe(Math.round(100 * inRate * 0.1));
+  });
+
+  it("returns 0 for an unknown model", () => {
+    expect(calcAnthropicCacheCostMicro("nope", 1000, 1000)).toBe(0);
   });
 });
 
