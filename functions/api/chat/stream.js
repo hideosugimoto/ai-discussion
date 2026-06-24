@@ -8,6 +8,7 @@ import {
   estimateMaxCostMicro,
   calcSearchCostMicro,
   nativeSearchPricingKey,
+  calcAnthropicCacheCostMicro,
 } from "../../../src/models.config.js";
 
 // Layer 4: Input validation
@@ -366,10 +367,11 @@ export async function onRequestPost(context) {
             try {
               const parsed = JSON.parse(jsonStr);
 
-              // Anthropic usage (cache tokens live on message_start.usage).
-              // server_tool_use.web_search_requests is a cumulative count of
-              // native web searches; it appears on message_start and is updated
-              // on message_delta — take the max so we never undercount.
+              // Anthropic usage. Cache tokens appear on message_start, but with
+              // native web search the agentic loop adds more (search results),
+              // and message_delta carries the final cumulative usage — so we
+              // refresh input/cache counts from message_delta when present.
+              // server_tool_use.web_search_requests is cumulative; take the max.
               if (parsed.type === "message_start" && parsed.message?.usage) {
                 const u = parsed.message.usage;
                 inputTokens = u.input_tokens || 0;
@@ -381,6 +383,11 @@ export async function onRequestPost(context) {
               }
               if (parsed.type === "message_delta" && parsed.usage) {
                 outputTokens = parsed.usage.output_tokens || 0;
+                // Final cumulative cache/input counts (only present on tool turns;
+                // guard so plain streaming keeps the message_start values).
+                if (parsed.usage.input_tokens != null) inputTokens = parsed.usage.input_tokens;
+                if (parsed.usage.cache_creation_input_tokens != null) cacheCreationTokens = parsed.usage.cache_creation_input_tokens;
+                if (parsed.usage.cache_read_input_tokens != null) cacheReadTokens = parsed.usage.cache_read_input_tokens;
                 if (parsed.usage.server_tool_use?.web_search_requests) {
                   nativeSearchCount = Math.max(nativeSearchCount, parsed.usage.server_tool_use.web_search_requests);
                 }
@@ -430,6 +437,15 @@ export async function onRequestPost(context) {
       const latencyMs = Date.now() - apiCallStart;
       if (inputTokens > 0 || outputTokens > 0) {
         let actualMicro = calcCostMicro(model, inputTokens, outputTokens);
+        // Anthropic cache cost: input_tokens excludes cache tokens, so the
+        // cache write (1.25x) and read (0.1x) must be billed explicitly or the
+        // proxy under-charges — especially with native web search, whose results
+        // land in cache_creation. OpenAI/Gemini already fold cached tokens into
+        // their token counts (billed via calcCostMicro), so they're excluded here
+        // to avoid double-counting.
+        if (provider === "anthropic") {
+          actualMicro += calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheReadTokens);
+        }
         // Native search fee: add the per-search cost when this call used each
         // provider's own web search tool. priorCount=0 keeps Gemini inside its
         // monthly free tier (pre-launch single-user assumption); anthropic/openai

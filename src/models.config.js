@@ -117,6 +117,26 @@ export function calcCostMicro(model, inputTokens, outputTokens) {
   return Math.round(inputTokens * pricing.input + outputTokens * pricing.output);
 }
 
+// Anthropic prompt-caching multipliers (relative to base input price). The
+// proxy uses the 5-minute (ephemeral) cache_control, so writes cost 1.25x and
+// reads cost 0.1x of the base input rate. Source: Anthropic prompt-caching docs.
+export const ANTHROPIC_CACHE_WRITE_MULTIPLIER = 1.25;
+export const ANTHROPIC_CACHE_READ_MULTIPLIER = 0.1;
+
+// Anthropic-only cache cost in microdollars. Unlike OpenAI/Gemini (whose token
+// counts already include cached tokens, billed via calcCostMicro), Anthropic
+// reports cache_creation_input_tokens / cache_read_input_tokens SEPARATELY from
+// input_tokens. Those must be billed explicitly or the proxy under-charges
+// (the cache write at 1.25x is a real cost, especially with native web search).
+export function calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheReadTokens) {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return 0;
+  return Math.round(
+    (cacheCreationTokens || 0) * pricing.input * ANTHROPIC_CACHE_WRITE_MULTIPLIER +
+    (cacheReadTokens || 0) * pricing.input * ANTHROPIC_CACHE_READ_MULTIPLIER
+  );
+}
+
 // Pre-debit upper-bound estimate (500 input + 1500 output tokens), used to
 // reserve budget before the upstream call so concurrent requests can't race
 // past the monthly cap.
