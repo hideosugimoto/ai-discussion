@@ -103,6 +103,18 @@
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: 'DM Sans', 'Noto Sans JP', -apple-system, sans-serif; transition: background .3s, color .3s; }
 textarea:focus, input:focus { outline: none; }
+
+/* iOS Safari auto-zooms into any text field whose font-size is < 16px on focus,
+   then doesn't zoom back out — making buttons hard to tap. Forcing >=16px on
+   mobile prevents the zoom. !important is required to beat the inline font-size
+   styles on these fields. text-size-adjust pins the rendered size too. */
+@media (max-width: 640px) {
+  input, textarea, select {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 
