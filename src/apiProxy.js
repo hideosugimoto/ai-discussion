@@ -49,10 +49,14 @@ export async function callProxySearch(token, queries, signal, sessionId) {
   }
 }
 
-export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts) {
+export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts, nativeSearch, searchMaxUses) {
   const body = { model, system: sys, message: user, sessionId, turnNumber };
   if (userParts && userParts.cachePrefix && userParts.variable) {
     body.userParts = { cachePrefix: userParts.cachePrefix, variable: userParts.variable };
+  }
+  if (nativeSearch) {
+    body.nativeSearch = true;
+    if (searchMaxUses) body.searchMaxUses = searchMaxUses;
   }
   const res = await fetch("/api/chat/stream", {
     method: "POST",
@@ -78,14 +82,25 @@ export async function callProxyClaude(token, model, sys, user, onChunk, signal, 
   return full;
 }
 
-export async function callProxyChatGPT(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
+// Extract the text delta from a ChatGPT SSE event. Two shapes coexist:
+//   - Chat Completions (shared / no-search): choices[].delta.content
+//   - Responses API (native search):         response.output_text.delta (.delta)
+// Returns "" for any other event (usage frames, tool-call markers, etc.).
+export function extractChatGPTChunk(json) {
+  if (json?.type === "response.output_text.delta") return json?.delta ?? "";
+  return json?.choices?.[0]?.delta?.content ?? "";
+}
+
+export async function callProxyChatGPT(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch) {
+  const body = { model, system: sys, message: user, sessionId, turnNumber };
+  if (nativeSearch) body.nativeSearch = true;
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) {
@@ -96,21 +111,23 @@ export async function callProxyChatGPT(token, model, sys, user, onChunk, signal,
   await readSSE(res, (data) => {
     try {
       const json = JSON.parse(data);
-      const chunk = json?.choices?.[0]?.delta?.content ?? "";
+      const chunk = extractChatGPTChunk(json);
       if (chunk) { full += chunk; onChunk(chunk); }
     } catch { /* skip */ }
   }, signal);
   return full;
 }
 
-export async function callProxyGemini(token, model, sys, user, onChunk, signal, sessionId, turnNumber) {
+export async function callProxyGemini(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch) {
+  const body = { model, system: sys, message: user, sessionId, turnNumber };
+  if (nativeSearch) body.nativeSearch = true;
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     },
-    body: JSON.stringify({ model, system: sys, message: user, sessionId, turnNumber }),
+    body: JSON.stringify(body),
     signal,
   });
   if (!res.ok) {

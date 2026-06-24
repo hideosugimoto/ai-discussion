@@ -6,6 +6,8 @@ import {
   detectProvider,
   calcCostMicro,
   estimateMaxCostMicro,
+  calcSearchCostMicro,
+  nativeSearchPricingKey,
 } from "../../../src/models.config.js";
 
 // Layer 4: Input validation
@@ -19,6 +21,17 @@ function validateRequest(body) {
   }
   if (typeof body.message !== "string" || body.message.length > 50000) {
     return "Invalid message (max 50000 chars)";
+  }
+  if (body.nativeSearch !== undefined && typeof body.nativeSearch !== "boolean") {
+    return "Invalid nativeSearch";
+  }
+  // searchMaxUses bounds the provider's agentic web-search loop. Clamp it server-
+  // side: it flows straight to the upstream tool config and each search is billed,
+  // so an unbounded value is a cost-amplification vector.
+  if (body.searchMaxUses !== undefined) {
+    if (!Number.isInteger(body.searchMaxUses) || body.searchMaxUses < 1 || body.searchMaxUses > 5) {
+      return "Invalid searchMaxUses (must be an integer 1-5)";
+    }
   }
   if (body.userParts !== undefined) {
     if (typeof body.userParts !== "object" || body.userParts === null) {
@@ -111,28 +124,34 @@ function buildAnthropicUserMessages(message, userParts) {
   return [{ role: "user", content: message }];
 }
 
-// Provider-specific API calls
-async function callAnthropic(apiKey, model, system, message, userParts) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+// Provider-specific API calls. `nativeSearch` enables each provider's own web
+// search tool (searchMode === "native"); maxUses bounds the agentic loop.
+async function callAnthropic(apiKey, model, system, message, userParts, nativeSearch, maxUses) {
+  const body = {
+    model,
+    max_tokens: 1500,
+    stream: true,
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+    messages: buildAnthropicUserMessages(message, userParts),
+  };
+  if (nativeSearch) {
+    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses || 2 }];
+  }
+  return fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1500,
-      stream: true,
-      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-      messages: buildAnthropicUserMessages(message, userParts),
-    }),
+    body: JSON.stringify(body),
   });
-  return res;
 }
 
 async function callOpenAI(apiKey, model, system, message) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  // Chat Completions path (shared / no-search mode). Native search uses the
+  // Responses API instead (callOpenAIResponses) — web_search isn't available here.
+  return fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -150,11 +169,39 @@ async function callOpenAI(apiKey, model, system, message) {
       ],
     }),
   });
-  return res;
 }
 
-async function callGoogle(apiKey, model, system, message) {
-  const res = await fetch(
+// OpenAI native search: Responses API (/v1/responses) with the web_search tool.
+// Streaming emits response.output_text.delta events; usage + web_search tool
+// calls arrive on the response.completed event.
+async function callOpenAIResponses(apiKey, model, system, message) {
+  return fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      stream: true,
+      max_output_tokens: 8192,
+      instructions: system,
+      input: message,
+      tools: [{ type: "web_search" }],
+    }),
+  });
+}
+
+async function callGoogle(apiKey, model, system, message, nativeSearch) {
+  const body = {
+    system_instruction: { parts: [{ text: system }] },
+    contents: [{ parts: [{ text: message }] }],
+    generationConfig: { maxOutputTokens: 8192 },
+  };
+  if (nativeSearch) {
+    body.tools = [{ google_search: {} }];
+  }
+  return fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
@@ -162,14 +209,9 @@ async function callGoogle(apiKey, model, system, message) {
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
       },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents: [{ parts: [{ text: message }] }],
-        generationConfig: { maxOutputTokens: 8192 },
-      }),
+      body: JSON.stringify(body),
     }
   );
-  return res;
 }
 
 export async function onRequestPost(context) {
@@ -250,15 +292,20 @@ export async function onRequestPost(context) {
     );
   }
 
+  // Native search mode: enable each provider's own web search tool this call.
+  const nativeSearch = body.nativeSearch === true;
+
   // Call upstream API
   let upstream;
   try {
     if (provider === "anthropic") {
-      upstream = await callAnthropic(apiKey, body.model, body.system, body.message, body.userParts);
+      upstream = await callAnthropic(apiKey, body.model, body.system, body.message, body.userParts, nativeSearch, body.searchMaxUses);
     } else if (provider === "openai") {
-      upstream = await callOpenAI(apiKey, body.model, body.system, body.message);
+      upstream = nativeSearch
+        ? await callOpenAIResponses(apiKey, body.model, body.system, body.message)
+        : await callOpenAI(apiKey, body.model, body.system, body.message);
     } else if (provider === "google") {
-      upstream = await callGoogle(apiKey, body.model, body.system, body.message);
+      upstream = await callGoogle(apiKey, body.model, body.system, body.message, nativeSearch);
     }
   } catch (e) {
     return new Response(
@@ -293,6 +340,7 @@ export async function onRequestPost(context) {
       let outputTokens = 0;
       let cacheCreationTokens = 0;
       let cacheReadTokens = 0;
+      let nativeSearchCount = 0;
       let buffer = "";
 
       try {
@@ -318,23 +366,42 @@ export async function onRequestPost(context) {
             try {
               const parsed = JSON.parse(jsonStr);
 
-              // Anthropic usage (cache tokens live on message_start.usage)
+              // Anthropic usage (cache tokens live on message_start.usage).
+              // server_tool_use.web_search_requests is a cumulative count of
+              // native web searches; it appears on message_start and is updated
+              // on message_delta — take the max so we never undercount.
               if (parsed.type === "message_start" && parsed.message?.usage) {
                 const u = parsed.message.usage;
                 inputTokens = u.input_tokens || 0;
                 cacheCreationTokens = u.cache_creation_input_tokens || 0;
                 cacheReadTokens = u.cache_read_input_tokens || 0;
+                if (u.server_tool_use?.web_search_requests) {
+                  nativeSearchCount = Math.max(nativeSearchCount, u.server_tool_use.web_search_requests);
+                }
               }
               if (parsed.type === "message_delta" && parsed.usage) {
                 outputTokens = parsed.usage.output_tokens || 0;
+                if (parsed.usage.server_tool_use?.web_search_requests) {
+                  nativeSearchCount = Math.max(nativeSearchCount, parsed.usage.server_tool_use.web_search_requests);
+                }
               }
 
-              // OpenAI usage (stream_options.include_usage)
-              // prompt_tokens_details.cached_tokens is populated when auto-cache hits
+              // OpenAI Chat Completions usage (stream_options.include_usage).
+              // prompt_tokens_details.cached_tokens is populated when auto-cache hits.
               if (parsed.usage && parsed.usage.prompt_tokens) {
                 inputTokens = parsed.usage.prompt_tokens;
                 outputTokens = parsed.usage.completion_tokens || 0;
                 cacheReadTokens = parsed.usage.prompt_tokens_details?.cached_tokens || 0;
+              }
+
+              // OpenAI Responses API usage (native search). Final usage and the
+              // web_search tool calls arrive together on response.completed.
+              if (parsed.type === "response.completed" && parsed.response?.usage) {
+                inputTokens = parsed.response.usage.input_tokens || 0;
+                outputTokens = parsed.response.usage.output_tokens || 0;
+                cacheReadTokens = parsed.response.usage.input_tokens_details?.cached_tokens || 0;
+                const outputs = parsed.response.output || [];
+                nativeSearchCount = outputs.filter((o) => String(o.type || "").includes("web_search")).length;
               }
 
               // Gemini usage (cachedContentTokenCount populated when explicit cache hits)
@@ -342,6 +409,13 @@ export async function onRequestPost(context) {
                 inputTokens = parsed.usageMetadata.promptTokenCount || 0;
                 outputTokens = parsed.usageMetadata.candidatesTokenCount || 0;
                 cacheReadTokens = parsed.usageMetadata.cachedContentTokenCount || 0;
+              }
+
+              // Gemini native search: groundingMetadata signals a grounded
+              // (search-backed) response. The API does not expose a per-call
+              // search count, so treat a grounded response as one search.
+              if (parsed.candidates?.[0]?.groundingMetadata) {
+                nativeSearchCount = Math.max(nativeSearchCount, 1);
               }
             } catch {
               // Not valid JSON, skip
@@ -355,7 +429,14 @@ export async function onRequestPost(context) {
       // Reconcile pre-debit with actual usage
       const latencyMs = Date.now() - apiCallStart;
       if (inputTokens > 0 || outputTokens > 0) {
-        const actualMicro = calcCostMicro(model, inputTokens, outputTokens);
+        let actualMicro = calcCostMicro(model, inputTokens, outputTokens);
+        // Native search fee: add the per-search cost when this call used each
+        // provider's own web search tool. priorCount=0 keeps Gemini inside its
+        // monthly free tier (pre-launch single-user assumption); anthropic/openai
+        // have no free tier so each search is billed.
+        if (nativeSearch && nativeSearchCount > 0) {
+          actualMicro += nativeSearchCount * calcSearchCostMicro(nativeSearchPricingKey(provider), 0);
+        }
         await reconcileUsage(env.DB, preDebitRowId, inputTokens, outputTokens, actualMicro, estimatedMicro);
       }
 

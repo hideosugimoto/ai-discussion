@@ -1,7 +1,7 @@
 // Tests for pure helpers in the web-search subsystem.
 import { describe, it, expect } from "vitest";
 import { parseQueries, mergeSources } from "../../functions/api/search/query.js";
-import { calcSearchCostMicro, SEARCH_PRICING } from "../models.config.js";
+import { calcSearchCostMicro, SEARCH_PRICING, nativeSearchPricingKey } from "../models.config.js";
 import { buildSearchBlock } from "../prompt.js";
 
 describe("parseQueries", () => {
@@ -66,6 +66,32 @@ describe("calcSearchCostMicro", () => {
   });
   it("returns 0 for an unknown provider", () => {
     expect(calcSearchCostMicro("nope", 0)).toBe(0);
+  });
+  it("bills anthropic/openai native search from the first call (no free tier)", () => {
+    expect(calcSearchCostMicro("anthropic-websearch", 0)).toBe(10_000);
+    expect(calcSearchCostMicro("openai-websearch", 0)).toBe(10_000);
+  });
+  it("keeps gemini native (grounding) free at priorCount 0", () => {
+    // The native billing path always passes priorCount=0, so Gemini grounding
+    // stays inside its free tier — confirms the pre-launch simplification.
+    expect(calcSearchCostMicro(nativeSearchPricingKey("google"), 0)).toBe(0);
+  });
+});
+
+describe("nativeSearchPricingKey", () => {
+  it("maps each AI provider to its native-search pricing key", () => {
+    expect(nativeSearchPricingKey("anthropic")).toBe("anthropic-websearch");
+    expect(nativeSearchPricingKey("openai")).toBe("openai-websearch");
+    expect(nativeSearchPricingKey("google")).toBe("gemini-grounding");
+  });
+  it("returns null for an unknown provider", () => {
+    expect(nativeSearchPricingKey("mistral")).toBeNull();
+    expect(nativeSearchPricingKey(undefined)).toBeNull();
+  });
+  it("returns keys that exist in SEARCH_PRICING", () => {
+    for (const p of ["anthropic", "openai", "google"]) {
+      expect(SEARCH_PRICING[nativeSearchPricingKey(p)]).toBeDefined();
+    }
   });
 });
 

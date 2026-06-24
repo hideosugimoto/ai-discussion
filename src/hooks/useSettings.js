@@ -11,14 +11,21 @@ export default function useSettings() {
   const [profileNotice, setProfileNotice] = useState(false);
   const [constitution, setConstitution] = useState(saved.constitution ?? "");
 
-  // Web search toggle (premium feature). Persisted independently of saveKeys so
-  // the preference survives reloads regardless of key-saving choice. Default OFF.
-  const [searchEnabled, setSearchEnabledState] = useState(() => {
-    try { return localStorage.getItem("search-enabled") === "1"; } catch { return false; }
+  // Web search mode (premium feature): "off" | "shared" | "native". Persisted
+  // independently of saveKeys so the preference survives reloads regardless of
+  // key-saving choice. Default "off". Migrates the legacy boolean flag
+  // (search-enabled === "1") to "shared".
+  const [searchMode, setSearchModeState] = useState(() => {
+    try {
+      const m = localStorage.getItem("search-mode");
+      if (m === "off" || m === "shared" || m === "native") return m;
+      return localStorage.getItem("search-enabled") === "1" ? "shared" : "off";
+    } catch { return "off"; }
   });
-  const setSearchEnabled = (val) => {
-    setSearchEnabledState(!!val);
-    try { localStorage.setItem("search-enabled", val ? "1" : "0"); } catch { /* ignore */ }
+  const setSearchMode = (val) => {
+    const m = (val === "shared" || val === "native") ? val : "off";
+    setSearchModeState(m);
+    try { localStorage.setItem("search-mode", m); } catch { /* ignore */ }
   };
 
   useEffect(() => {
@@ -62,7 +69,7 @@ export default function useSettings() {
 
   return {
     keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
-    searchEnabled, setSearchEnabled,
+    searchMode, setSearchMode,
     updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
     allKeysSet,
   };

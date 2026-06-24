@@ -200,7 +200,7 @@ export function buildSearchBlock(searchContext) {
   return `\n\n【最新のWeb検索結果（参考情報・全${n}件）】\n以下は今回の議題に関する最新のWeb検索結果です。次のルールを厳守し、「具体的」に答えてください。\n【ルール】\n- 数値・日時・固有名詞などの事実（例: 価格・統計・年号・営業時間）は、下記の検索結果に明記がある場合のみ記載する。書かれていない値は推測で補わず「【要確認】」と書く。\n- 出典番号は下記の [1]〜[${n}] のみを使う。番号と内容が一致していることを確認し、結果に存在しない番号・固有名詞・数値を創作しない。\n- 各推薦・主張に確度ラベルを付ける: 【確実】検索結果に明記がある／【候補】名称・概要はあるが詳細は要確認／【推測】検索結果に根拠がない。\n- 検索結果に明示されていない事項（固有名詞・主張・数値など）を【確実】扱いにしたり出典[番号]を付けたりしない。あなた自身の知識から補足する場合は必ず【推測】とし、出典番号は付けない。検索結果に在る情報と、自分の知識による補足を明確に区別すること。\n- 固有名詞（店名・企業名・銘柄・地名・製品・人物など）や具体的な数値は積極的に挙げ、抽象論や「要確認」だけで終わらせない。\n- 推薦する具体名は文章に埋もれさせず、箇条書きで列挙して見やすくする。各項目は「・名称 ［確度ラベル］（あれば営業時間/出典[番号]）」の形にし、そのうえで理由・考察は文章で述べる（議論全体が文章主体でも、推薦リストは箇条書きにしてよい）。\n- 内容を鵜呑みにせず、あなた自身の視点で取捨選択・解釈し、他のAIとは異なる切り口を出してください。\n${lines.join("\n\n")}`;
 }
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext) {
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext, nativeSearch) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -233,8 +233,15 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
 
   const contextText = buildContextText(contextDiscussions);
 
+  // Native search mode: each AI uses its own web search tool instead of the
+  // shared injected evidence block. Give a light instruction (no source list);
+  // the shared search block is suppressed below.
+  const nativeText = nativeSearch
+    ? "\n\n【Web検索】必要に応じてWeb検索ツールで最新情報を調べ、固有名詞・数値は具体名と出典を示してください。検索で裏が取れない事項は【推測】と明示してください。"
+    : "";
+
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
-  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}`;
+  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}${nativeText}`;
 
   const histText = compressHistory(history, summaries, personas, rollingSummary);
   const attachText = buildAttachmentsBlock(attachments);
@@ -252,7 +259,7 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   // prefix and saves ~90% of input cost on it; OpenAI auto-caches matching
   // prefixes too. Keeping the (large) search block in the prefix avoids
   // re-paying for it every round.
-  const searchText = buildSearchBlock(searchContext);
+  const searchText = nativeSearch ? "" : buildSearchBlock(searchContext);
   const userCachePrefix = `【議題】${safeTopic}${attachText}${searchText}`;
   const userVariable = `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   const user = `${userCachePrefix}${userVariable}`;

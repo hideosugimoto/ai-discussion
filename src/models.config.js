@@ -66,9 +66,20 @@ export const SEARCH_PRICING = {
   // correct the moment the provider changes — no code edit needed elsewhere.
   "serper":           { per1k: 1.00,  freeTierPerMonth: 2500 },
   "brave":            { per1k: 5.00,  freeTierPerMonth: 0    },
+  // Native (per-AI) web search fees, used when searchMode === "native".
+  "anthropic-websearch": { per1k: 10.00, freeTierPerMonth: 0 },
+  "openai-websearch":    { per1k: 10.00, freeTierPerMonth: 0 },
 };
 
 export const DEFAULT_SEARCH_PROVIDER = "gemini-grounding";
+
+// Map an AI provider (anthropic/openai/google) to its native-search pricing key.
+export function nativeSearchPricingKey(provider) {
+  if (provider === "anthropic") return "anthropic-websearch";
+  if (provider === "openai")    return "openai-websearch";
+  if (provider === "google")    return "gemini-grounding";
+  return null;
+}
 
 // Cost of a single search in microdollars, given how many searches the user
 // has already made this month. Returns 0 while inside the provider's monthly
