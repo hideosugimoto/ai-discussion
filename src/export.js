@@ -1,4 +1,6 @@
 import { MODELS } from "./constants";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 function sanitize(text) {
   return (text || "")
@@ -75,6 +77,14 @@ function sanitizeHtml(text) {
   return (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Render an AI message (markdown) to sanitized HTML for the export document, so
+// headings/lists/tables/bold match the in-app rendering instead of dumping raw
+// "##" / "**" markers into the file.
+function renderMarkdownHtml(text) {
+  const raw = marked.parse(text || "");
+  return DOMPurify.sanitize(raw);
+}
+
 export function exportToHtml(topic, discussion, summaries, personas) {
   const rounds = discussion.map((round, i) => {
     const intervention = round.userIntervention
@@ -88,7 +98,7 @@ export function exportToHtml(topic, discussion, summaries, personas) {
       const color = AI_COLORS_STATIC[msg.modelId] || "#666";
       const content = msg.error
         ? `<span style="color:#b91c1c">⚠ ${sanitizeHtml(msg.error)}</span>`
-        : sanitizeHtml(msg.text).replace(/\n/g, "<br>");
+        : `<div class="md-body">${renderMarkdownHtml(msg.text)}</div>`;
       const persona = personas?.[msg.modelId];
       const displayName = persona ? `${name}（${sanitizeHtml(persona)}）` : name;
       return `<div style="border-left:3px solid ${color};padding:12px 16px;margin-bottom:12px;background:#fafafa;border-radius:0 8px 8px 0">
@@ -137,6 +147,20 @@ export function exportToHtml(topic, discussion, summaries, personas) {
   body { font-family: -apple-system, 'Noto Sans JP', sans-serif; max-width: 800px; margin: 0 auto; padding: 24px 16px; background: #fff; color: #333; }
   h1 { font-size: 20px; margin-bottom: 4px; }
   .meta { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .md-body > :first-child { margin-top: 0; }
+  .md-body > :last-child { margin-bottom: 0; }
+  .md-body p { margin: 0 0 8px; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 { margin: 12px 0 6px; line-height: 1.35; }
+  .md-body h2 { font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 3px; }
+  .md-body ul, .md-body ol { margin: 4px 0 8px; padding-left: 1.4em; }
+  .md-body li { margin: 2px 0; }
+  .md-body code { font-family: ui-monospace, Menlo, monospace; font-size: .9em; background: #f3f3f3; border-radius: 4px; padding: 1px 5px; }
+  .md-body pre { background: #f6f6f6; border: 1px solid #e5e5e5; border-radius: 6px; padding: 10px; overflow-x: auto; }
+  .md-body pre code { background: none; padding: 0; }
+  .md-body blockquote { margin: 6px 0; padding: 2px 12px; border-left: 3px solid #ddd; color: #666; }
+  .md-body table { border-collapse: collapse; margin: 8px 0; font-size: .95em; }
+  .md-body th, .md-body td { border: 1px solid #ddd; padding: 5px 10px; text-align: left; }
+  .md-body th { background: #f3f3f3; }
   @media print { body { max-width: 100%; } }
 </style>
 </head>

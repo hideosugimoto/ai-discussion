@@ -15,7 +15,7 @@ import useUsage from "./hooks/useUsage";
 import useRoundEstimate from "./hooks/useRoundEstimate";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
-import PlanPicker from "./components/PlanPicker";
+import Onboarding from "./components/Onboarding";
 import HelpHint from "./components/HelpHint";
 import PlanBadge from "./components/PlanBadge";
 import AuthBar from "./components/AuthBar";
@@ -29,6 +29,7 @@ const PersonaPanel = lazy(() => import("./components/PersonaPanel"));
 const ActionPlanView = lazy(() => import("./components/ActionPlanView"));
 const SharedView = lazy(() => import("./components/SharedView"));
 const ShareDialog = lazy(() => import("./components/ShareDialog"));
+const DemoView = lazy(() => import("./components/DemoView"));
 
 export default function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("ai-discussion-theme") || "dark");
@@ -38,6 +39,9 @@ export default function App() {
     const url = new URL(window.location.href);
     return url.searchParams.get("share");
   });
+
+  // Read-only sample-discussion preview ("try before you buy").
+  const [showDemo, setShowDemo] = useState(false);
 
   const exitShareView = () => {
     setShareViewId(null);
@@ -71,7 +75,10 @@ export default function App() {
   const [mode, setMode]         = useState("fast");
   // Adaptive "remaining rounds" estimate (per mode), learned from actual usage.
   const roundEstimate = useRoundEstimate(usage, mode);
-  const [activePanel, setActivePanel] = useState(!keys.claude ? "keys" : null);
+  // Don't auto-open the API-keys panel on first load: showing 3 empty key
+  // fields before any value is shown was the biggest first-impression wall.
+  // New users get the Onboarding card instead (value + login / keys paths).
+  const [activePanel, setActivePanel] = useState(null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
   const [conclusionTarget, setConclusionTarget] = useState("claude");
@@ -328,6 +335,10 @@ export default function App() {
     return <Suspense fallback={null}><SharedView shareId={shareViewId} onExit={exitShareView} /></Suspense>;
   }
 
+  if (showDemo) {
+    return <Suspense fallback={null}><DemoView onExit={() => setShowDemo(false)} onStart={() => setShowDemo(false)} /></Suspense>;
+  }
+
   return (
     <Suspense fallback={null}>
     <div style={{ minHeight:"100vh", background:"var(--bg)", color:"var(--text)", display:"flex", flexDirection:"column", alignItems:"center", padding:"24px 16px 80px" }}>
@@ -402,7 +413,7 @@ export default function App() {
             </div>
           )}
         </div>
-        <div style={{ textAlign:"center", fontSize:11, color:"var(--text3)", marginTop:6, maxWidth:560, marginLeft:"auto", marginRight:"auto" }}>
+        <div className="mode-hint-line" style={{ textAlign:"center", fontSize:11, color:"var(--text3)", marginTop:6, maxWidth:560, marginLeft:"auto", marginRight:"auto" }}>
           {mode === "best"
             ? "🧠 最強：各社の最上位モデルで深く議論（複雑な論点・微妙な判断に強い）。消費は多めで目安 約7議論/月。"
             : "⚡ 高速：軽量モデルで十分な品質。たくさん回せて目安 約25議論/月。じっくり深めたい時だけ「最強」を選んでください。"}
@@ -411,12 +422,15 @@ export default function App() {
 
       <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
 
-        {/* ── APIキー（未設定時は目立つ） ── */}
+        {/* ── 初見オンボーディング（開始できない時＝キー未設定・非課金） ── */}
         {!canStart && !started && (
-          <div style={{ marginBottom:12, padding:"10px 14px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:10, display:"flex", alignItems:"center", gap:8, cursor:"pointer" }} onClick={() => togglePanel("keys")}>
-            <span style={{ color:"var(--warning)", fontSize:13, fontWeight:600 }}>⚠ APIキーを設定してください</span>
-            <span style={{ color:"var(--text3)", fontSize:11 }}>— 3つのAIサービスのAPIキーが必要です（またはログインして有料プランをご利用ください）</span>
-          </div>
+          <Onboarding
+            isLoggedIn={!!auth.user}
+            onLogin={auth.login}
+            onUseKeys={() => togglePanel("keys")}
+            onPickPlan={startCheckout}
+            onTryDemo={() => setShowDemo(true)}
+          />
         )}
 
         {/* ── 過去議論コンテキスト ── */}
@@ -681,10 +695,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Plan selection (Premium / Plus) */}
-        {auth.user && !auth.isPremium && activePanel === "keys" && (
-          <PlanPicker onPick={startCheckout} />
-        )}
+        {/* Plan selection lives in the Onboarding card above (single source). */}
 
         {activePanel === "suggest" && (
           <SuggestedQuestions
