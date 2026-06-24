@@ -136,7 +136,10 @@ async function callAnthropic(apiKey, model, system, message, userParts, nativeSe
     messages: buildAnthropicUserMessages(message, userParts),
   };
   if (nativeSearch) {
-    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses || 2 }];
+    // Default to a single search: each Anthropic web_search injects large
+    // results that are billed as cache_creation at 1.25x, so extra loops are
+    // expensive. One search is enough for the panel; callers can raise maxUses.
+    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses || 1 }];
   }
   return fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -163,6 +166,11 @@ async function callOpenAI(apiKey, model, system, message) {
       max_completion_tokens: 8192,
       stream: true,
       stream_options: { include_usage: true },
+      // Reasoning effort "low": GPT-5.x defaults to "medium", whose hidden
+      // reasoning tokens dominate output cost. "low" keeps meaningful reasoning
+      // (OpenAI recommends it over "none" when search/tool use matters) while
+      // cutting cost. Quality is preserved for short panel turns.
+      reasoning_effort: "low",
       // OpenAI auto-caches matching prompt prefixes (50% input cost reduction)
       messages: [
         { role: "system", content: system },
@@ -186,6 +194,8 @@ async function callOpenAIResponses(apiKey, model, system, message) {
       model,
       stream: true,
       max_output_tokens: 8192,
+      // Same cost lever as the Chat path; "low" still reasons over search results.
+      reasoning: { effort: "low" },
       instructions: system,
       input: message,
       tools: [{ type: "web_search" }],
@@ -197,7 +207,11 @@ async function callGoogle(apiKey, model, system, message, nativeSearch) {
   const body = {
     system_instruction: { parts: [{ text: system }] },
     contents: [{ parts: [{ text: message }] }],
-    generationConfig: { maxOutputTokens: 8192 },
+    // thinkingLevel "low": Gemini 3.5 Flash defaults to "medium" thinking, whose
+    // hidden thought tokens (billed as output) far exceed the visible answer for
+    // short turns. "low" keeps useful reasoning while cutting cost. (Gemini 3.x
+    // uses thinkingLevel, not the 2.x thinkingBudget — setting both errors.)
+    generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingLevel: "low" } },
   };
   if (nativeSearch) {
     body.tools = [{ google_search: {} }];
@@ -411,10 +425,14 @@ export async function onRequestPost(context) {
                 nativeSearchCount = outputs.filter((o) => String(o.type || "").includes("web_search")).length;
               }
 
-              // Gemini usage (cachedContentTokenCount populated when explicit cache hits)
+              // Gemini usage (cachedContentTokenCount populated when explicit cache hits).
+              // thoughtsTokenCount (thinking) is billed by Google at the output
+              // rate but is NOT part of candidatesTokenCount, so it must be added
+              // to outputTokens or the proxy under-charges (these are excluded from
+              // OpenAI/Anthropic here because their output_tokens already include it).
               if (parsed.usageMetadata) {
                 inputTokens = parsed.usageMetadata.promptTokenCount || 0;
-                outputTokens = parsed.usageMetadata.candidatesTokenCount || 0;
+                outputTokens = (parsed.usageMetadata.candidatesTokenCount || 0) + (parsed.usageMetadata.thoughtsTokenCount || 0);
                 cacheReadTokens = parsed.usageMetadata.cachedContentTokenCount || 0;
               }
 
