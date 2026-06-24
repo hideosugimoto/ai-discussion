@@ -64,7 +64,10 @@ export default function App() {
           allKeysSet } = settings;
 
   const [topic, setTopic]       = useState("");
-  const [mode, setMode]         = useState("best");
+  // Default to "fast": good quality at ~1/3 the cost, so casual use doesn't burn
+  // the monthly budget. "best" is an opt-in per session — NOT persisted, so a
+  // reload (or reset/clear) returns to "fast".
+  const [mode, setMode]         = useState("fast");
   const [activePanel, setActivePanel] = useState(!keys.claude ? "keys" : null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
@@ -146,11 +149,19 @@ export default function App() {
 
   const handleResetInputs = () => {
     setTopic("");
+    setMode("fast");
     setDiscussionMode("standard");
     setConclusionTarget("claude");
     setPersonas({ claude:"", chatgpt:"", gemini:"" });
     setContextDiscussions([]);
     setAttachments([]);
+  };
+
+  // Reset (end discussion) also returns the mode to the default "fast", so "best"
+  // is never silently carried into the next discussion.
+  const handleResetAll = () => {
+    handleReset();
+    setMode("fast");
   };
 
   const hasResettableState = !!(
@@ -356,8 +367,11 @@ export default function App() {
         </div>
         <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
           <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
-            {[{id:"best",label:"🧠 最強"},{id:"fast",label:"⚡ 高速"}].map(({id,label}) => (
-              <button key={id} role="radio" aria-checked={mode===id} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"var(--accent)":"transparent", color:mode===id?"#fff":"var(--text2)" }}>{label}</button>
+            {[
+              { id:"best", label:"🧠 最強", title:"各社の最上位モデル（Opus 4.8 / GPT-5.5 / 3.5 Flash）。深い洞察・複雑な論点・微妙なニュアンスに強い。消費が多め（目安 約7議論/月）。" },
+              { id:"fast", label:"⚡ 高速", title:"軽量・高速モデル（Sonnet 4.6 / GPT-5.4 mini / 3.1 Flash-Lite）。日常の議論には十分な品質で、たくさん回せる（目安 約25議論/月）。" },
+            ].map(({id,label,title}) => (
+              <button key={id} role="radio" aria-checked={mode===id} title={title} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"var(--accent)":"transparent", color:mode===id?"#fff":"var(--text2)" }}>{label}</button>
             ))}
           </div>
           <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
@@ -384,6 +398,11 @@ export default function App() {
               ))}
             </div>
           )}
+        </div>
+        <div style={{ textAlign:"center", fontSize:11, color:"var(--text3)", marginTop:6, maxWidth:560, marginLeft:"auto", marginRight:"auto" }}>
+          {mode === "best"
+            ? "🧠 最強：各社の最上位モデルで深く議論（複雑な論点・微妙な判断に強い）。消費は多めで目安 約7議論/月。"
+            : "⚡ 高速：軽量モデルで十分な品質。たくさん回せて目安 約25議論/月。じっくり深めたい時だけ「最強」を選んでください。"}
         </div>
       </div>
 
@@ -708,7 +727,7 @@ export default function App() {
                   </button>
                 )}
               </>)}
-              <button onClick={handleReset} title="この議論を終了して新しい議題を入力する画面に戻る（履歴は自動保存済み）" style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
+              <button onClick={handleResetAll} title="この議論を終了して新しい議題を入力する画面に戻る（履歴は自動保存済み・モードは高速に戻ります）" style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"4px 10px", color:"var(--text3)", cursor:"pointer", fontSize:12 }}>リセット</button>
             </div>
           </div>
         )}
