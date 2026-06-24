@@ -196,7 +196,7 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, searchEnabled, cloudUpsertFn }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, searchMode, cloudUpsertFn }) {
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -304,15 +304,26 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
       : MODELS;
 
-    // Architecture B: run web search (multiple facet queries, merged) and inject
-    // the same evidence into every model. Premium-only; skipped on conclusion
-    // rounds. Cost optimization: only search fresh on Round 1 and when the user
-    // intervenes (the focus shifts); other rounds REUSE the last results so we
-    // don't re-pay grounding calls + injection every round. The reused block
-    // stays stable, so it also stays in the cacheable prefix (see buildPrompt).
+    // Search modes (premium-only, skipped on conclusion rounds):
+    //  - "shared":  Architecture B — one server-side search, same evidence
+    //    injected into all three models.
+    //  - "native":  each AI uses its own web search tool (different sources →
+    //    richer debate). No shared injection.
+    // Cost optimization (both modes): search only on Round 1 and after a user
+    // intervention (focus shifts); other rounds carry context forward.
+    const canSearch = isPremium && authToken && !isConclusionRound;
+    const shouldSearchFreshRound = roundNum === 1 || !!(userIntervention && userIntervention.trim());
+    // Native search runs per-AI this round only when fresh search is warranted;
+    // reuse rounds rely on conversation history instead of new tool calls.
+    const useNativeThisRound = canSearch && searchMode === "native" && shouldSearchFreshRound;
+
+    // Architecture B shared search. Cost optimization: only search fresh on
+    // Round 1 and when the user intervenes; other rounds REUSE the last results
+    // so we don't re-pay grounding calls + injection every round. The reused
+    // block stays stable, so it also stays in the cacheable prefix.
     let searchContext = null;
-    if (searchEnabled && isPremium && authToken && !isConclusionRound) {
-      const shouldSearchFresh = roundNum === 1 || !!(userIntervention && userIntervention.trim());
+    if (searchMode === "shared" && canSearch) {
+      const shouldSearchFresh = shouldSearchFreshRound;
       if (shouldSearchFresh) {
         try {
           const queries = await generateSearchQueries(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
@@ -353,7 +364,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext);
+        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext, useNativeThisRound);
         const tag = models[model.id].tag;
         // Pass userParts to Claude when the cacheable prefix is large enough to
         // benefit from cache_control: when there are attachments OR injected
@@ -382,9 +393,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
           if (isPremium && authToken) {
             // Premium: server-side proxy (no API keys needed)
             const sid = discussionIdRef.current;
-            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts);
-            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
-            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum);
+            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts, useNativeThisRound);
+            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound);
+            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound);
           } else {
             // Free: direct API calls (user's own keys)
             if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts);
@@ -433,7 +444,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         setDiscussionMode("standard");
       }
     }
-  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, searchEnabled, syncToCloud]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, searchMode, syncToCloud]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;

@@ -269,4 +269,42 @@ describe("buildPrompt", () => {
       expect(userVariable).toContain("もっと詳しく");
     });
   });
+
+  // ── native search mode (searchMode === "native") ───────────
+  describe("native search mode", () => {
+    const searchContext = { results: [{ title: "T1", url: "http://example.com/1", snippet: "事実A" }] };
+
+    it("adds the native search instruction to sys when nativeSearch is true", () => {
+      const { sys } = buildPrompt(
+        "claude", "議題", "", [], 1, "", "standard", null, "", [], [], null, null, null, true
+      );
+      expect(sys).toContain("【Web検索】");
+      expect(sys).toContain("【推測】");
+    });
+
+    it("omits the native instruction when nativeSearch is falsy (backward compatible)", () => {
+      const { sys: off } = buildPrompt("claude", "議題", "", [], 1, "");
+      const { sys: explicitFalse } = buildPrompt(
+        "claude", "議題", "", [], 1, "", "standard", null, "", [], [], null, null, null, false
+      );
+      expect(off).not.toContain("【Web検索】");
+      expect(explicitFalse).not.toContain("【Web検索】");
+    });
+
+    it("suppresses the shared search block in native mode even if searchContext is passed", () => {
+      const { user } = buildPrompt(
+        "claude", "議題", "", [], 1, "", "standard", null, "", [], [], null, null, searchContext, true
+      );
+      expect(user).not.toContain("【最新のWeb検索結果");
+      expect(user).not.toContain("事実A");
+    });
+
+    it("still injects the shared search block when not native", () => {
+      const { user } = buildPrompt(
+        "claude", "議題", "", [], 1, "", "standard", null, "", [], [], null, null, searchContext, false
+      );
+      expect(user).toContain("【最新のWeb検索結果");
+      expect(user).toContain("事実A");
+    });
+  });
 });

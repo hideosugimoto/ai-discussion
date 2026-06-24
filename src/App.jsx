@@ -59,7 +59,7 @@ export default function App() {
 
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
-          searchEnabled, setSearchEnabled,
+          searchMode, setSearchMode,
           updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
           allKeysSet } = settings;
 
@@ -89,7 +89,7 @@ export default function App() {
     conclusionTarget, personas, constitution, contextDiscussions,
     attachments, setAttachments, summaryMode,
     authToken: auth.token, isPremium: auth.isPremium,
-    searchEnabled: auth.isPremium && searchEnabled,
+    searchMode: auth.isPremium ? searchMode : "off",
     cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
   });
   const { discussion, summaries, detailedAnalyses,
@@ -366,15 +366,23 @@ export default function App() {
             ))}
           </div>
           {auth.isPremium && (
-            <button
-              onClick={() => setSearchEnabled(!searchEnabled)}
-              role="switch"
-              aria-checked={searchEnabled}
-              aria-label={`Web検索 ${searchEnabled ? "ON" : "OFF"}に切り替え`}
-              title={searchEnabled ? "最新情報をWeb検索して3AIに渡します（クリックでOFF）" : "ONにすると議題に関する最新情報をWeb検索し、3AIに同じ事実を渡して議論させます"}
-              style={{ padding:"6px 12px", border:`1px solid ${searchEnabled?"var(--accent)":"var(--border)"}`, borderRadius:8, cursor:"pointer", fontSize:11, fontWeight:600, background:searchEnabled?"var(--accent)":"transparent", color:searchEnabled?"#fff":"var(--text2)", display:"flex", alignItems:"center", gap:4 }}>
-              <span>{searchEnabled ? "🔎 Web検索ON" : "🔎 Web検索OFF"}</span>
-            </button>
+            <div role="radiogroup" aria-label="Web検索モード" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
+              {[
+                { id:"off",    label:"🔎 検索なし", title:"Web検索を使いません" },
+                { id:"shared", label:"共通",        title:"議題に関する最新情報を1回検索し、3AIに同じ事実を渡して議論させます" },
+                { id:"native", label:"各AI個別",    title:"各AIが自分のWeb検索ツールで個別に調べ、別ソースを引いて議論を発達させます" },
+              ].map(({ id, label, title }) => (
+                <button
+                  key={id}
+                  role="radio"
+                  aria-checked={searchMode===id}
+                  title={title}
+                  onClick={() => setSearchMode(id)}
+                  style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:searchMode===id?"var(--accent)":"transparent", color:searchMode===id?"#fff":"var(--text2)" }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
