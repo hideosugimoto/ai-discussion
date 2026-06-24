@@ -8,8 +8,7 @@ import { saveDiscussion } from "../history";
 import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
 import { shouldSummarize } from "../lib/fileParser";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
-import summaryPromptText from "../prompts/summary.txt?raw";
-import rollingSummaryPromptText from "../prompts/rolling-summary.txt?raw";
+import combinedSummaryPromptText from "../prompts/combined-summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 
 const ATTACHMENT_SUMMARY_SYSTEM =
@@ -89,40 +88,11 @@ async function generateSearchQueries(apiKey, authToken, isPremium, topic, profil
   }
 }
 
-async function generateSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, sessionId) {
-  const roundText = messages
-    .map((m) => {
-      const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
-      const p = (personas?.[m.modelId] || "").trim();
-      return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
-    })
-    .join("\n\n");
-
-  const userMsg = `【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
-
-  const tryOnce = async () => {
-    const text = await callGPTMini(apiKey, authToken, isPremium, summaryPromptText, userMsg, sessionId, roundNum);
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    return JSON.parse(cleaned);
-  };
-
-  let parsed;
-  try {
-    parsed = await tryOnce();
-  } catch {
-    parsed = await tryOnce();
-  }
-  if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
-  return {
-    agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
-    disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
-    unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
-    positionChanges: Array.isArray(parsed.positionChanges) ? parsed.positionChanges : [],
-    stances: parsed.stances && typeof parsed.stances === "object" ? parsed.stances : {},
-  };
-}
-
-async function generateRollingSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, prevRolling, sessionId) {
+// One gpt-5.4-mini call produces BOTH the per-round summary and the updated
+// cumulative (rolling) summary, halving the summary call count. Same round text
+// and prev-rolling context the two separate calls used, so quality is preserved.
+// Returns { round, rolling } with the same shapes the callers already expect.
+async function generateCombinedSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, prevRolling, sessionId) {
   const roundText = messages
     .map((m) => {
       const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
@@ -138,15 +108,38 @@ async function generateRollingSummary(apiKey, authToken, isPremium, messages, to
 
   const userMsg = `${prevText}【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
-  const text = await callGPTMini(apiKey, authToken, isPremium, rollingSummaryPromptText, userMsg, sessionId, roundNum);
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  const parsed = JSON.parse(cleaned);
-  if (!parsed || typeof parsed !== "object") throw new Error("Invalid rolling summary format");
+  const tryOnce = async () => {
+    const text = await callGPTMini(apiKey, authToken, isPremium, combinedSummaryPromptText, userMsg, sessionId, roundNum);
+    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return JSON.parse(cleaned);
+  };
+
+  let parsed;
+  try {
+    parsed = await tryOnce();
+  } catch {
+    parsed = await tryOnce();
+  }
+  if (!parsed || typeof parsed !== "object") throw new Error("Invalid summary format");
+
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const obj = (v) => (v && typeof v === "object" ? v : {});
+  const r = obj(parsed.round);
+  const ro = obj(parsed.rolling);
   return {
-    agreements: Array.isArray(parsed.agreements) ? parsed.agreements : [],
-    disagreements: Array.isArray(parsed.disagreements) ? parsed.disagreements : [],
-    unresolved: Array.isArray(parsed.unresolved) ? parsed.unresolved : [],
-    stances: parsed.stances && typeof parsed.stances === "object" ? parsed.stances : {},
+    round: {
+      agreements: arr(r.agreements),
+      disagreements: arr(r.disagreements),
+      unresolved: arr(r.unresolved),
+      positionChanges: arr(r.positionChanges),
+      stances: obj(r.stances),
+    },
+    rolling: {
+      agreements: arr(ro.agreements),
+      disagreements: arr(ro.disagreements),
+      unresolved: arr(ro.unresolved),
+      stances: obj(ro.stances),
+    },
   };
 }
 
@@ -261,22 +254,21 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     if (!keys.chatgpt && !isPremium) return;
     setSummaries((s) => [...s, null]);
     try {
-      const summary = await generateSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, sessionId);
+      // One call returns both the round summary and the updated rolling summary.
+      const { round, rolling } = await generateCombinedSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId);
       setSummaries((s) => {
         const next = [...s];
-        next[roundNum - 1] = summary;
+        next[roundNum - 1] = round;
         return next;
       });
-      // Update rolling summary (cumulative) - non-blocking, falls back to per-round on failure
-      generateRollingSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId)
-        .then((rolling) => setRollingSummary(rolling))
-        .catch(() => setRollingSummary((prev) => prev ?? { error: true }));
+      setRollingSummary(rolling);
     } catch {
       setSummaries((s) => {
         const next = [...s];
         next[roundNum - 1] = { agreements:[], disagreements:[], unresolved:[], positionChanges:[], error:true };
         return next;
       });
+      setRollingSummary((prev) => prev ?? { error: true });
     }
   }, [keys.chatgpt, authToken, isPremium, topic, personas]);
 
