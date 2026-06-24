@@ -3,7 +3,7 @@ import HelpHint from "./HelpHint";
 // Premium / Plus active subscription badge with credit purchase + plan
 // management buttons. Rendered at the top of the page when user is logged
 // in and has a paid plan.
-export default function PlanBadge({ plan, usage, token, onCreditPurchase }) {
+export default function PlanBadge({ plan, usage, estimate, token, onCreditPurchase }) {
   const handleManagePlan = async () => {
     try {
       const res = await fetch("/api/billing/portal", {
@@ -25,6 +25,14 @@ export default function PlanBadge({ plan, usage, token, onCreditPurchase }) {
         {usage && (
           <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}>
             使用量: {(usage.usage_percent ?? 0).toFixed(0)}%
+          </span>
+        )}
+        {usage && estimate && (
+          <span
+            title="あなたの最近の消費から算出した目安です。1ラウンドで1減ります。検索やラウンドの重さで変動し、使うほど精度が上がります。"
+            style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}
+          >
+            残り目安 ⚡{estimate.fastRounds} / 🧠{estimate.bestRounds} ラウンド
           </span>
         )}
         <button

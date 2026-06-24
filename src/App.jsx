@@ -12,6 +12,7 @@ import useCryptoBackup from "./hooks/useCryptoBackup";
 import useDiscussion from "./hooks/useDiscussion";
 import useAuth from "./hooks/useAuth";
 import useUsage from "./hooks/useUsage";
+import useRoundEstimate from "./hooks/useRoundEstimate";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
 import PlanPicker from "./components/PlanPicker";
@@ -68,6 +69,8 @@ export default function App() {
   // the monthly budget. "best" is an opt-in per session — NOT persisted, so a
   // reload (or reset/clear) returns to "fast".
   const [mode, setMode]         = useState("fast");
+  // Adaptive "remaining rounds" estimate (per mode), learned from actual usage.
+  const roundEstimate = useRoundEstimate(usage, mode);
   const [activePanel, setActivePanel] = useState(!keys.claude ? "keys" : null);
   const togglePanel = (id) => setActivePanel((p) => p === id ? null : id);
   const [discussionMode, setDiscussionMode] = useState("standard");
@@ -346,7 +349,7 @@ export default function App() {
         </div>
       )}
       {auth.isPremium && !auth.planLoading && (
-        <PlanBadge plan={auth.plan} usage={usage} token={auth.token} onCreditPurchase={startCreditPurchase} />
+        <PlanBadge plan={auth.plan} usage={usage} estimate={roundEstimate} token={auth.token} onCreditPurchase={startCreditPurchase} />
       )}
 
       {/* Header */}
