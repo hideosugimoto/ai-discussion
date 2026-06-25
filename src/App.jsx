@@ -66,8 +66,14 @@ export default function App() {
   const settings = useSettings();
   const { keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
           searchMode, setSearchMode,
+          preferOwnKeys, setPreferOwnKeys,
           updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
           allKeysSet } = settings;
+
+  // Premium users with all three keys set can opt to spend their own API keys
+  // instead of the plan budget. Only effective when keys are complete, so the
+  // direct-call path never fails on a missing key.
+  const useOwnKeys = auth.isPremium && preferOwnKeys && allKeysSet;
 
   const [topic, setTopic]       = useState("");
   // Default to "fast": good quality at ~1/3 the cost, so casual use doesn't burn
@@ -102,7 +108,7 @@ export default function App() {
     keys, topic, profile, mode, discussionMode, setDiscussionMode,
     conclusionTarget, personas, constitution, contextDiscussions,
     attachments, setAttachments, summaryMode,
-    authToken: auth.token, isPremium: auth.isPremium,
+    authToken: auth.token, isPremium: auth.isPremium, useOwnKeys,
     searchMode: auth.isPremium ? searchMode : "off",
     cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
   });
@@ -366,7 +372,7 @@ export default function App() {
         </div>
       )}
       {auth.isPremium && !auth.planLoading && (
-        <PlanBadge plan={auth.plan} usage={usage} estimate={roundEstimate} token={auth.token} onCreditPurchase={startCreditPurchase} />
+        <PlanBadge plan={auth.plan} usage={usage} estimate={roundEstimate} token={auth.token} onCreditPurchase={startCreditPurchase} usingOwnKeys={useOwnKeys} />
       )}
 
       {/* Header */}
@@ -400,7 +406,7 @@ export default function App() {
             ))}
           </div>
           {auth.isPremium && (
-            <div role="radiogroup" aria-label="Web検索モード" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
+            <div role="radiogroup" aria-label="Web検索モード" title={useOwnKeys ? "「自分のキーを優先」がON中はWeb検索は使えません（検索は運営側機能のため）" : undefined} style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden", opacity:useOwnKeys?0.45:1 }}>
               {[
                 { id:"off",    label:"🔎 検索なし", title:"Web検索を使いません" },
                 { id:"shared", label:"共通",        title:"議題に関する最新情報を1回検索し、3AIに同じ事実を渡して議論させます" },
@@ -410,9 +416,10 @@ export default function App() {
                   key={id}
                   role="radio"
                   aria-checked={searchMode===id}
-                  title={title}
+                  title={useOwnKeys ? "自分のキー使用中はWeb検索は無効です" : title}
+                  disabled={useOwnKeys}
                   onClick={() => setSearchMode(id)}
-                  style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:searchMode===id?"var(--accent)":"transparent", color:searchMode===id?"#fff":"var(--text2)" }}>
+                  style={{ padding:"6px 12px", border:"none", cursor:useOwnKeys?"not-allowed":"pointer", fontSize:11, fontWeight:600, background:searchMode===id?"var(--accent)":"transparent", color:searchMode===id?"#fff":"var(--text2)" }}>
                   {label}
                 </button>
               ))}
@@ -620,6 +627,36 @@ export default function App() {
               <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
                 ※ 運営者サーバーには一切送信されません。上部の「💾 保存」ボタンでブラウザ保存のON/OFFを切り替えられます。
               </div>
+
+              {/* Premium-only: spend own keys instead of the plan budget */}
+              {auth.isPremium && (
+                <div style={{ marginTop:4, padding:"12px 14px", background:"var(--bg)", border:`1px solid ${useOwnKeys ? "var(--success)" : "var(--border)"}`, borderRadius:8 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}>
+                    <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>🔑 自分のキーを優先</span>
+                    <button
+                      onClick={() => setPreferOwnKeys(!preferOwnKeys)}
+                      role="switch"
+                      aria-checked={preferOwnKeys}
+                      aria-label="自分のキーを優先"
+                      style={{ padding:"5px 14px", border:`1px solid ${preferOwnKeys ? "var(--success)" : "var(--border)"}`, borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:preferOwnKeys?"var(--success)":"transparent", color:preferOwnKeys?"#fff":"var(--text2)", whiteSpace:"nowrap" }}>
+                      {preferOwnKeys ? "ON" : "OFF"}
+                    </button>
+                  </div>
+                  <div style={{ fontSize:11, color:"var(--text2)", lineHeight:1.7, marginTop:8 }}>
+                    ONにすると、プレミアム加入中でも<b style={{ color:"var(--text)" }}>自分のAPIキーで実行</b>し、<b style={{ color:"var(--text)" }}>プランの月間枠を消費しません</b>。3つすべてのキーが必要です。Web検索は運営側機能のため、ON中は無効になります。
+                  </div>
+                  {preferOwnKeys && !allKeysSet && (
+                    <div style={{ fontSize:11, color:"var(--warning)", marginTop:6 }}>
+                      ⚠ キーが未設定の項目があるため、現在はプラン枠で実行されます。3つすべて設定すると自分のキーに切り替わります。
+                    </div>
+                  )}
+                  {useOwnKeys && (
+                    <div style={{ fontSize:11, color:"var(--success)", marginTop:6 }}>
+                      ✓ 現在「自分のキー」で実行中（プラン枠は消費しません）
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -842,7 +879,7 @@ export default function App() {
       </div>
 
       {/* 使用量ピル: 上部のコスト表示を過ぎてスクロールした有料ユーザーに表示 */}
-      {auth.isPremium && !auth.planLoading && usage && scrolledPastTop && (
+      {auth.isPremium && !auth.planLoading && usage && !useOwnKeys && scrolledPastTop && (
         <UsagePill usage={usage} estimate={roundEstimate} onClick={scrollToTop} />
       )}
 

@@ -3,7 +3,7 @@ import HelpHint from "./HelpHint";
 // Premium / Plus active subscription badge with credit purchase + plan
 // management buttons. Rendered at the top of the page when user is logged
 // in and has a paid plan.
-export default function PlanBadge({ plan, usage, estimate, token, onCreditPurchase }) {
+export default function PlanBadge({ plan, usage, estimate, token, onCreditPurchase, usingOwnKeys }) {
   const handleManagePlan = async () => {
     try {
       const res = await fetch("/api/billing/portal", {
@@ -22,12 +22,16 @@ export default function PlanBadge({ plan, usage, estimate, token, onCreditPurcha
     <>
       <div style={{ width:"100%", maxWidth:900, marginBottom:8, padding:"8px 14px", background:"var(--success-bg, rgba(34,197,94,0.1))", border:"1px solid var(--success, #22c55e)", borderRadius:8, fontSize:12, color:"var(--success, #22c55e)", display:"flex", justifyContent:"center", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         <span style={{ fontWeight:600 }}>{plan === "plus" ? "Plus Plan" : "Premium Plan"}</span>
-        {usage && (
+        {usingOwnKeys ? (
+          <span title="『自分のキーを優先』がON。自分のAPIキーで実行中で、プランの月間枠は消費しません。" style={{ fontFamily:"monospace", fontSize:11, color:"var(--success)" }}>
+            🔑 自分のキー使用中・枠は消費しません
+          </span>
+        ) : usage && (
           <span style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}>
             使用量: {(usage.usage_percent ?? 0).toFixed(0)}%
           </span>
         )}
-        {usage && estimate && (
+        {!usingOwnKeys && usage && estimate && (
           <span
             title="あなたの最近の消費から算出した目安です。1ラウンドで1減ります。検索やラウンドの重さで変動し、使うほど精度が上がります。"
             style={{ fontFamily:"monospace", fontSize:11, color:"var(--text2)" }}
