@@ -512,7 +512,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   };
 
   return {
-    discussion, summaries, detailedAnalyses,
+    discussion, summaries, detailedAnalyses, rollingSummary,
     running, started, intervention, setIntervention, showIntervention,
     sidePanel, setSidePanel,
     actionPlan, actionPlanLoading,
