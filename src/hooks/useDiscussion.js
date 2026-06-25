@@ -18,8 +18,8 @@ function buildAttachmentSummaryUser(name, text) {
   return `ファイル名: ${name}\n以下の内容を、議論で参照しやすいよう 600〜800字程度で要約してください。重要な数値・固有名詞・主張は省略せず保持してください。元の文書の意図と論点を残してください。\n\n${text}`;
 }
 
-async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, turnNumber) {
-  if (isPremium && authToken) {
+async function callGPTMini(apiKey, authToken, viaProxy, sys, user, sessionId, turnNumber) {
+  if (viaProxy && authToken) {
     return await callProxyChatGPT(authToken, SUMMARY_MODEL, sys, user, () => {}, undefined, sessionId, turnNumber);
   }
   return await callChatGPT(apiKey, SUMMARY_MODEL, sys, user, () => {});
@@ -29,7 +29,7 @@ async function callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, t
 // were not already summarised. Returns the same reference (===) when nothing
 // changed so callers can avoid extra renders. Falls back to the original
 // attachment on individual summary failures — degraded but never blocking.
-async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, authToken, isPremium, sessionId }) {
+async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, authToken, viaProxy, sessionId }) {
   if (!attachments || attachments.length === 0) return attachments;
   if (!shouldSummarize(summaryMode, attachments)) return attachments;
   if (!authToken && !apiKey) return attachments; // can't reach the summary model
@@ -43,7 +43,7 @@ async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, aut
     try {
       const sys = ATTACHMENT_SUMMARY_SYSTEM;
       const user = buildAttachmentSummaryUser(a.name, a.text);
-      const summary = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
+      const summary = await callGPTMini(apiKey, authToken, viaProxy, sys, user, sessionId, 0);
       const cleaned = (summary || "").trim();
       if (!cleaned) return a;
       changed = true;
@@ -62,14 +62,14 @@ async function ensureAttachmentSummaries({ attachments, summaryMode, apiKey, aut
 // Each query is tagged place/general so the backend routes place queries
 // (restaurants/spots/lodging) to Maps grounding. Returns [{q,type}]; falls back
 // to a single general raw-topic query on any failure.
-async function generateSearchQueries(apiKey, authToken, isPremium, topic, profile, intervention, sessionId) {
+async function generateSearchQueries(apiKey, authToken, viaProxy, topic, profile, intervention, sessionId) {
   const fallback = (topic || "").trim() ? [{ q: topic.slice(0, 200), type: "general" }] : [];
   const sys = "あなたは検索クエリ作成アシスタントです。与えられた議題で最新情報が必要な観点を最大3つに分け、それぞれの簡潔で具体的な日本語検索クエリを作ります。各クエリの先頭に種別を付けます: 店・施設・観光地・宿・場所に関するものは「place:」、それ以外（事実・統計・トレンド・一般情報）は「general:」。観点が1つで十分なら1つだけでよい。出力は1行に1クエリ、最大3行。形式は「place: 〇〇」または「general: 〇〇」。説明・番号・引用符・前置きは不要。";
   const user = `議題: ${(topic || "").slice(0, 500)}`
     + (profile ? `\n質問者の背景: ${profile.slice(0, 300)}` : "")
     + (intervention ? `\n直近の論点（今回はこの観点を優先）: ${intervention.slice(0, 300)}` : "");
   try {
-    const raw = await callGPTMini(apiKey, authToken, isPremium, sys, user, sessionId, 0);
+    const raw = await callGPTMini(apiKey, authToken, viaProxy, sys, user, sessionId, 0);
     const queries = (raw || "")
       .split("\n")
       .map((line) => line.replace(/^[\s\d.、)）-]+/, "").trim())
@@ -92,7 +92,7 @@ async function generateSearchQueries(apiKey, authToken, isPremium, topic, profil
 // cumulative (rolling) summary, halving the summary call count. Same round text
 // and prev-rolling context the two separate calls used, so quality is preserved.
 // Returns { round, rolling } with the same shapes the callers already expect.
-async function generateCombinedSummary(apiKey, authToken, isPremium, messages, topic, roundNum, personas, prevRolling, sessionId) {
+async function generateCombinedSummary(apiKey, authToken, viaProxy, messages, topic, roundNum, personas, prevRolling, sessionId) {
   const roundText = messages
     .map((m) => {
       const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
@@ -109,7 +109,7 @@ async function generateCombinedSummary(apiKey, authToken, isPremium, messages, t
   const userMsg = `${prevText}【議題】${topic}\n【Round ${roundNum}の発言】\n${roundText}\n\nJSON形式で出力してください。`;
 
   const tryOnce = async () => {
-    const text = await callGPTMini(apiKey, authToken, isPremium, combinedSummaryPromptText, userMsg, sessionId, roundNum);
+    const text = await callGPTMini(apiKey, authToken, viaProxy, combinedSummaryPromptText, userMsg, sessionId, roundNum);
     const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     return JSON.parse(cleaned);
   };
@@ -143,7 +143,7 @@ async function generateCombinedSummary(apiKey, authToken, isPremium, messages, t
   };
 }
 
-async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds, topic, personas, sessionId) {
+async function generateDetailedAnalysis(apiKey, authToken, viaProxy, allRounds, topic, personas, sessionId) {
   const allText = allRounds
     .map((round, i) => {
       const msgs = round.messages
@@ -159,7 +159,7 @@ async function generateDetailedAnalysis(apiKey, authToken, isPremium, allRounds,
 
   const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
 
-  const text = await callGPTMini(apiKey, authToken, isPremium, detailedPromptText, userMsg, sessionId, allRounds.length);
+  const text = await callGPTMini(apiKey, authToken, viaProxy, detailedPromptText, userMsg, sessionId, allRounds.length);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
   if (!parsed || typeof parsed !== "object") throw new Error("Invalid analysis format");
@@ -189,7 +189,12 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
   };
 }
 
-export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, searchMode, cloudUpsertFn }) {
+export default function useDiscussion({ keys, topic, profile, mode, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, attachments, setAttachments, summaryMode, authToken, isPremium, useOwnKeys, searchMode, cloudUpsertFn }) {
+  // When a premium user opts to use their own keys, route all AI/summary/search
+  // calls through the direct API path (their keys) instead of the plan proxy, so
+  // nothing is charged to the monthly plan budget. `viaProxy` is the single
+  // decision used everywhere a request is dispatched.
+  const viaProxy = isPremium && !!authToken && !useOwnKeys;
   const [discussion, setDiscussion] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [detailedAnalyses, setDetailedAnalyses] = useState([]);
@@ -255,7 +260,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setSummaries((s) => [...s, null]);
     try {
       // One call returns both the round summary and the updated rolling summary.
-      const { round, rolling } = await generateCombinedSummary(keys.chatgpt, authToken, isPremium, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId);
+      const { round, rolling } = await generateCombinedSummary(keys.chatgpt, authToken, viaProxy, roundMessages, topic, roundNum, personas, rollingSummaryRef.current, sessionId);
       setSummaries((s) => {
         const next = [...s];
         next[roundNum - 1] = round;
@@ -270,19 +275,19 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       });
       setRollingSummary((prev) => prev ?? { error: true });
     }
-  }, [keys.chatgpt, authToken, isPremium, topic, personas]);
+  }, [keys.chatgpt, authToken, isPremium, useOwnKeys, topic, personas]);
 
   const runDetailedAnalysis = useCallback(async (roundIdx) => {
     if ((!keys.chatgpt && !isPremium) || detailedAnalyses[roundIdx]) return;
     setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = null; return next; });
     try {
       const roundsUpTo = discussion.slice(0, roundIdx + 1);
-      const analysis = await generateDetailedAnalysis(keys.chatgpt, authToken, isPremium, roundsUpTo, topic, personas, discussionIdRef.current);
+      const analysis = await generateDetailedAnalysis(keys.chatgpt, authToken, viaProxy, roundsUpTo, topic, personas, discussionIdRef.current);
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = analysis; return next; });
     } catch {
       setDetailedAnalyses((s) => { const next = [...s]; next[roundIdx] = { themes: [], consensus: [], unresolved: [], error: true }; return next; });
     }
-  }, [keys.chatgpt, authToken, isPremium, topic, discussion, detailedAnalyses]);
+  }, [keys.chatgpt, authToken, isPremium, useOwnKeys, topic, discussion, detailedAnalyses]);
 
   const runRound = useCallback(async (currentHistory, roundNum, userIntervention) => {
     const controller = new AbortController();
@@ -303,7 +308,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     //    richer debate). No shared injection.
     // Cost optimization (both modes): search only on Round 1 and after a user
     // intervention (focus shifts); other rounds carry context forward.
-    const canSearch = isPremium && authToken && !isConclusionRound;
+    // Web search runs only through the plan proxy (operator grounding); there is
+    // no own-key search path, so it is disabled when using own keys.
+    const canSearch = viaProxy && !isConclusionRound;
     const shouldSearchFreshRound = roundNum === 1 || !!(userIntervention && userIntervention.trim());
     // Native search runs per-AI this round only when fresh search is warranted;
     // reuse rounds rely on conversation history instead of new tool calls.
@@ -318,7 +325,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       const shouldSearchFresh = shouldSearchFreshRound;
       if (shouldSearchFresh) {
         try {
-          const queries = await generateSearchQueries(keys.chatgpt, authToken, isPremium, topic, profile, userIntervention, discussionIdRef.current);
+          const queries = await generateSearchQueries(keys.chatgpt, authToken, viaProxy, topic, profile, userIntervention, discussionIdRef.current);
           if (queries.length && !controller.signal.aborted) {
             searchContext = await callProxySearch(authToken, queries, controller.signal, discussionIdRef.current);
           }
@@ -347,7 +354,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       summaryMode: summaryModeRef.current,
       apiKey: keys.chatgpt,
       authToken,
-      isPremium,
+      viaProxy,
       sessionId: discussionIdRef.current,
     });
     if (effectiveAttachments !== attachmentsRef.current && setAttachmentsRef.current) {
@@ -382,7 +389,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         try {
           let text = "";
           const sig = controller.signal;
-          if (isPremium && authToken) {
+          if (viaProxy) {
             // Premium: server-side proxy (no API keys needed)
             const sid = discussionIdRef.current;
             if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts, useNativeThisRound);
@@ -436,7 +443,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         setDiscussionMode("standard");
       }
     }
-  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, searchMode, syncToCloud]);
+  }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, useOwnKeys, searchMode, syncToCloud]);
 
   const handleStart = async () => {
     if (!topic.trim() || running) return;
@@ -474,7 +481,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setActionPlanLoading(true);
     try {
       const userMsg = buildActionPlanPrompt(topic, discussion, summaries);
-      const raw = await callGPTMini(keys.chatgpt, authToken, isPremium, actionPlanPromptText, userMsg, discussionIdRef.current, discussion.length);
+      const raw = await callGPTMini(keys.chatgpt, authToken, viaProxy, actionPlanPromptText, userMsg, discussionIdRef.current, discussion.length);
       setActionPlan(parseActionPlan(raw));
     } catch {
       setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });

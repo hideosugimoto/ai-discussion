@@ -28,6 +28,18 @@ export default function useSettings() {
     try { localStorage.setItem("search-mode", m); } catch { /* ignore */ }
   };
 
+  // Premium users can opt to use their OWN API keys instead of the plan's
+  // server-side proxy, so the discussion doesn't consume their monthly plan
+  // budget. Only takes effect when all three keys are set (see App.jsx).
+  // Persisted independently so the preference survives reloads.
+  const [preferOwnKeys, setPreferOwnKeysState] = useState(() => {
+    try { return localStorage.getItem("prefer-own-keys") === "1"; } catch { return false; }
+  });
+  const setPreferOwnKeys = (val) => {
+    setPreferOwnKeysState(!!val);
+    try { localStorage.setItem("prefer-own-keys", val ? "1" : "0"); } catch { /* ignore */ }
+  };
+
   useEffect(() => {
     if (profile.trim() && profileUpdatedAt && !sessionStorage.getItem("profile-notice-dismissed")) {
       const days = Math.floor((Date.now() - new Date(profileUpdatedAt)) / (1000 * 60 * 60 * 24));
@@ -70,6 +82,7 @@ export default function useSettings() {
   return {
     keys, saveKeys, profile, profileUpdatedAt, profileNotice, constitution,
     searchMode, setSearchMode,
+    preferOwnKeys, setPreferOwnKeys,
     updateKey, toggleSaveKeys, updateProfile, updateConstitution, dismissProfileNotice,
     allKeysSet,
   };
