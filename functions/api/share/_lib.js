@@ -40,6 +40,9 @@ export function buildShareMeta(topic, dataJson, origin, id) {
     // Per-discussion dynamic card (functions/og/[id].js); falls back to the
     // static /og.png if rendering fails or the share is gone.
     image: `${origin}/og/${encodeURIComponent(id)}.png`,
+    imageWidth: 1200,
+    imageHeight: 630,
+    imageAlt: `${t} — 3つのAIによる議論の結論カード`.slice(0, 200),
   };
 }
 
@@ -53,10 +56,14 @@ export function shareMetaTagsHtml(meta) {
     `<meta property="og:description" content="${e(meta.description)}">`,
     `<meta property="og:url" content="${e(meta.url)}">`,
     `<meta property="og:image" content="${e(meta.image)}">`,
+    `<meta property="og:image:width" content="${e(meta.imageWidth ?? 1200)}">`,
+    `<meta property="og:image:height" content="${e(meta.imageHeight ?? 630)}">`,
+    `<meta property="og:image:alt" content="${e(meta.imageAlt ?? meta.title)}">`,
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta name="twitter:title" content="${e(meta.title)}">`,
     `<meta name="twitter:description" content="${e(meta.description)}">`,
     `<meta name="twitter:image" content="${e(meta.image)}">`,
+    `<meta name="twitter:image:alt" content="${e(meta.imageAlt ?? meta.title)}">`,
   ].join("");
 }
 
