@@ -52,4 +52,13 @@ describe("shareMetaTagsHtml", () => {
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
   });
+
+  it("emits og:image dimensions and alt text for large-card previews + a11y", () => {
+    const html = shareMetaTagsHtml(buildShareMeta("リモートか出社か", "{}", "https://e.com", "abcdefghij0123456789AB"));
+    expect(html).toContain('property="og:image:width" content="1200"');
+    expect(html).toContain('property="og:image:height" content="630"');
+    expect(html).toContain('property="og:image:alt"');
+    expect(html).toContain('name="twitter:image:alt"');
+    expect(html).toContain("リモートか出社か — 3つのAIによる議論の結論カード");
+  });
 });
