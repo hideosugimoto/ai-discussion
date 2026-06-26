@@ -102,7 +102,7 @@ export default function SharedView({ shareId, onExit }) {
             </div>
 
             {/* 全文トランスクリプト（折りたたみ） */}
-            <button onClick={() => setShowTranscript((v) => !v)}
+            <button onClick={() => setShowTranscript((v) => !v)} aria-expanded={showTranscript}
               style={{ width:"100%", padding:"10px 14px", marginBottom:16, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", cursor:"pointer", fontSize:13, fontWeight:600, display:"flex", alignItems:"center", gap:8 }}>
               <span>{showTranscript ? "▾" : "▸"}</span>
               <span>{showTranscript ? "議論の全文を閉じる" : `議論の全文を読む（${data.discussion.length} ラウンド）`}</span>

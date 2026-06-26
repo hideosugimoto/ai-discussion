@@ -1,26 +1,12 @@
 import { useState } from "react";
 import StanceMap from "./StanceMap";
 import RoundTimeline from "./RoundTimeline";
+import { pts, trend as trendOf } from "../lib/consensus";
 
 // "現在の到達点" hero card: the at-a-glance verdict pinned above the transcript
 // so a reader grasps the outcome (consensus / conflict / open questions + where
 // each AI stands) without scrolling through three columns. Built entirely from
 // already-computed summary data — no extra API cost.
-
-const pts = (arr) => (Array.isArray(arr) ? arr.map((x) => (x && x.point) ? x.point : (typeof x === "string" ? x : null)).filter(Boolean) : []);
-
-// Compare the two most recent rounds' conflict counts to label the trend.
-function trendOf(summaries) {
-  const valid = (summaries || []).filter(Boolean);
-  if (valid.length < 2) return null;
-  const a = valid[valid.length - 2];
-  const b = valid[valid.length - 1];
-  const da = Array.isArray(a.disagreements) ? a.disagreements.length : 0;
-  const db = Array.isArray(b.disagreements) ? b.disagreements.length : 0;
-  if (db < da) return { label: "収束に向かっています", color: "var(--success)", icon: "↘" };
-  if (db > da) return { label: "対立が広がっています", color: "var(--warning)", icon: "↗" };
-  return { label: "論点は平行線です", color: "var(--text2)", icon: "→" };
-}
 
 function Section({ icon, title, color, items, max = 2 }) {
   if (!items.length) return null;
@@ -48,7 +34,7 @@ export default function ConsensusCard({ summary, summaries, roundCount, conclusi
 
   return (
     <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:12, marginBottom:20, overflow:"hidden" }}>
-      <button onClick={() => setOpen((o) => !o)}
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open}
         style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"var(--accent-bg)", border:"none", cursor:"pointer", textAlign:"left", flexWrap:"wrap" }}>
         <span style={{ fontSize:14, fontWeight:700, color:"var(--text)" }}>📌 現在の到達点</span>
         <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace" }}>Round {roundCount}{running ? " · 議論中…" : ""}</span>
