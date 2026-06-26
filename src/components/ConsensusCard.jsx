@@ -13,7 +13,7 @@ const aiColor = (id) => MODELS.find((m) => m.id === id)?.color || "var(--text2)"
 // each AI stands) without scrolling through three columns. Built entirely from
 // already-computed summary data — no extra API cost.
 
-function Section({ icon, title, color, items, max = 2 }) {
+function Section({ icon, title, color, items, max = 2, onAction, actionLabel }) {
   if (!items.length) return null;
   const shown = items.slice(0, max);
   const rest = items.length - shown.length;
@@ -21,14 +21,24 @@ function Section({ icon, title, color, items, max = 2 }) {
     <div style={{ marginTop:8 }}>
       <div style={{ fontSize:11, fontWeight:700, color, marginBottom:4 }}>{icon} {title}（{items.length}）</div>
       <ul style={{ margin:0, paddingLeft:18, fontSize:12.5, color:"var(--text)", lineHeight:1.6 }}>
-        {shown.map((t, i) => <li key={i}>{t}</li>)}
+        {shown.map((t, i) => (
+          <li key={i}>
+            {t}
+            {onAction && (
+              <button onClick={() => onAction(t)} title="この未解決点を次のラウンドで重点的に議論します"
+                style={{ marginLeft:8, padding:"0 8px", fontSize:10.5, fontWeight:700, color:"var(--accent-light)", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:5, cursor:"pointer", whiteSpace:"nowrap" }}>
+                {actionLabel || "🔍 深掘り"}
+              </button>
+            )}
+          </li>
+        ))}
         {rest > 0 && <li style={{ listStyle:"none", marginLeft:-18, color:"var(--text3)", fontSize:11 }}>＋他 {rest} 件（下の各ラウンド詳細を参照）</li>}
       </ul>
     </div>
   );
 }
 
-export default function ConsensusCard({ summary, summaries, roundCount, conclusion, running }) {
+export default function ConsensusCard({ summary, summaries, roundCount, conclusion, running, onDeepDive }) {
   const [open, setOpen] = useState(true);
   if (!summary) return null;
 
@@ -93,7 +103,7 @@ export default function ConsensusCard({ summary, summaries, roundCount, conclusi
           {/* Top items */}
           <Section icon="🤝" title="合意点" color="var(--success)" items={agreements} />
           <Section icon="⚔️" title="対立点" color="var(--error)" items={disagreements} />
-          <Section icon="❓" title="未解決" color="var(--warning)" items={unresolved} max={1} />
+          <Section icon="❓" title="未解決" color="var(--warning)" items={unresolved} max={1} onAction={running ? undefined : onDeepDive} />
 
           {/* 心変わり: 議論の中で立場を変えたAI（熟議の証拠） */}
           {changes.length > 0 && (
