@@ -237,8 +237,19 @@ export default function App() {
     }
   };
 
-  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
-  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas, verdict, actionPlan); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas, verdict, actionPlan); };
+
+  // Turn an open question into the next round's focus: stage it as a moderator
+  // intervention and scroll the input into view so the user just hits "次へ".
+  const handleDeepDive = (point) => {
+    if (!point) return;
+    setIntervention(`「${point}」について重点的に深掘りして議論してください。`);
+    requestAnimationFrame(() => {
+      const el = document.querySelector('[aria-label="司会者介入"]');
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+    });
+  };
 
   // Render the conclusion as a shareable PNG (OGP ratio) from the verdict +
   // consensus counts. Pure client-side canvas — no deps, no external fonts.
@@ -610,6 +621,7 @@ export default function App() {
             roundCount={discussion.length}
             conclusion={verdict?.recommendation || actionPlan?.conclusion}
             running={running}
+            onDeepDive={handleDeepDive}
           />
         )}
 
