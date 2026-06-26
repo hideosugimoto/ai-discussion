@@ -10,6 +10,7 @@ import { shouldSummarize } from "../lib/fileParser";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import combinedSummaryPromptText from "../prompts/combined-summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
+import finalVerdictPromptText from "../prompts/final-verdict.txt?raw";
 
 const ATTACHMENT_SUMMARY_SYSTEM =
   "あなたは資料を議論用に要約するアシスタントです。重要な数値・固有名詞・主張は省略せず、引用可能な形で簡潔にまとめます。";
@@ -170,6 +171,45 @@ async function generateDetailedAnalysis(apiKey, authToken, viaProxy, allRounds, 
   };
 }
 
+// "最終ジャッジ": resolve each disagreement and produce a single recommendation
+// with confidence — Fugu's "one answer" deliverable, but with the reasoning and
+// the underlying debate kept visible.
+const ONE_OF = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
+
+async function generateFinalVerdict(apiKey, authToken, viaProxy, allRounds, topic, personas, sessionId) {
+  const allText = allRounds
+    .map((round, i) => {
+      const msgs = round.messages
+        .map((m) => {
+          const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+          const p = (personas?.[m.modelId] || "").trim();
+          return `[${p ? `${name}（${p}）` : name}] ${m.text || "(エラー)"}`;
+        })
+        .join("\n\n");
+      return `【Round ${i + 1}】\n${msgs}`;
+    })
+    .join("\n\n---\n\n");
+
+  const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
+  const text = await callGPTMini(apiKey, authToken, viaProxy, finalVerdictPromptText, userMsg, sessionId, allRounds.length);
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  const parsed = JSON.parse(cleaned);
+  if (!parsed || typeof parsed !== "object") throw new Error("Invalid verdict format");
+  const conf = ["high", "medium", "low"];
+  return {
+    recommendation: typeof parsed.recommendation === "string" ? parsed.recommendation : "",
+    confidence: ONE_OF(parsed.confidence, conf, "medium"),
+    resolved: (Array.isArray(parsed.resolved) ? parsed.resolved : []).map((r) => ({
+      point: typeof r?.point === "string" ? r.point : "",
+      verdict: typeof r?.verdict === "string" ? r.verdict : "",
+      reason: typeof r?.reason === "string" ? r.reason : "",
+      confidence: ONE_OF(r?.confidence, conf, "medium"),
+    })).filter((r) => r.point || r.verdict),
+    caveats: (Array.isArray(parsed.caveats) ? parsed.caveats : []).filter((x) => typeof x === "string"),
+    decisionHint: typeof parsed.decisionHint === "string" ? parsed.decisionHint : "",
+  };
+}
+
 // Build the cloud-sync payload from current discussion state.
 // Intentionally excludes profile, constitution, and API keys — only the
 // discussion artifact itself is uploaded. (Personas are part of the
@@ -205,6 +245,8 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const [sidePanel, setSidePanel] = useState(false);
   const [actionPlan, setActionPlan] = useState(null);
   const [actionPlanLoading, setActionPlanLoading] = useState(false);
+  const [verdict, setVerdict] = useState(null);
+  const [verdictLoading, setVerdictLoading] = useState(false);
   const [discussionId, setDiscussionId] = useState(null);
   const [rollingSummary, setRollingSummary] = useState(null);
 
@@ -295,6 +337,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setRunning(true);
     setShowIntervention(false);
     setIntervention("");
+    setVerdict(null); // a new round invalidates any prior final verdict
 
     const isConclusionRound = discussionMode === "conclusion";
     const targetModels = isConclusionRound
@@ -451,6 +494,8 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setSummaries([]);
     setDetailedAnalyses([]);
     setRollingSummary(null);
+    setActionPlan(null);
+    setVerdict(null);
     lastSearchSourcesRef.current = [];
     setStarted(true);
     await runRound([], 1, "");
@@ -473,7 +518,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         .catch(() => {});
     }
     lastSearchSourcesRef.current = [];
-    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setRollingSummary(null); setActionPlan(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
+    setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setRollingSummary(null); setActionPlan(null); setVerdict(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
 
   const handleGenerateActionPlan = async () => {
@@ -487,6 +532,19 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       setActionPlan({ conclusion: "生成に失敗しました", actions: [], risks: [], nextQuestion: "" });
     } finally {
       setActionPlanLoading(false);
+    }
+  };
+
+  const handleGenerateVerdict = async () => {
+    if ((!keys.chatgpt && !isPremium) || verdictLoading || discussion.length === 0) return;
+    setVerdictLoading(true);
+    try {
+      const v = await generateFinalVerdict(keys.chatgpt, authToken, viaProxy, discussion, topic, personas, discussionIdRef.current);
+      setVerdict(v);
+    } catch {
+      setVerdict({ recommendation: "生成に失敗しました。もう一度お試しください。", confidence: "low", resolved: [], caveats: [], decisionHint: "", error: true });
+    } finally {
+      setVerdictLoading(false);
     }
   };
 
@@ -507,6 +565,8 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     // doesn't re-inject stale file context.
     if (setAttachments) setAttachments([]);
     setDiscussionId(item.id || null);
+    setVerdict(null);
+    setActionPlan(null);
     setStarted(true);
     setShowIntervention(true);
   };
@@ -516,6 +576,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     running, started, intervention, setIntervention, showIntervention,
     sidePanel, setSidePanel,
     actionPlan, actionPlanLoading,
+    verdict, verdictLoading, handleGenerateVerdict,
     bottomRef,
     handleStart, handleNextRound, handleStop, handleReset,
     handleGenerateActionPlan, runDetailedAnalysis, loadFromHistory,

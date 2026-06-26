@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { MODELS, MODE_MODELS, DISCUSSION_MODES } from "./constants";
+import { MODELS, MODE_MODELS, DISCUSSION_MODES, INTERVENTION_QUICKFILLS } from "./constants";
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
@@ -17,6 +17,7 @@ import useShare from "./hooks/useShare";
 import useBilling from "./hooks/useBilling";
 import Onboarding from "./components/Onboarding";
 import ConsensusCard from "./components/ConsensusCard";
+import FinalVerdict from "./components/FinalVerdict";
 import DiscussionHeader from "./components/DiscussionHeader";
 import ExpandedPanels from "./components/ExpandedPanels";
 import HelpHint from "./components/HelpHint";
@@ -25,6 +26,8 @@ import UsagePill from "./components/UsagePill";
 import AuthBar from "./components/AuthBar";
 import FileAttachment from "./components/FileAttachment";
 import { useHelp } from "./hooks/useHelp.jsx";
+import { pts } from "./lib/consensus";
+import { drawConsensusImage, downloadCanvasPng } from "./lib/shareImage";
 
 const SummaryPanel = lazy(() => import("./components/SummaryPanel"));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel"));
@@ -118,6 +121,7 @@ export default function App() {
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
           actionPlan, actionPlanLoading,
+          verdict, verdictLoading, handleGenerateVerdict,
           bottomRef,
           handleStart: startDiscussion, handleNextRound, handleStop, handleReset,
           handleGenerateActionPlan, runDetailedAnalysis, loadFromHistory } = disc;
@@ -235,6 +239,22 @@ export default function App() {
 
   const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas); };
   const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas); };
+
+  // Render the conclusion as a shareable PNG (OGP ratio) from the verdict +
+  // consensus counts. Pure client-side canvas — no deps, no external fonts.
+  const handleSaveVerdictImage = () => {
+    const s = consensusSummary || {};
+    const canvas = document.createElement("canvas");
+    drawConsensusImage(canvas, {
+      topic,
+      recommendation: verdict?.recommendation || "",
+      agree: pts(s.agreements).length,
+      conflict: pts(s.disagreements).length,
+      unresolved: pts(s.unresolved).length,
+      confidence: verdict?.confidence,
+    });
+    downloadCanvasPng(canvas, `ai-discussion_結論_${new Date().toISOString().slice(0,10)}.png`);
+  };
 
   const handleShare = async () => {
     if (!auth.isPremium) {
@@ -586,9 +606,14 @@ export default function App() {
             summary={consensusSummary}
             summaries={summaries}
             roundCount={discussion.length}
-            conclusion={actionPlan?.conclusion}
+            conclusion={verdict?.recommendation || actionPlan?.conclusion}
             running={running}
           />
+        )}
+
+        {/* 最終ジャッジ（検証付き単一結論）: 議論が1ラウンド以上・停止中に提供 */}
+        {started && discussion.length > 0 && !running && (
+          <FinalVerdict verdict={verdict} loading={verdictLoading} onGenerate={handleGenerateVerdict} onSaveImage={handleSaveVerdictImage} />
         )}
 
         {/* Discussion + Side Panel layout */}
@@ -626,6 +651,15 @@ export default function App() {
                     placeholder={"💬 司会者として介入する（任意）\n例: 経済的影響についてもっと掘り下げてください"}
                     rows={2}
                     style={{ width:"100%", background:"transparent", border:"none", padding:"12px 14px", color:"var(--accent-light)", fontSize:13, lineHeight:1.6, resize:"none" }} />
+                </div>
+                {/* ワンタップ介入: あなたが議論の指揮者。次ラウンドの方向を1タップで */}
+                <div style={{ display:"flex", justifyContent:"center", gap:6, flexWrap:"wrap" }}>
+                  {INTERVENTION_QUICKFILLS.map((q) => (
+                    <button key={q} onClick={() => setIntervention(q)}
+                      style={{ padding:"4px 10px", border:"1px solid var(--accent-bd)", borderRadius:14, cursor:"pointer", fontSize:10.5, fontWeight:600, background:"var(--accent-bg)", color:"var(--accent-light)" }}>
+                      {q}
+                    </button>
+                  ))}
                 </div>
                 <div style={{ display:"flex", justifyContent:"center", gap:6, flexWrap:"wrap" }}>
                   {DISCUSSION_MODES.map(({id,label}) => (
