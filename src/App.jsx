@@ -492,7 +492,7 @@ export default function App() {
                       ・<b>ディベート</b>: 各AIが対立しながら論点を掘り下げる。反論・批判が中心<br />
                       ・<b>ブレスト</b>: 否定せずアイデアを発散。「Yes, and」の姿勢<br />
                       ・<b>事実検証</b>: 根拠・データ重視で互いの発言を検証<br />
-                      ・<b>結論まとめ</b>: 1つのAIが中立記録者として全体を「合意/相違/結論」に統合
+                      ・<b>中立まとめ</b>: 1つのAIが中立記録者として全体を「合意/相違/結論」に整理（裁定はしない）
                     </div>
                   )}
                   {discussionMode === "conclusion" && (
@@ -508,7 +508,7 @@ export default function App() {
                         ))}
                       </div>
                       <HelpHint>
-                        結論まとめモードは3AIで議論せず、選んだAIだけが全体を「合意点／相違点／最終結論」にまとめます。実行後は自動で標準モードに戻ります
+                        中立まとめモードは3AIで議論せず、選んだAIだけが全体を「合意点／相違点／最終結論」に中立整理します（どちらが正しいかの裁定はしません）。実行後は自動で標準モードに戻ります
                       </HelpHint>
                     </div>
                   )}
@@ -682,7 +682,7 @@ export default function App() {
                 )}
                 <div style={{ textAlign:"center" }}>
                   <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-                    ↻ {discussionMode === "conclusion" ? `結論まとめを生成（${MODELS.find(m=>m.id===conclusionTarget)?.name}）` : `次のラウンドへ（Round ${discussion.length+1}）`}
+                    ↻ {discussionMode === "conclusion" ? `中立まとめを生成（${MODELS.find(m=>m.id===conclusionTarget)?.name}）` : `次のラウンドへ（Round ${discussion.length+1}）`}
                   </button>
                 </div>
               </div>

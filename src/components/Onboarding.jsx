@@ -18,7 +18,7 @@ export default function Onboarding({ isLoggedIn, onLogin, onUseKeys, onPickPlan,
       <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--text2)", marginBottom:12 }}>
         <span>🔭 多角的な視点</span>
         <span>🤝 合意・対立を可視化</span>
-        <span>📋 結論・アクションプラン</span>
+        <span>🏛️ 結論を決める＋✅実行プラン</span>
         <span>📂 履歴・共有</span>
       </div>
 
