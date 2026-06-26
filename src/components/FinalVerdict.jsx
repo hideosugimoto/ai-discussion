@@ -64,12 +64,12 @@ export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage
     return (
       <div style={{ textAlign:"center", marginBottom:20 }}>
         <button onClick={onGenerate}
-          title="議論を踏まえ、各対立点を検証して『最も妥当な単一の推奨』を生成します"
+          title="議論を踏まえ、各対立点を検証して『最も妥当な単一の結論』に決めます（最終ジャッジ＝裁定）"
           style={{ background:"var(--accent)", border:"none", borderRadius:24, padding:"12px 26px", color:"#fff", cursor:"pointer", fontSize:14, fontWeight:700 }}>
-          🏛️ 最終ジャッジを出す
+          🏛️ 結論を決める（最終ジャッジ）
         </button>
         <HelpHint style={{ marginTop:6 }}>
-          3者の議論から「結論を1つ」に。各対立点を妥当性・確度つきで判定します（GPT-5.4 mini 使用、約0.005ドル）。Fuguと違い、根拠と議論はすべて見えたままです
+          3者の議論から“1つの結論”に決めます。各対立点を妥当性・確度つきで判定（GPT-5.4 mini 使用、約0.005ドル）。中立まとめが「整理」なのに対し、こちらは「裁定」。Fuguと違い、根拠と議論はすべて見えたままです
         </HelpHint>
       </div>
     );

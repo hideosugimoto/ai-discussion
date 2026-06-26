@@ -16,7 +16,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
         <button onClick={onGenerate}
           title="議論全体を要約し、優先度・期限付きの実行可能なアクションを自動生成"
           style={{ background:"var(--accent)", border:"none", borderRadius:20, padding:"10px 24px", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-          📋 アクションプランを生成
+          ✅ アクションプランを生成
         </button>
         <HelpHint style={{ marginTop: 6 }}>
           議論を踏まえて「結論／優先度付きアクション／リスク／次に議論すべきテーマ」を自動生成します（GPT-5.4 mini 使用、約0.005ドル）
@@ -37,7 +37,7 @@ export default function ActionPlanView({ plan, loading, onGenerate }) {
     <div className="action-plan-card" style={{ background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10, overflow:"hidden", marginTop:16 }}>
       <button onClick={() => setOpen((o) => !o)} style={{ width:"100%", background:"none", border:"none", padding:"12px 14px", cursor:"pointer", display:"flex", alignItems:"center", gap:8, color:"var(--text)", fontSize:13, fontWeight:600 }}>
         <span>{open ? "▾" : "▸"}</span>
-        <span>📋 アクションプラン</span>
+        <span>✅ アクションプラン</span>
       </button>
 
       {open && (

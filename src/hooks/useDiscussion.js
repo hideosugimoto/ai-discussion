@@ -501,7 +501,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
     if (!controller.signal.aborted) {
       setShowIntervention(true);
-      // 結論まとめラウンドはサマリー生成をスキップ（3AI前提の機能のため）
+      // 中立まとめラウンドはサマリー生成をスキップ（3AI前提の機能のため）
       if (!isConclusionRound) {
         runSummary(results, roundNum, discussionIdRef.current);
       } else {
