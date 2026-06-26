@@ -2,7 +2,10 @@ echo "🔨 Pre-push: フロントエンドビルドチェック..."
 npx vite build || exit 1
 
 echo "🔨 Pre-push: Functions 構文チェック..."
-find functions -name '*.js' | xargs npx esbuild --bundle --format=esm --outdir=/tmp/ai-discussion-check --platform=neutral 2>&1 || exit 1
+# `--external:*.wasm`: workers-og など WASM を import する依存は、実際の
+# Cloudflare Pages ビルド(wrangler)が .wasm を解決する。素の esbuild では
+# 解決できないため external 扱いにして、自前の Functions コードの構文だけ検証する。
+find functions -name '*.js' | xargs npx esbuild --bundle --format=esm --outdir=/tmp/ai-discussion-check --platform=neutral '--external:*.wasm' 2>&1 || exit 1
 rm -r /tmp/ai-discussion-check 2>/dev/null
 
 echo "✅ ビルドチェック完了"
