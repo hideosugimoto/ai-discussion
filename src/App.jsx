@@ -1,9 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { MODELS, MODE_MODELS, THEMES, DISCUSSION_MODES } from "./constants";
+import { MODELS, MODE_MODELS, DISCUSSION_MODES } from "./constants";
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
-import ModelBadge from "./components/ModelBadge";
 import RoundSection from "./components/RoundSection";
 import useKeyValidation from "./hooks/useKeyValidation";
 import { downloadMarkdown, downloadHtml } from "./export";
@@ -15,8 +14,11 @@ import useUsage from "./hooks/useUsage";
 import useRoundEstimate from "./hooks/useRoundEstimate";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
+import useBilling from "./hooks/useBilling";
 import Onboarding from "./components/Onboarding";
 import ConsensusCard from "./components/ConsensusCard";
+import DiscussionHeader from "./components/DiscussionHeader";
+import ExpandedPanels from "./components/ExpandedPanels";
 import HelpHint from "./components/HelpHint";
 import PlanBadge from "./components/PlanBadge";
 import UsagePill from "./components/UsagePill";
@@ -24,7 +26,6 @@ import AuthBar from "./components/AuthBar";
 import FileAttachment from "./components/FileAttachment";
 import { useHelp } from "./hooks/useHelp.jsx";
 
-const SecurityPanel = lazy(() => import("./components/SecurityPanel"));
 const SummaryPanel = lazy(() => import("./components/SummaryPanel"));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel"));
 const PersonaPanel = lazy(() => import("./components/PersonaPanel"));
@@ -281,57 +282,9 @@ export default function App() {
   const cm = MODE_MODELS[mode];
   const latestSummary = summaries[summaries.length - 1] ?? null;
 
-  const startCheckout = async (targetPlan) => {
-    try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-        body: JSON.stringify({ plan: targetPlan }),
-      });
-      if (!res.ok) throw new Error("Request failed");
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      alert("決済ページの取得に失敗しました。再度お試しください。");
-    }
-  };
-
-  const startCreditPurchase = async () => {
-    try {
-      const res = await fetch("/api/billing/credits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${auth.token}` },
-      });
-      if (!res.ok) {
-        let msg = "クレジット購入ページの取得に失敗しました。";
-        try {
-          const d = await res.json();
-          if (d?.error) msg = d.error;
-        } catch { /* ignore */ }
-        throw new Error(msg);
-      }
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch (e) {
-      alert(e.message || "クレジット購入の開始に失敗しました。");
-    }
-  };
-
-  // Refetch usage after credit purchase success redirect.
-  // URL cleanup is unconditional so the param doesn't linger across sessions
-  // (e.g. if the user logged out before redirect completed).
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const creditStatus = url.searchParams.get("credit");
-    if (creditStatus) {
-      url.searchParams.delete("credit");
-      window.history.replaceState({}, "", url.pathname + url.search);
-    }
-    if (creditStatus === "success" && auth.isPremium) {
-      // Slight delay so webhook can land
-      setTimeout(() => fetchUsage(), 1500);
-    }
-  }, [auth.isPremium, fetchUsage]);
+  const { startCheckout, startCreditPurchase } = useBilling({
+    token: auth.token, isPremium: auth.isPremium, fetchUsage,
+  });
 
   const keyConfigs = [
     { id:"claude",  label:"Anthropic API Key (Claude)", ph:"sk-ant-...",  link:"https://console.anthropic.com" },
@@ -381,63 +334,15 @@ export default function App() {
         <PlanBadge plan={auth.plan} usage={usage} estimate={roundEstimate} token={auth.token} onCreditPurchase={startCreditPurchase} usingOwnKeys={useOwnKeys} />
       )}
 
-      {/* Header */}
-      <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:900 }}>
-        <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
-        <h1 style={{ margin:"0 0 14px", fontSize:22, fontWeight:700, color:"var(--text)", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="28" height="28" style={{ flexShrink:0 }}>
-            <rect width="64" height="64" rx="14" fill="#161627"/>
-            <circle cx="32" cy="22" r="14" fill="#E8815C" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
-            <circle cx="22" cy="40" r="14" fill="#10A37F" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
-            <circle cx="42" cy="40" r="14" fill="#4285F4" opacity="0.85" style={{ mixBlendMode:"screen" }}/>
-            <circle cx="32" cy="34" r="4" fill="#fff" opacity="0.9"/>
-          </svg>
-          3 AI Discussion
-        </h1>
-        <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap", marginBottom:12 }}>
-          {MODELS.map((m) => <ModelBadge key={m.id} model={m} tag={cm[m.id].label} />)}
-        </div>
-        <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
-          <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
-            {[
-              { id:"best", label:"🧠 最強", title:"各社の最上位モデル（Opus 4.8 / GPT-5.5 / 3.5 Flash）。深い洞察・複雑な論点・微妙なニュアンスに強い。消費が多め（目安 約7議論/月）。" },
-              { id:"fast", label:"⚡ 高速", title:"軽量・高速モデル（Sonnet 4.6 / GPT-5.4 mini / 3.1 Flash-Lite）。日常の議論には十分な品質で、たくさん回せる（目安 約25議論/月）。" },
-            ].map(({id,label,title}) => (
-              <button key={id} role="radio" aria-checked={mode===id} title={title} onClick={() => setMode(id)} style={{ padding:"6px 14px", border:"none", cursor:"pointer", fontSize:12, fontWeight:600, background:mode===id?"var(--accent)":"transparent", color:mode===id?"#fff":"var(--text2)" }}>{label}</button>
-            ))}
-          </div>
-          <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
-            {THEMES.map(({id,label}) => (
-              <button key={id} role="radio" aria-checked={theme===id} onClick={() => setTheme(id)} style={{ padding:"6px 12px", border:"none", cursor:"pointer", fontSize:11, fontWeight:600, background:theme===id?"var(--accent)":"transparent", color:theme===id?"#fff":"var(--text2)" }}>{label}</button>
-            ))}
-          </div>
-          {auth.isPremium && (
-            <div role="radiogroup" aria-label="Web検索モード" title={useOwnKeys ? "「自分のキーを優先」がON中はWeb検索は使えません（検索は運営側機能のため）" : undefined} style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden", opacity:useOwnKeys?0.45:1 }}>
-              {[
-                { id:"off",    label:"🔎 検索なし", title:"Web検索を使いません" },
-                { id:"shared", label:"共通",        title:"議題に関する最新情報を1回検索し、3AIに同じ事実を渡して議論させます" },
-                { id:"native", label:"各AI個別",    title:"各AIが自分のWeb検索ツールで個別に調べ、別ソースを引いて議論を発達させます" },
-              ].map(({ id, label, title }) => (
-                <button
-                  key={id}
-                  role="radio"
-                  aria-checked={searchMode===id}
-                  title={useOwnKeys ? "自分のキー使用中はWeb検索は無効です" : title}
-                  disabled={useOwnKeys}
-                  onClick={() => setSearchMode(id)}
-                  style={{ padding:"6px 12px", border:"none", cursor:useOwnKeys?"not-allowed":"pointer", fontSize:11, fontWeight:600, background:searchMode===id?"var(--accent)":"transparent", color:searchMode===id?"#fff":"var(--text2)" }}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="mode-hint-line" style={{ textAlign:"center", fontSize:11, color:"var(--text3)", marginTop:6, maxWidth:560, marginLeft:"auto", marginRight:"auto" }}>
-          {mode === "best"
-            ? "🧠 最強：各社の最上位モデルで深く議論（複雑な論点・微妙な判断に強い）。消費は多めで目安 約7議論/月。"
-            : "⚡ 高速：軽量モデルで十分な品質。たくさん回せて目安 約25議論/月。じっくり深めたい時だけ「最強」を選んでください。"}
-        </div>
-      </div>
+      {/* Header (title + model badges + mode/theme/search toggles) */}
+      <DiscussionHeader
+        cm={cm}
+        mode={mode} setMode={setMode}
+        theme={theme} setTheme={setTheme}
+        isPremium={auth.isPremium}
+        searchMode={searchMode} setSearchMode={setSearchMode}
+        useOwnKeys={useOwnKeys}
+      />
 
       <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
 
@@ -608,141 +513,16 @@ export default function App() {
         )}
 
         {/* Expanded panel content */}
-        {activePanel === "keys" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {keyConfigs.map(({id,label,ph,link}) => (
-                <div key={id}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-                    <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"monospace" }}>{label}</span>
-                    <a href={link} target="_blank" rel="noopener noreferrer" style={{ fontSize:10, color:"var(--link)", textDecoration:"none" }}>取得 →</a>
-                  </div>
-                  <div style={{ display:"flex", gap:6 }}>
-                    <input type="password" value={keys[id]} onChange={(e) => updateKey(id, e.target.value)} placeholder={ph} aria-label={label}
-                      style={{ flex:1, background:"var(--bg)", border:`1px solid ${validationColor(id)}`, borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace" }} />
-                    <button onClick={() => validateKey(id, keys[id])} disabled={!keys[id] || keyStatus[id]==="checking"} aria-label={`${label} 疎通確認`}
-                      style={{ padding:"8px 12px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:6, color:keyStatus[id]==="ok"?"var(--success)":"var(--link)", cursor:keys[id]?"pointer":"not-allowed", fontSize:11, fontWeight:600, whiteSpace:"nowrap" }}>
-                      {keyStatus[id]==="checking"?"確認中..." : keyStatus[id]==="ok"?"✓ OK" : keyStatus[id]?.startsWith("error")?"✗ NG":"疎通確認"}
-                    </button>
-                  </div>
-                  {keyStatus[id]?.startsWith("error") && (
-                    <div style={{ fontSize:11, color:"var(--error)", marginTop:4 }}>{keyStatus[id]}</div>
-                  )}
-                </div>
-              ))}
-              <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>
-                ※ 運営者サーバーには一切送信されません。上部の「💾 保存」ボタンでブラウザ保存のON/OFFを切り替えられます。
-              </div>
-
-              {/* Premium-only: spend own keys instead of the plan budget */}
-              {auth.isPremium && (
-                <div style={{ marginTop:4, padding:"12px 14px", background:"var(--bg)", border:`1px solid ${useOwnKeys ? "var(--success)" : "var(--border)"}`, borderRadius:8 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:10 }}>
-                    <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>🔑 自分のキーを優先</span>
-                    <button
-                      onClick={() => setPreferOwnKeys(!preferOwnKeys)}
-                      role="switch"
-                      aria-checked={preferOwnKeys}
-                      aria-label="自分のキーを優先"
-                      style={{ padding:"5px 14px", border:`1px solid ${preferOwnKeys ? "var(--success)" : "var(--border)"}`, borderRadius:20, cursor:"pointer", fontSize:12, fontWeight:700, background:preferOwnKeys?"var(--success)":"transparent", color:preferOwnKeys?"#fff":"var(--text2)", whiteSpace:"nowrap" }}>
-                      {preferOwnKeys ? "ON" : "OFF"}
-                    </button>
-                  </div>
-                  <div style={{ fontSize:11, color:"var(--text2)", lineHeight:1.7, marginTop:8 }}>
-                    ONにすると、プレミアム加入中でも<b style={{ color:"var(--text)" }}>自分のAPIキーで実行</b>し、<b style={{ color:"var(--text)" }}>プランの月間枠を消費しません</b>。3つすべてのキーが必要です。Web検索は運営側機能のため、ON中は無効になります。
-                  </div>
-                  {preferOwnKeys && !allKeysSet && (
-                    <div style={{ fontSize:11, color:"var(--warning)", marginTop:6 }}>
-                      ⚠ キーが未設定の項目があるため、現在はプラン枠で実行されます。3つすべて設定すると自分のキーに切り替わります。
-                    </div>
-                  )}
-                  {useOwnKeys && (
-                    <div style={{ fontSize:11, color:"var(--success)", marginTop:6 }}>
-                      ✓ 現在「自分のキー」で実行中（プラン枠は消費しません）
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activePanel === "security" && (
-          <div style={{ marginTop:8, marginBottom:10 }}>
-            <SecurityPanel />
-          </div>
-        )}
-
-        {activePanel === "profile" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              <div style={{ fontSize:11, color:"var(--text3)" }}>各AIのシステムプロンプトに自動注入。Claude.aiで「今まで把握している私の情報をまとめて」と聞いた内容をそのまま貼るのがおすすめ。</div>
-              <HelpHint>
-                プロフィール = あなた自身の情報。AIが「あなた向け」にカスタマイズした回答をしてくれます。「自己分析・キャリア相談」系の質問では特に効果的
-              </HelpHint>
-              <textarea value={profile} onChange={(e) => updateProfile(e.target.value)} maxLength={5000} aria-label="プロフィール"
-                placeholder={"例:\n- エンジニア、30代\n- 会社員＋LLC運営\n- 最小労働・最大成果を目指している"} rows={5}
-                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
-              {profile.trim() && <button onClick={() => updateProfile("")} aria-label="プロフィールをクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
-            </div>
-          </div>
-        )}
-
-        {activePanel === "constitution" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              <div style={{ fontSize:11, color:"var(--text3)" }}>あなたの意思決定の基準・価値観を定義してください。議論中、各AIがこの憲法に基づいて推奨・非推奨を明示します。</div>
-              <HelpHint>
-                憲法 = あなたの価値観・判断基準。プロフィールとの違いは「事実」ではなく「ポリシー」。例: 「短期利益より長期の自由度」「破産リスクは絶対NG」など
-              </HelpHint>
-              <textarea value={constitution} onChange={(e) => updateConstitution(e.target.value)} maxLength={2000} aria-label="議論の憲法"
-                placeholder={"例:\n- 最小労働・最大成果を優先する\n- 短期利益より長期の自由度を重視\n- リスクは取るが、破産リスクは絶対に避ける\n- 技術的負債は3ヶ月以内に返済する"}
-                rows={5}
-                style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:13, lineHeight:1.7, resize:"vertical" }} />
-              {constitution.trim() && <button onClick={() => updateConstitution("")} aria-label="憲法をクリア" style={{ alignSelf:"flex-end", background:"none", border:"1px solid var(--border)", borderRadius:6, padding:"4px 12px", color:"var(--error)", cursor:"pointer", fontSize:11 }}>クリア</button>}
-            </div>
-          </div>
-        )}
-
-        {activePanel === "backup" && (
-          <div style={{ marginTop:8, marginBottom:10, padding:14, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:10 }}>
-            <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-              <HelpHint>
-                バックアップ = APIキー・プロフィールをパスワードで暗号化してテキスト化。別端末への移行や、ブラウザデータが消えても復元できる安心機能
-              </HelpHint>
-              <div style={{ padding:"10px 12px", background:"var(--warning-bg)", border:"1px solid var(--warning-bd)", borderRadius:8, fontSize:11, color:"var(--warning)", lineHeight:1.6 }}>
-                ⚠ APIキーはAES-GCM（256bit）で暗号化されます。<br/>
-                パスワードを忘れると復元できません。安全な場所に保管してください。
-              </div>
-              <div>
-                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>① バックアップの作成</div>
-                <input type="password" value={crypto.exportPw} onChange={(e) => crypto.setExportPw(e.target.value)} placeholder="バックアップ用パスワードを設定" aria-label="エクスポート用パスワード"
-                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-                <button onClick={crypto.handleExport} disabled={!crypto.exportPw} style={{ width:"100%", background:crypto.exportPw?"var(--accent-bg)":"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:crypto.exportPw?"pointer":"not-allowed", fontWeight:600, opacity:crypto.exportPw?1:0.5 }}>
-                  🔐 暗号化してコピー
-                </button>
-                {crypto.exportText && (
-                  <textarea readOnly value={crypto.exportText} rows={3} aria-label="暗号化されたバックアップ"
-                    style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text2)", fontSize:10, resize:"none", fontFamily:"monospace", marginTop:8 }} />
-                )}
-              </div>
-              <div style={{ height:1, background:"var(--border)" }} />
-              <div>
-                <div style={{ fontSize:12, color:"var(--text2)", marginBottom:8 }}>② バックアップから復元</div>
-                <textarea value={crypto.importText} onChange={(e) => crypto.setImportText(e.target.value)} placeholder="バックアップテキストを貼り付け" rows={3} aria-label="バックアップテキスト"
-                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:10, color:"var(--text)", fontSize:12, resize:"none", fontFamily:"monospace", marginBottom:8 }} />
-                <input type="password" value={crypto.importPw} onChange={(e) => crypto.setImportPw(e.target.value)} placeholder="バックアップ時に設定したパスワード" aria-label="インポート用パスワード"
-                  style={{ width:"100%", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:6, padding:"8px 10px", color:"var(--text)", fontSize:13, fontFamily:"monospace", marginBottom:8 }} />
-                <button onClick={crypto.handleImport} disabled={!crypto.importText.trim()||!crypto.importPw} style={{ width:"100%", background:"var(--accent)", border:"none", borderRadius:8, padding:"10px 20px", color:"#fff", fontSize:13, cursor:(crypto.importText.trim()&&crypto.importPw)?"pointer":"not-allowed", fontWeight:600, opacity:(crypto.importText.trim()&&crypto.importPw)?1:0.4 }}>
-                  復元する
-                </button>
-              </div>
-              {crypto.cryptoMsg && (
-                <div style={{ fontSize:13, color:crypto.cryptoMsg.startsWith("✓")?"var(--success)":"var(--error)", textAlign:"center" }}>{crypto.cryptoMsg}</div>
-              )}
-            </div>
-          </div>
-        )}
+        <ExpandedPanels
+          activePanel={activePanel}
+          keyConfigs={keyConfigs} keys={keys} updateKey={updateKey}
+          keyStatus={keyStatus} validateKey={validateKey} validationColor={validationColor}
+          isPremium={auth.isPremium} useOwnKeys={useOwnKeys}
+          preferOwnKeys={preferOwnKeys} setPreferOwnKeys={setPreferOwnKeys} allKeysSet={allKeysSet}
+          profile={profile} updateProfile={updateProfile}
+          constitution={constitution} updateConstitution={updateConstitution}
+          crypto={crypto}
+        />
 
         {/* Plan selection lives in the Onboarding card above (single source). */}
 
