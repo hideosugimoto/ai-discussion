@@ -25,8 +25,13 @@ const SURVIVE = {
   no:      { label: "✕ 反論で覆る可能性", color: "var(--error)", bg: "rgba(239,68,68,.1)", bd: "var(--error)" },
 };
 
-function StressTest({ critique }) {
+function StressTest({ critique, onRejudge, loading }) {
   const s = SURVIVE[critique.survives] || SURVIVE.partial;
+  // When the verdict didn't fully survive, offer a one-click re-judge that
+  // feeds the strongest objection back into the judge. "no" gets a prominent
+  // CTA; "partial" gets a quieter "補強して再判定" option.
+  const needsRejudge = critique.survives === "no" || critique.survives === "partial";
+  const isOverturn = critique.survives === "no";
   return (
     <div style={{ marginTop:12, marginBottom:12, padding:"10px 12px", background:s.bg, border:`1px solid ${s.bd}`, borderRadius:8 }}>
       <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
@@ -36,6 +41,20 @@ function StressTest({ critique }) {
       {critique.strongestObjection && <div style={{ fontSize:12, color:"var(--text2)", lineHeight:1.6 }}>最強の反論: {critique.strongestObjection}</div>}
       {critique.weakness && <div style={{ fontSize:12, color:"var(--text2)", lineHeight:1.6 }}>最も脆い前提: {critique.weakness}</div>}
       {critique.fix && <div style={{ fontSize:12, color:"var(--text)", lineHeight:1.6, marginTop:4 }}>🛠 補強: <b>{critique.fix}</b></div>}
+      {needsRejudge && onRejudge && (
+        <div style={{ marginTop:10, paddingTop:10, borderTop:`1px dashed ${s.bd}` }}>
+          <button onClick={onRejudge} disabled={loading}
+            title="この反論を判定材料に差し戻し、結論を出し直します（GPT-5.4 mini 使用、約0.005ドル）"
+            style={{ background:isOverturn?"var(--error)":"none", border:`1px solid ${isOverturn?"var(--error)":s.bd}`, borderRadius:8, padding:"7px 14px", color:isOverturn?"#fff":s.color, cursor:loading?"wait":"pointer", fontSize:12, fontWeight:700, opacity:loading?0.6:1 }}>
+            {loading ? "再判定中…" : isOverturn ? "🔁 反論を踏まえて再ジャッジ" : "🔁 反論で補強して再判定"}
+          </button>
+          <div style={{ fontSize:11, color:"var(--text3)", lineHeight:1.5, marginTop:6 }}>
+            {isOverturn
+              ? "この結論は反論で覆る可能性があります。反論を正面から扱った結論に作り直せます。"
+              : "条件付きの成立です。反論を反映してより堅い結論に作り直せます。"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -69,6 +88,9 @@ export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage
       <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px", background:"var(--accent-bg)", flexWrap:"wrap" }}>
         <span style={{ fontSize:14, fontWeight:700, color:"var(--text)" }}>🏛️ 最終ジャッジ</span>
         <ConfBadge value={verdict.confidence} />
+        {verdict.rejudged && (
+          <span style={{ fontSize:10.5, fontWeight:700, color:"var(--accent-light)", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:5, padding:"1px 7px" }}>反論を反映済み</span>
+        )}
         <span style={{ marginLeft:"auto", display:"flex", gap:6 }}>
           {onSaveImage && !verdict.error && (
             <button onClick={onSaveImage} title="結論カードを画像(PNG)で保存（SNS共有用）" style={{ background:"none", border:"1px solid var(--accent-bd)", borderRadius:6, padding:"3px 10px", color:"var(--accent-light)", cursor:"pointer", fontSize:11 }}>📸 画像で保存</button>
@@ -113,7 +135,11 @@ export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage
 
         {/* 反対意見ストレステスト（adversarial verify）: 結論が最強の反論に耐えたか */}
         {verdict.critique && (
-          <StressTest critique={verdict.critique} />
+          <StressTest
+            critique={verdict.critique}
+            loading={loading}
+            onRejudge={onGenerate ? () => onGenerate([verdict.critique.strongestObjection, verdict.critique.weakness].filter(Boolean).join(" / ")) : undefined}
+          />
         )}
 
         {/* The decision is yours — what to check last */}

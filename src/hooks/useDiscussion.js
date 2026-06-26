@@ -177,7 +177,7 @@ async function generateDetailedAnalysis(apiKey, authToken, viaProxy, allRounds, 
 // the underlying debate kept visible.
 const ONE_OF = (v, allowed, fallback) => (allowed.includes(v) ? v : fallback);
 
-async function generateFinalVerdict(apiKey, authToken, viaProxy, allRounds, topic, personas, sessionId) {
+async function generateFinalVerdict(apiKey, authToken, viaProxy, allRounds, topic, personas, sessionId, priorObjection) {
   const allText = allRounds
     .map((round, i) => {
       const msgs = round.messages
@@ -191,7 +191,13 @@ async function generateFinalVerdict(apiKey, authToken, viaProxy, allRounds, topi
     })
     .join("\n\n---\n\n");
 
-  const userMsg = `【議題】${topic}\n\n${allText}\n\nJSON形式で出力してください。`;
+  // Re-judge mode: a prior verdict failed its stress test, so we feed the
+  // strongest objection back in and force the judge to confront it head-on.
+  const objection = typeof priorObjection === "string" ? priorObjection.trim() : "";
+  const rebuttalBlock = objection
+    ? `\n\n【前回の推奨に出た最も強い反論（必ず正面から扱うこと）】\n${objection}\nこの反論に逃げず応答すること。推奨を維持するなら反論への反証を根拠に示し、覆るなら結論自体を見直して、改めて最も妥当な単一の推奨を導いてください。`
+    : "";
+  const userMsg = `【議題】${topic}\n\n${allText}${rebuttalBlock}\n\nJSON形式で出力してください。`;
   const text = await callGPTMini(apiKey, authToken, viaProxy, finalVerdictPromptText, userMsg, sessionId, allRounds.length);
   const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   const parsed = JSON.parse(cleaned);
@@ -567,11 +573,16 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     }
   };
 
-  const handleGenerateVerdict = async () => {
+  const handleGenerateVerdict = async (priorObjection) => {
     if ((!keys.chatgpt && !isPremium) || verdictLoading || discussion.length === 0) return;
+    // priorObjection is a string only when invoked from the "re-judge" CTA;
+    // the ↻ button passes a click event, which we must ignore here.
+    const objection = typeof priorObjection === "string" ? priorObjection : "";
     setVerdictLoading(true);
     try {
-      const v = await generateFinalVerdict(keys.chatgpt, authToken, viaProxy, discussion, topic, personas, discussionIdRef.current);
+      const base = await generateFinalVerdict(keys.chatgpt, authToken, viaProxy, discussion, topic, personas, discussionIdRef.current, objection);
+      // Mark re-judged verdicts so the UI can show a "反論を反映済み" badge.
+      const v = objection ? { ...base, rejudged: true } : base;
       setVerdict(v); // show the verdict immediately
       // Then stress-test it adversarially (best-effort; attaches when ready).
       const critique = await generateVerdictCritique(keys.chatgpt, authToken, viaProxy, v.recommendation, discussion, topic, discussionIdRef.current);
