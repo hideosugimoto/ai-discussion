@@ -19,7 +19,7 @@ describe("buildShareMeta", () => {
     const m = buildShareMeta("リモートか出社か", "{}", origin, id);
     expect(m.title).toBe("リモートか出社か｜3 AI Discussion");
     expect(m.url).toBe(`${origin}/?share=${id}`);
-    expect(m.image).toBe(`${origin}/og.png`);
+    expect(m.image).toBe(`${origin}/og/${id}.png`);
   });
 
   it("derives counts from the last summary", () => {

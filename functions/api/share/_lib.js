@@ -37,7 +37,9 @@ export function buildShareMeta(topic, dataJson, origin, id) {
     title: `${t}｜3 AI Discussion`,
     description: desc.slice(0, 200),
     url: `${origin}/?share=${encodeURIComponent(id)}`,
-    image: `${origin}/og.png`,
+    // Per-discussion dynamic card (functions/og/[id].js); falls back to the
+    // static /og.png if rendering fails or the share is gone.
+    image: `${origin}/og/${encodeURIComponent(id)}.png`,
   };
 }
 
