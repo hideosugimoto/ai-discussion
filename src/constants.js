@@ -45,6 +45,18 @@ export const PERSONA_PACKS = [
   { id: "engineering", label: "🛠 開発チーム",   personas: { claude: "経験豊富なアーキテクト", chatgpt: "フルスタックエンジニア", gemini: "プロダクトオーナー" } },
   { id: "creative",   label: "🎬 クリエイティブ", personas: { claude: "映画監督", chatgpt: "脚本家", gemini: "プロデューサー" } },
   { id: "philosophy", label: "🧠 思想家トリオ", personas: { claude: "楽観主義の哲学者", chatgpt: "懐疑的な哲学者", gemini: "実用主義の哲学者" } },
+  { id: "devil",      label: "😈 逆張り（悪魔の代弁者）", personas: { claude: "提案を擁護する推進派", chatgpt: "あえて全力で反対する悪魔の代弁者", gemini: "両者を検証する中立の審判" } },
+];
+
+// One-tap intervention templates: the user is the conductor — steer the next
+// round in a single tap instead of typing every time.
+export const INTERVENTION_QUICKFILLS = [
+  "もっと具体的に（数値・固有名詞を）",
+  "反論を強めに（弱点を突いて）",
+  "逆張りの視点を加えて",
+  "コスト・リスク面を深掘り",
+  "実行手順に落として",
+  "結論を1つに絞って",
 ];
 
 export const DISCUSSION_MODES = [

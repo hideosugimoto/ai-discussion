@@ -15,13 +15,32 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   }
 });
 
+// Confidence labels the AIs emit in search / fact-check modes. Rendering them as
+// colored chips makes claim reliability glanceable — the kind of verifiability
+// a single-answer orchestrator can't surface. Static spans, injected before
+// sanitize so DOMPurify keeps them.
+const CONF_BADGES = [
+  { token: "【確実】",   cls: "conf-sure" },
+  { token: "【候補】",   cls: "conf-maybe" },
+  { token: "【要確認】", cls: "conf-check" },
+  { token: "【推測】",   cls: "conf-guess" },
+];
+
+function injectConfidenceBadges(html) {
+  let out = html;
+  for (const { token, cls } of CONF_BADGES) {
+    out = out.split(token).join(`<span class="conf-badge ${cls}">${token}</span>`);
+  }
+  return out;
+}
+
 // Renders a markdown string to sanitized HTML. Memoized on the source text so a
 // re-render with identical text does no parsing work. Use for final (non-
 // streaming) AI output; stream partial text as plain pre-wrap to avoid
 // re-parsing on every chunk.
 export default function Markdown({ text }) {
   const html = useMemo(() => {
-    const raw = marked.parse(text || "");
+    const raw = injectConfidenceBadges(marked.parse(text || ""));
     return DOMPurify.sanitize(raw);
   }, [text]);
 

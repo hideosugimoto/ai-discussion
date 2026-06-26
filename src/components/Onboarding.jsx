@@ -15,11 +15,16 @@ export default function Onboarding({ isLoggedIn, onLogin, onUseKeys, onPickPlan,
         ChatGPT・Claude・Gemini が同じ議題を多角的に議論。<b style={{ color:"var(--text)" }}>合意点・対立点・最終結論</b>まで整理して提示します。AIを1つずつ試して比べる必要はもうありません。
       </div>
 
-      <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--text2)", marginBottom:14 }}>
+      <div style={{ display:"flex", gap:14, flexWrap:"wrap", fontSize:12, color:"var(--text2)", marginBottom:12 }}>
         <span>🔭 多角的な視点</span>
         <span>🤝 合意・対立を可視化</span>
         <span>📋 結論・アクションプラン</span>
         <span>📂 履歴・共有</span>
+      </div>
+
+      {/* Positioning vs single-answer orchestrators (e.g. Fugu) */}
+      <div style={{ marginBottom:14, padding:"8px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, fontSize:12, color:"var(--text2)", lineHeight:1.6 }}>
+        🆚 “答えを1つにまとめるAI”との違い：<b style={{ color:"var(--text)" }}>結論も出しますが、3者がどこで割れ・なぜそうなったかが全部見えます。</b>最後に決めるのはあなた。だから検証できます。
       </div>
 
       {onTryDemo && (

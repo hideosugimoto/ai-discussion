@@ -1,7 +1,12 @@
 import { useState } from "react";
+import { MODELS } from "../constants";
 import StanceMap from "./StanceMap";
 import RoundTimeline from "./RoundTimeline";
-import { pts, trend as trendOf } from "../lib/consensus";
+import DisagreementMatrix from "./DisagreementMatrix";
+import { pts, trend as trendOf, positionChanges } from "../lib/consensus";
+
+const aiName = (id) => MODELS.find((m) => m.id === id)?.name || id || "";
+const aiColor = (id) => MODELS.find((m) => m.id === id)?.color || "var(--text2)";
 
 // "現在の到達点" hero card: the at-a-glance verdict pinned above the transcript
 // so a reader grasps the outcome (consensus / conflict / open questions + where
@@ -31,6 +36,13 @@ export default function ConsensusCard({ summary, summaries, roundCount, conclusi
   const disagreements = pts(summary.disagreements);
   const unresolved = pts(summary.unresolved);
   const trend = trendOf(summaries);
+
+  // Matrix needs per-round disagreements with .positions; the rolling summary
+  // lacks them, so pull from the latest per-round summary that has any.
+  const matrixSource = [...(summaries || [])].reverse()
+    .find((s) => s && Array.isArray(s.disagreements) && s.disagreements.some((d) => d?.positions));
+  const matrixDisagreements = matrixSource?.disagreements || [];
+  const changes = positionChanges(summaries);
 
   return (
     <div style={{ background:"var(--surface)", border:"1px solid var(--accent-bd)", borderRadius:12, marginBottom:20, overflow:"hidden" }}>
@@ -70,10 +82,33 @@ export default function ConsensusCard({ summary, summaries, roundCount, conclusi
           <div style={{ fontSize:11, color:"var(--text3)", fontWeight:700, marginBottom:6 }}>🧭 各AIの立場</div>
           <StanceMap stances={summary.stances} />
 
+          {/* 賛否マトリクス: 論点ごとの各AIの立場 */}
+          {matrixDisagreements.some((d) => d?.positions) && (
+            <div style={{ marginTop:12 }}>
+              <div style={{ fontSize:11, color:"var(--text3)", fontWeight:700, marginBottom:6 }}>⚖️ 論点ごとの賛否</div>
+              <DisagreementMatrix disagreements={matrixDisagreements} />
+            </div>
+          )}
+
           {/* Top items */}
           <Section icon="🤝" title="合意点" color="var(--success)" items={agreements} />
           <Section icon="⚔️" title="対立点" color="var(--error)" items={disagreements} />
           <Section icon="❓" title="未解決" color="var(--warning)" items={unresolved} max={1} />
+
+          {/* 心変わり: 議論の中で立場を変えたAI（熟議の証拠） */}
+          {changes.length > 0 && (
+            <div style={{ marginTop:12 }}>
+              <div style={{ fontSize:11, color:"var(--accent-light)", fontWeight:700, marginBottom:6 }}>🔄 議論で変わった立場</div>
+              <ul style={{ margin:0, paddingLeft:18, fontSize:12.5, color:"var(--text)", lineHeight:1.6 }}>
+                {changes.map((c, i) => (
+                  <li key={i}>
+                    {c.ai && <b style={{ color:aiColor(c.ai) }}>{aiName(c.ai)}</b>}
+                    <span style={{ color:"var(--text3)", fontSize:11 }}>（R{c.round}）</span>: {c.description}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Round-by-round trend */}
           {(summaries || []).filter(Boolean).length >= 2 && (

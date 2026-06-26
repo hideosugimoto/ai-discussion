@@ -10,6 +10,24 @@ export function pts(arr) {
     .filter(Boolean);
 }
 
+// Flatten every round's positionChanges into a single chronological list of
+// { round, ai, description } — the "心変わり" record that proves real
+// deliberation happened (vs a hidden one-shot answer). Tolerates both the
+// {ai, description} and {model, change} shapes.
+export function positionChanges(summaries) {
+  const out = [];
+  (summaries || []).forEach((s, i) => {
+    const list = s && Array.isArray(s.positionChanges) ? s.positionChanges : [];
+    for (const pc of list) {
+      if (!pc) continue;
+      const ai = pc.ai || pc.model || null;
+      const description = pc.description || pc.change || "";
+      if (description) out.push({ round: i + 1, ai, description });
+    }
+  });
+  return out;
+}
+
 // Compare the two most recent (non-null) rounds' conflict counts to label the
 // trend. Returns null when there are fewer than two summarized rounds.
 export function trend(summaries) {
