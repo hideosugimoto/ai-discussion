@@ -9,7 +9,7 @@ const FALLBACK_MODEL = { name:"?", color:"var(--text2)", dimColor:"var(--border)
 // require endless scrolling (especially on mobile, where the 3 AIs stack).
 const CLAMP_PX = 460;
 
-export default function MessageBubble({ msg, isNew, persona }) {
+export default function MessageBubble({ msg, isNew, persona, stance }) {
   const model = MODELS.find((m) => m.id === msg.modelId) ?? FALLBACK_MODEL;
   const isStreaming = msg.loading && msg.text;
   const isFinal = !msg.loading && !!msg.text && !msg.error;
@@ -37,6 +37,14 @@ export default function MessageBubble({ msg, isNew, persona }) {
           </span>
         )}
       </div>
+      {/* One-line stance (from the round summary) so the 3 AIs can be skimmed
+          in seconds without reading the full bubble. */}
+      {stance && stance.trim() && (
+        <div style={{ fontSize:11.5, color:model.color, fontWeight:600, lineHeight:1.45, display:"flex", gap:4 }}>
+          <span style={{ flexShrink:0 }}>▸</span>
+          <span>{stance.trim()}</span>
+        </div>
+      )}
       <div className="msg-bubble" style={{ background:model.bg, border:`1px solid ${model.dimColor}`, borderLeft:`3px solid ${model.color}`, borderRadius:"0 10px 10px 10px", padding:"12px 16px", color:"var(--text)", fontSize:13.5, lineHeight:1.8, minHeight:48 }}>
         {msg.error
           ? <span style={{ color:"var(--error)" }}>⚠ {msg.error}</span>

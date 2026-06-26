@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { fetchSharedDiscussion } from "../hooks/useShare";
 import RoundSection from "./RoundSection";
 import RoundSummary from "./RoundSummary";
+import ConsensusCard from "./ConsensusCard";
 
 export default function SharedView({ shareId, onExit }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [showTranscript, setShowTranscript] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,19 +83,39 @@ export default function SharedView({ shareId, onExit }) {
               </div>
             </div>
 
+            {/* 結論ファースト: 到達点カードを最上部に */}
+            {(() => {
+              const consensus = [...data.summaries].reverse().find((s) => s && !s.error) || null;
+              return consensus ? (
+                <ConsensusCard
+                  summary={consensus}
+                  summaries={data.summaries}
+                  roundCount={data.discussion.length}
+                  running={false}
+                />
+              ) : null;
+            })()}
+
             {/* Disclaimer */}
             <div style={{ marginBottom:16, padding:"8px 12px", background:"var(--bg)", border:"1px solid var(--border)", borderRadius:8, fontSize:11, color:"var(--text3)" }}>
               ※ 共有データには議論本文と要約のみが含まれます。投稿者のプロフィール・ペルソナ・憲法・司会者介入は除外されています。
             </div>
 
-            {/* Rounds */}
-            {data.discussion.map((round, i) => (
+            {/* 全文トランスクリプト（折りたたみ） */}
+            <button onClick={() => setShowTranscript((v) => !v)}
+              style={{ width:"100%", padding:"10px 14px", marginBottom:16, background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", cursor:"pointer", fontSize:13, fontWeight:600, display:"flex", alignItems:"center", gap:8 }}>
+              <span>{showTranscript ? "▾" : "▸"}</span>
+              <span>{showTranscript ? "議論の全文を閉じる" : `議論の全文を読む（${data.discussion.length} ラウンド）`}</span>
+            </button>
+
+            {showTranscript && data.discussion.map((round, i) => (
               <div key={i}>
                 <RoundSection
                   round={round}
                   roundNum={i + 1}
                   isLatest={i === data.discussion.length - 1}
                   personas={{ claude:"", chatgpt:"", gemini:"" }}
+                  summary={data.summaries[i]}
                 />
                 {data.summaries[i] && !data.summaries[i].error && !round.isConclusion && (
                   <RoundSummary summary={data.summaries[i]} roundNum={i + 1} onScrollToMessage={() => {}} />

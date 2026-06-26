@@ -16,6 +16,7 @@ import useRoundEstimate from "./hooks/useRoundEstimate";
 import useCloudHistory from "./hooks/useCloudHistory";
 import useShare from "./hooks/useShare";
 import Onboarding from "./components/Onboarding";
+import ConsensusCard from "./components/ConsensusCard";
 import HelpHint from "./components/HelpHint";
 import PlanBadge from "./components/PlanBadge";
 import UsagePill from "./components/UsagePill";
@@ -112,13 +113,18 @@ export default function App() {
     searchMode: auth.isPremium ? searchMode : "off",
     cloudUpsertFn: auth.isPremium ? cloudHistory.upsert : null,
   });
-  const { discussion, summaries, detailedAnalyses,
+  const { discussion, summaries, detailedAnalyses, rollingSummary,
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
           actionPlan, actionPlanLoading,
           bottomRef,
           handleStart: startDiscussion, handleNextRound, handleStop, handleReset,
           handleGenerateActionPlan, runDetailedAnalysis, loadFromHistory } = disc;
+
+  // The "現在の到達点" card draws on the cumulative rolling summary when live;
+  // for history-loaded discussions (no rolling) it falls back to the latest
+  // per-round summary, whose stances/agreements approximate the current state.
+  const consensusSummary = rollingSummary || [...summaries].reverse().find(Boolean) || null;
 
   const crypto = useCryptoBackup({
     keys, profile, saveKeys,
@@ -794,12 +800,23 @@ export default function App() {
           </HelpHint>
         )}
 
+        {/* 現在の到達点（結論ファースト）: 議論本文の上に常時表示 */}
+        {started && discussion.length > 0 && consensusSummary && (
+          <ConsensusCard
+            summary={consensusSummary}
+            summaries={summaries}
+            roundCount={discussion.length}
+            conclusion={actionPlan?.conclusion}
+            running={running}
+          />
+        )}
+
         {/* Discussion + Side Panel layout */}
         <div className={sidePanel ? "app-layout" : ""}>
           <div className={sidePanel ? "app-main" : ""}>
             {discussion.map((round, i) => (
               <div key={i}>
-                <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} />
+                <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} summary={summaries[i]} />
                 {!sidePanel && summaries[i] !== undefined && !round.isConclusion && (
                   <SummaryPanel
                     summary={summaries[i]}
