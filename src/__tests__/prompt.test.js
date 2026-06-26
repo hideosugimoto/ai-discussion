@@ -69,6 +69,29 @@ describe("buildPrompt", () => {
     expect(sys).toContain("事実・データ・根拠");
   });
 
+  it("consensus mode round 1 builds toward agreement", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "consensus");
+    expect(sys).toContain("合意の土台");
+  });
+
+  it("consensus mode round 2+ seeks a third option / conditional agreement", () => {
+    const history = [{ round: 1, messages: [{ modelId: "chatgpt", text: "意見A" }] }];
+    const { sys } = buildPrompt("claude", "テスト", "", history, 2, "", "consensus");
+    expect(sys).toContain("第三案");
+  });
+
+  it("decision mode round 1 evaluates options on criteria", () => {
+    const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "decision");
+    expect(sys).toContain("評価軸");
+    expect(sys).toContain("暫定推奨");
+  });
+
+  it("decision mode round 2+ surfaces trade-offs", () => {
+    const history = [{ round: 1, messages: [{ modelId: "chatgpt", text: "選択肢A" }] }];
+    const { sys } = buildPrompt("claude", "テスト", "", history, 2, "", "decision");
+    expect(sys).toContain("トレードオフ");
+  });
+
   it("conclusion mode round 1 acts as neutral recorder", () => {
     const { sys } = buildPrompt("claude", "テスト", "", [], 1, "", "conclusion");
     expect(sys).toContain("中立的な記録者");
