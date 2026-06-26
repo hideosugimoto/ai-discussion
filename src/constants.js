@@ -64,5 +64,7 @@ export const DISCUSSION_MODES = [
   { id: "debate",    label: "⚔️ ディベート", description: "対立・反論を重視" },
   { id: "brainstorm", label: "💡 ブレスト",  description: "発散・アイデア重視" },
   { id: "factcheck", label: "🔍 事実検証",  description: "根拠・正確性を重視" },
+  { id: "consensus", label: "🤝 合意形成",  description: "対立を歩み寄り・第三案で合意へ" },
+  { id: "decision",  label: "⚖️ 意思決定",  description: "選択肢を評価軸で比較し推奨を出す" },
   { id: "conclusion", label: "🧾 中立まとめ", description: "1AIが合意/相違/結論に中立整理（裁定なし）" },
 ];
