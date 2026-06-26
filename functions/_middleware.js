@@ -1,3 +1,5 @@
+import { validateShareId, buildShareMeta, shareMetaTagsHtml } from "./api/share/_lib.js";
+
 // Layer 1: Global security headers
 //
 // CSP は2系統:
@@ -57,6 +59,33 @@ export async function onRequest(context) {
       "Content-Security-Policy",
       isLandingPage(url.pathname) ? LP_CSP : APP_CSP
     );
+
+    // Dynamic OG/Twitter meta for shared-discussion links (/?share=ID) so link
+    // previews on X/LINE/Slack show the topic + outcome instead of a bare URL.
+    // Best-effort: any failure falls through to the normal SPA response.
+    const shareId = url.searchParams.get("share");
+    const contentType = response.headers.get("content-type") || "";
+    if (shareId && url.pathname === "/" && contentType.includes("text/html") && context.env?.DB) {
+      try {
+        const id = validateShareId(shareId);
+        if (id) {
+          const row = await context.env.DB.prepare(
+            "SELECT topic, data_json, expires_at FROM shared_discussions WHERE id = ?"
+          ).bind(id).first();
+          const live = row && (!row.expires_at || isNaN(new Date(row.expires_at).getTime()) || new Date(row.expires_at).getTime() >= Date.now());
+          if (live) {
+            const meta = buildShareMeta(row.topic, row.data_json, url.origin, id);
+            const tags = shareMetaTagsHtml(meta);
+            return new HTMLRewriter()
+              .on("title", { element(el) { el.setInnerContent(meta.title); } })
+              .on("head", { element(el) { el.append(tags, { html: true }); } })
+              .transform(response);
+          }
+        }
+      } catch (e) {
+        console.error("[og-meta] injection failed:", e?.message || e);
+      }
+    }
 
     return response;
   } catch (e) {

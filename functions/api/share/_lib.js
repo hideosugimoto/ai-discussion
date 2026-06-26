@@ -6,6 +6,58 @@ export const MAX_SHARED_PER_USER = 50;
 export const MAX_SHARED_DATA_BYTES = 200 * 1024;
 export const MAX_TOPIC_LEN = 2000;
 
+// Escape a string for safe insertion into an HTML attribute (OG/Twitter meta).
+export function escapeHtmlAttr(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Build OG/Twitter metadata for a shared discussion link preview. Pure function
+// (no I/O) so it is unit-testable; the middleware supplies the row + origin.
+export function buildShareMeta(topic, dataJson, origin, id) {
+  const t = (typeof topic === "string" && topic.trim() ? topic.trim() : "AIディスカッション").slice(0, 120);
+  let desc = "Claude・ChatGPT・Geminiが同じ議題を多角的に議論し、合意点・対立点・結論まで整理します。";
+  try {
+    const parsed = JSON.parse(dataJson || "{}");
+    const summaries = Array.isArray(parsed.summaries) ? parsed.summaries.filter(Boolean) : [];
+    const rounds = Array.isArray(parsed.discussion) ? parsed.discussion.length : 0;
+    const last = summaries[summaries.length - 1];
+    if (last && !last.error) {
+      const a = Array.isArray(last.agreements) ? last.agreements.length : 0;
+      const d = Array.isArray(last.disagreements) ? last.disagreements.length : 0;
+      const u = Array.isArray(last.unresolved) ? last.unresolved.length : 0;
+      desc = `3つのAIが${rounds}ラウンド議論。合意${a}・対立${d}・未解決${u}点を整理しました。`;
+    }
+  } catch { /* keep generic description */ }
+  return {
+    title: `${t}｜3 AI Discussion`,
+    description: desc.slice(0, 200),
+    url: `${origin}/?share=${encodeURIComponent(id)}`,
+    image: `${origin}/og.png`,
+  };
+}
+
+// Render the OG/Twitter meta tags (escaped) for injection into <head>.
+export function shareMetaTagsHtml(meta) {
+  const e = escapeHtmlAttr;
+  return [
+    `<meta property="og:type" content="article">`,
+    `<meta property="og:site_name" content="3 AI Discussion">`,
+    `<meta property="og:title" content="${e(meta.title)}">`,
+    `<meta property="og:description" content="${e(meta.description)}">`,
+    `<meta property="og:url" content="${e(meta.url)}">`,
+    `<meta property="og:image" content="${e(meta.image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${e(meta.title)}">`,
+    `<meta name="twitter:description" content="${e(meta.description)}">`,
+    `<meta name="twitter:image" content="${e(meta.image)}">`,
+  ].join("");
+}
+
 export function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,

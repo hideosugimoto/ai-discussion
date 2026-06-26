@@ -11,6 +11,7 @@ import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import combinedSummaryPromptText from "../prompts/combined-summary.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 import finalVerdictPromptText from "../prompts/final-verdict.txt?raw";
+import finalVerdictCritiquePromptText from "../prompts/final-verdict-critique.txt?raw";
 
 const ATTACHMENT_SUMMARY_SYSTEM =
   "あなたは資料を議論用に要約するアシスタントです。重要な数値・固有名詞・主張は省略せず、引用可能な形で簡潔にまとめます。";
@@ -208,6 +209,37 @@ async function generateFinalVerdict(apiKey, authToken, viaProxy, allRounds, topi
     caveats: (Array.isArray(parsed.caveats) ? parsed.caveats : []).filter((x) => typeof x === "string"),
     decisionHint: typeof parsed.decisionHint === "string" ? parsed.decisionHint : "",
   };
+}
+
+// Adversarial stress test of the verdict: an independent critic mounts the
+// strongest objection from the debate and judges whether the recommendation
+// survives. Makes the rigor visible — something a hidden one-shot answer can't
+// show. Returns null on failure so the verdict still renders without it.
+async function generateVerdictCritique(apiKey, authToken, viaProxy, recommendation, allRounds, topic, sessionId) {
+  const roundText = allRounds
+    .map((round, i) => {
+      const msgs = round.messages.map((m) => {
+        const name = MODELS.find((x) => x.id === m.modelId)?.name ?? m.modelId;
+        return `[${name}] ${m.text || "(エラー)"}`;
+      }).join("\n\n");
+      return `【Round ${i + 1}】\n${msgs}`;
+    })
+    .join("\n\n---\n\n");
+  const userMsg = `【議題】${topic}\n\n【検証対象の最終推奨】\n${recommendation}\n\n【議論の記録】\n${roundText}\n\nJSON形式で出力してください。`;
+  try {
+    const text = await callGPTMini(apiKey, authToken, viaProxy, finalVerdictCritiquePromptText, userMsg, sessionId, allRounds.length);
+    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(cleaned);
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      survives: ONE_OF(parsed.survives, ["yes", "partial", "no"], "partial"),
+      strongestObjection: typeof parsed.strongestObjection === "string" ? parsed.strongestObjection : "",
+      weakness: typeof parsed.weakness === "string" ? parsed.weakness : "",
+      fix: typeof parsed.fix === "string" ? parsed.fix : "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Build the cloud-sync payload from current discussion state.
@@ -540,7 +572,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setVerdictLoading(true);
     try {
       const v = await generateFinalVerdict(keys.chatgpt, authToken, viaProxy, discussion, topic, personas, discussionIdRef.current);
-      setVerdict(v);
+      setVerdict(v); // show the verdict immediately
+      // Then stress-test it adversarially (best-effort; attaches when ready).
+      const critique = await generateVerdictCritique(keys.chatgpt, authToken, viaProxy, v.recommendation, discussion, topic, discussionIdRef.current);
+      if (critique) setVerdict({ ...v, critique });
     } catch {
       setVerdict({ recommendation: "生成に失敗しました。もう一度お試しください。", confidence: "low", resolved: [], caveats: [], decisionHint: "", error: true });
     } finally {

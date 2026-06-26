@@ -19,6 +19,27 @@ function ConfBadge({ value, small }) {
   );
 }
 
+const SURVIVE = {
+  yes:     { label: "✅ 主要な反論に耐えた", color: "var(--success)", bg: "var(--success-bg)", bd: "var(--success)" },
+  partial: { label: "△ 条件付きで成立（要補強）", color: "var(--warning)", bg: "var(--warning-bg)", bd: "var(--warning-bd)" },
+  no:      { label: "✕ 反論で覆る可能性", color: "var(--error)", bg: "rgba(239,68,68,.1)", bd: "var(--error)" },
+};
+
+function StressTest({ critique }) {
+  const s = SURVIVE[critique.survives] || SURVIVE.partial;
+  return (
+    <div style={{ marginTop:12, marginBottom:12, padding:"10px 12px", background:s.bg, border:`1px solid ${s.bd}`, borderRadius:8 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:6 }}>
+        <span style={{ fontSize:12, fontWeight:700, color:"var(--text)" }}>🧪 反対意見ストレステスト</span>
+        <span style={{ fontSize:11.5, fontWeight:700, color:s.color }}>{s.label}</span>
+      </div>
+      {critique.strongestObjection && <div style={{ fontSize:12, color:"var(--text2)", lineHeight:1.6 }}>最強の反論: {critique.strongestObjection}</div>}
+      {critique.weakness && <div style={{ fontSize:12, color:"var(--text2)", lineHeight:1.6 }}>最も脆い前提: {critique.weakness}</div>}
+      {critique.fix && <div style={{ fontSize:12, color:"var(--text)", lineHeight:1.6, marginTop:4 }}>🛠 補強: <b>{critique.fix}</b></div>}
+    </div>
+  );
+}
+
 export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage }) {
   if (!verdict && !loading) {
     return (
@@ -88,6 +109,11 @@ export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage
               {verdict.caveats.map((c, i) => <li key={i}>{c}</li>)}
             </ul>
           </div>
+        )}
+
+        {/* 反対意見ストレステスト（adversarial verify）: 結論が最強の反論に耐えたか */}
+        {verdict.critique && (
+          <StressTest critique={verdict.critique} />
         )}
 
         {/* The decision is yours — what to check last */}
