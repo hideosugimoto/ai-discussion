@@ -4,14 +4,14 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#285240" />
-<title>3 AI Discussion — 3 つの AI に、まとめて聞こう。月¥980 で AI 比較が不要に</title>
-<meta name="description" content="ChatGPT・Claude・Gemini が同じ議題を議論し、合意点・対立点・結論まで自動でまとめます。AI を 1 つずつ試して比べる時代は、もう終わり。月額980円、API キー不要。" />
+<title>3 AI Discussion — 3 つの AI に議論させ、裁定まで出す。月¥980</title>
+<meta name="description" content="ChatGPT・Claude・Gemini が同じ議題で議論し、中立 AI が確信度つきで「裁定」。その結論を最強の反論でストレステストし、覆れば即・再ジャッジ。ただ要約するだけの AI とは違う。月額980円、API キー不要。" />
 <meta name="keywords" content="マルチAI, AI 比較, AI 議論, ChatGPT, Claude, Gemini, ChatGPT 卒業, 意思決定支援, AI まとめ" />
 <link rel="canonical" href="https://ai-discussion.pages.dev/lp" />
 
 <!-- Open Graph -->
-<meta property="og:title" content="3 AI Discussion — 3 つの AI に、まとめて聞こう。月¥980 で AI 比較が不要に" />
-<meta property="og:description" content="ChatGPT・Claude・Gemini が同じ議題を議論し、合意点・対立点・結論まで自動でまとめる。AI を 1 つずつ試して比べる時代は、もう終わり。月¥980。" />
+<meta property="og:title" content="3 AI Discussion — 3 つの AI に議論させ、裁定まで出す。月¥980" />
+<meta property="og:description" content="ChatGPT・Claude・Gemini が議論し、中立 AI が確信度つきで裁定。その結論を最強の反論で検証し、覆れば即・再ジャッジ。あなたは司会者として議論を指揮できる。月¥980。" />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://ai-discussion.pages.dev/lp" />
 <meta property="og:locale" content="ja_JP" />
@@ -24,8 +24,8 @@
 
 <!-- Twitter Card -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="3 AI Discussion — 3 つの AI に、まとめて聞こう。月¥980。" />
-<meta name="twitter:description" content="ChatGPT・Claude・Gemini が同じ議題を議論し、結論まで自動でまとめる。AI を 1 つずつ試して比べる時代は、もう終わり。" />
+<meta name="twitter:title" content="3 AI Discussion — 3 つの AI に議論させ、裁定まで出す。月¥980。" />
+<meta name="twitter:description" content="ChatGPT・Claude・Gemini が議論し、中立 AI が確信度つきで裁定。結論を最強の反論で検証し、覆れば即・再ジャッジ。ただ要約するだけの AI とは違う。" />
 <meta name="twitter:image" content="https://ai-discussion.pages.dev/og.png" />
 
 <!-- Favicon -->
@@ -49,7 +49,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "3 AI Discussion",
-  "description": "Claude・ChatGPT・Geminiの3つの最新AIが同じ議題を議論し、結論まで自動でまとめるプラットフォーム",
+  "description": "Claude・ChatGPT・Geminiの3つの最新AIが同じ議題を議論し、中立AIが確信度つきで裁定。その結論を最強の反論でストレステストし、覆れば再ジャッジするマルチAI熟議プラットフォーム",
   "applicationCategory": "ProductivityApplication",
   "operatingSystem": "Web",
   "offers": [
@@ -500,7 +500,7 @@
   }
   .mode-list {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 14px;
     margin-top: 12px;
   }
@@ -514,8 +514,7 @@
     text-align: center;
   }
   .mode .num {
-    font-size: 11px; font-weight: 700; color: var(--accent);
-    letter-spacing: 0.1em;
+    font-size: 22px; line-height: 1;
   }
   .mode h5 {
     font-size: 15px; font-weight: 700; margin: 4px 0 8px;
@@ -723,6 +722,34 @@
     margin-left: auto; margin-right: auto;
   }
   .dialogue-summary strong { color: var(--accent); }
+
+  /* ── Hero verdict (裁定 + ストレステスト) ──────── */
+  .dialogue-verdict {
+    margin: 10px auto 0;
+    max-width: 720px;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, var(--accent-bg), var(--surface));
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    text-align: left;
+  }
+  .verdict-badge {
+    flex-shrink: 0;
+    font-size: 11px; font-weight: 700;
+    color: #fff; background: var(--accent);
+    border-radius: 999px;
+    padding: 4px 11px;
+    white-space: nowrap;
+    line-height: 1.5;
+  }
+  .verdict-text { font-size: 13px; color: var(--text); line-height: 1.6; }
+  .verdict-text strong { color: var(--accent); }
+  .verdict-stress {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px; color: var(--text2);
+  }
 
   /* ── Trust strip ─────────────────────────────── */
   .trust-strip {
@@ -1417,6 +1444,96 @@
     footer { padding-bottom: 90px; }
   }
 
+  /* ── Verdict & Stress-test (差別化の核) ───────── */
+  .verdict-section { background: var(--bg2); }
+  .verdict-flow {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    max-width: 1000px;
+    margin: 0 auto 28px;
+  }
+  @media (max-width: 880px) { .verdict-flow { grid-template-columns: 1fr; } }
+  .vf-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px;
+    position: relative;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .vf-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .vf-card.is-judge { border: 2px solid var(--accent); }
+  .vf-step {
+    display: inline-block;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--accent);
+    background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin-bottom: 14px;
+  }
+  .vf-card h3 { font-size: 18px; font-weight: 700; margin: 0 0 10px; }
+  .vf-card p { font-size: 13.5px; color: var(--text2); margin: 0; line-height: 1.7; }
+  .vf-demo {
+    margin-top: 16px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+  .vf-conf {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent); background: var(--accent-bg);
+    border: 1px solid var(--accent-bd);
+    border-radius: 999px; padding: 2px 9px;
+    margin-bottom: 8px;
+  }
+  .vf-verdict-line { color: var(--text); font-weight: 600; }
+  .vf-obj {
+    color: var(--warning);
+    font-weight: 600;
+    display: block; margin-top: 8px;
+  }
+  .vf-rejudge-btn {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 11.5px; font-weight: 700;
+    color: #fff; background: var(--accent);
+    border-radius: 8px; padding: 6px 14px;
+  }
+  .vf-arrow {
+    display: none;
+  }
+  /* Contrast strip: ふつうのまとめ vs 裁定 */
+  .verdict-contrast {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+  @media (max-width: 720px) { .verdict-contrast { grid-template-columns: 1fr; } }
+  .vc-col {
+    border-radius: var(--radius);
+    padding: 22px 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .vc-col.is-them { opacity: 0.88; }
+  .vc-col.is-us { border: 2px solid var(--accent); background: var(--accent-bg); }
+  .vc-head { font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+  .vc-col.is-them .vc-head { color: var(--text3); }
+  .vc-col.is-us .vc-head { color: var(--accent); }
+  .vc-col ul { list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--text2); }
+  .vc-col ul li { padding: 5px 0 5px 22px; position: relative; line-height: 1.6; }
+  .vc-col.is-them ul li::before { content: "✕"; position: absolute; left: 0; color: var(--text3); font-weight: 700; }
+  .vc-col.is-us ul li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+
   /* ── Footer ──────────────────────────────────── */
   footer {
     padding: 48px 0 60px;
@@ -1445,6 +1562,7 @@
     </a>
     <nav class="nav" aria-label="メインナビゲーション">
       <a href="#how-it-works">使い方</a>
+      <a href="#verdict">裁定の仕組み</a>
       <a href="#features">機能</a>
       <a href="#pricing">料金</a>
       <a href="#faq">FAQ</a>
@@ -1461,15 +1579,15 @@
 <!-- ── Hero ─────────────────────────────────────── -->
 <section class="hero" id="top" aria-labelledby="hero-title">
   <div class="container">
-    <span class="hero-eyebrow">マルチ AI 議論プラットフォーム</span>
+    <span class="hero-eyebrow">マルチ AI 熟議プラットフォーム</span>
     <h1 id="hero-title">
-      3 つの AI に、<br />
-      <span class="accent">まとめて聞こう。</span>
+      3 つの AI に議論させ、<br />
+      <span class="accent">裁定まで出す。</span>
     </h1>
     <p class="lead">
-      ChatGPT・Claude・Gemini が同じ議題を議論し、<br />
-      合意点・対立点・結論まで自動でまとめる。<strong>AI を 1 つずつ試して比べる時代は、もう終わり。</strong><br />
-      月¥980、API キー不要。
+      ChatGPT・Claude・Gemini が同じ議題でぶつかり合い、中立 AI が<strong>確信度つきで「裁定」</strong>。<br />
+      さらにその結論を<strong>最強の反論でストレステスト</strong>し、覆れば即・再ジャッジ。<br />
+      ただ要約するだけの AI とは、ここが違う。月¥980、API キー不要。
     </p>
     <div class="hero-cta">
       <a href="/" class="btn btn-primary btn-lg">Google アカウントで30秒で始める →</a>
@@ -1521,7 +1639,7 @@
       </div>
 
       <div id="trial-followup" class="trial-followup">
-        <p>議題を変えて違う AI の個性を試せます。さらに <strong>議論を 3 ラウンド以上で深堀り</strong> したり、Opus 4.8 / GPT-5.5 / Gemini 2.5 Pro の <strong>best モード</strong> を使うには、ログインが必要です。</p>
+        <p>議題を変えて違う AI の個性を試せます。さらに <strong>議論を 3 ラウンド以上で深堀り</strong> したり、Opus 4.8 / GPT-5.5 / Gemini 3.5 Flash の <strong>最強モード</strong>・<strong>裁定＋ストレステスト</strong> を使うには、ログインが必要です。</p>
         <a href="/" class="btn btn-primary">Google でフル機能を試す →</a>
       </div>
     </div>
@@ -1551,12 +1669,16 @@
         <p data-slot="chatgpt">いや、収入の安定性を軽視しすぎだ。最低6ヶ月の生活防衛資金を確保した上で判断するべき。</p>
       </div>
       <div class="ai-card gemini">
-        <div class="name"><span class="dot" aria-hidden="true"></span>Gemini<span class="model">2.5 pro</span></div>
+        <div class="name"><span class="dot" aria-hidden="true"></span>Gemini<span class="model">3.5 flash</span></div>
         <p data-slot="gemini">2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
       </div>
     </div>
     <div class="dialogue-summary" role="note">
       <strong>自動サマリー:</strong> <span data-slot="summary">3者は「タイミング」で合意。「優先順位」で対立 (価値観 vs 安定性 vs 家族要因)。</span>
+    </div>
+    <div class="dialogue-verdict" role="note">
+      <span class="verdict-badge">🏛️ 最終ジャッジ</span>
+      <span class="verdict-text">中立 AI の裁定：<strong>段階的独立を推奨</strong>（確信度 <b>高</b>）。<span class="verdict-stress">⚔️ ストレステスト：最強の反論「半年で資金が尽きるリスク」にも条件付きで成立</span></span>
     </div>
   </div>
 </section>
@@ -1599,7 +1721,9 @@
           <button class="mode-pill" type="button">ディベート</button>
           <button class="mode-pill" type="button">ブレスト</button>
           <button class="mode-pill" type="button">事実検証</button>
-          <button class="mode-pill" type="button">結論まとめ</button>
+          <button class="mode-pill" type="button">合意形成</button>
+          <button class="mode-pill" type="button">意思決定</button>
+          <button class="mode-pill" type="button">中立まとめ</button>
         </div>
 
         <div class="discussion-grid">
@@ -1614,7 +1738,7 @@
             <p class="msg-fade">具体的には、副業を週末に限定して半年運営し、月10万の利益が出てから独立を検討...</p>
           </article>
           <article class="msg msg-gemini">
-            <header><span class="msg-name">Gemini</span><span class="msg-model">2.5 pro</span></header>
+            <header><span class="msg-name">Gemini</span><span class="msg-model">3.5 flash</span></header>
             <p>2人とも前提を見落としている。家族の状況と健康保険の切替コストを先に検討するべきです。</p>
             <p class="msg-fade">国民健康保険への切替で年間20-40万のコスト増。配偶者の社保扶養なら...</p>
           </article>
@@ -1648,14 +1772,75 @@
   </div>
 </section>
 
+<!-- ── Verdict & Stress-test (差別化の核) ─────────── -->
+<section class="verdict-section" id="verdict" aria-labelledby="verdict-title">
+  <div class="container">
+    <h2 id="verdict-title">議論を、放置しない。<br />裁定して、反論で殴って、検証する。</h2>
+    <p class="sub">他の AI ツールは「両論を要約」して終わり。このアプリは中立 AI が確信度つきで<strong>裁定</strong>を下し、その結論を<strong>最強の反論</strong>でストレステストします。覆ったら、ワンクリックで再ジャッジ。</p>
+
+    <div class="verdict-flow">
+      <article class="vf-card is-judge">
+        <span class="vf-step">STEP 1 — 裁定</span>
+        <h3>🏛️ 中立 AI が結論を出す</h3>
+        <p>議論を「整理」するだけでなく、対立点ごとに<strong>どちらが妥当か</strong>を判定。全体の推奨と確信度（高 / 中 / 低）まで明示します。</p>
+        <div class="vf-demo">
+          <span class="vf-conf">確信度 高</span>
+          <span class="vf-verdict-line">推奨：段階的に独立。まず副業を半年運営し、月10万の利益を確認してから本独立。</span>
+        </div>
+      </article>
+
+      <article class="vf-card">
+        <span class="vf-step">STEP 2 — 検証</span>
+        <h3>⚔️ 最強の反論でストレステスト</h3>
+        <p>出した結論に、別の AI が<strong>あえて全力で反論</strong>。「この裁定は主要な反論に耐えるか?」を、覆る / 条件付き / 耐える で評価します。</p>
+        <div class="vf-demo">
+          <span class="vf-verdict-line">判定：⚠️ 条件付きで成立</span>
+          <span class="vf-obj">最強の反論：「半年で生活防衛資金が尽きるケースを見落としている」</span>
+        </div>
+      </article>
+
+      <article class="vf-card">
+        <span class="vf-step">STEP 3 — 再裁定</span>
+        <h3>🔄 覆ればワンクリックで再ジャッジ</h3>
+        <p>反論で結論が揺らいだら、その反論を<strong>そのまま材料として差し戻し</strong>、より強い結論へ。納得いくまで「裁定 → 検証」を回せます。</p>
+        <div class="vf-demo">
+          <span class="vf-verdict-line">反論を反映して再裁定 →</span>
+          <span class="vf-rejudge-btn">🔄 反論を反映して再ジャッジ</span>
+        </div>
+      </article>
+    </div>
+
+    <div class="verdict-contrast">
+      <div class="vc-col is-them">
+        <div class="vc-head">ふつうの AI / 隠れたオーケストレーター</div>
+        <ul>
+          <li>裏で勝手にまとめた「答えらしきもの」だけが出る</li>
+          <li>どう議論したか、なぜその結論かが見えない</li>
+          <li>結論への反論検証がなく、鵜呑みにするしかない</li>
+          <li>途中で口を挟めない</li>
+        </ul>
+      </div>
+      <div class="vc-col is-us">
+        <div class="vc-head">3 AI Discussion</div>
+        <ul>
+          <li>3 AI の議論が全部見える（熟議の過程を読める）</li>
+          <li>裁定に確信度と「対立点ごとの判定」が付く</li>
+          <li>結論を最強の反論でストレステスト → 覆れば再ジャッジ</li>
+          <li>あなたが司会者として、いつでも議論に介入できる</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Trust strip: model authority + tech stack ─── -->
 <section class="trust-strip" aria-label="使用技術">
   <div class="container">
     <div class="trust-label">POWERED BY</div>
     <div class="trust-row">
-      <div class="trust-item"><strong>Claude Opus 4.7</strong><span>Anthropic</span></div>
-      <div class="trust-item"><strong>GPT-5.4</strong><span>OpenAI</span></div>
-      <div class="trust-item"><strong>Gemini 2.5 Pro</strong><span>Google</span></div>
+      <div class="trust-item"><strong>Claude Opus 4.8</strong><span>Anthropic</span></div>
+      <div class="trust-item"><strong>GPT-5.5</strong><span>OpenAI</span></div>
+      <div class="trust-item"><strong>Gemini 3.5 Flash</strong><span>Google</span></div>
       <div class="trust-divider" aria-hidden="true"></div>
       <div class="trust-item"><strong>Cloudflare</strong><span>edge</span></div>
       <div class="trust-item"><strong>Stripe</strong><span>決済</span></div>
@@ -1698,8 +1883,8 @@
       <div class="step-arrow" aria-hidden="true">→</div>
       <div class="step">
         <div class="step-num">03</div>
-        <h3>結論を自動でまとめる</h3>
-        <p>合意点・対立点・最終結論を自動分析。<br />マインドマップ・アクションプランまでワンクリックで生成。</p>
+        <h3>裁定し、反論で検証する</h3>
+        <p>中立 AI が確信度つきで裁定 → 最強の反論でストレステスト。<br />アクションプラン・マインドマップまでワンクリックで生成。</p>
       </div>
     </div>
   </div>
@@ -1730,7 +1915,7 @@
         <ul>
           <li>Claude (opus 4.8 / sonnet 4.6)</li>
           <li>ChatGPT (gpt-5.5 / 5.4 mini)</li>
-          <li>Gemini (2.5 pro / 3.1 flash-lite)</li>
+          <li>Gemini (3.5 flash / 3.1 flash-lite)</li>
           <li>1画面で3AIが議論</li>
           <li>履歴・要約・共有まで統合</li>
         </ul>
@@ -1747,49 +1932,69 @@
 
     <div class="features">
       <div class="feature">
-        <div class="ico">01</div>
+        <div class="ico">⚡</div>
         <h4>3AI並列ストリーミング</h4>
         <p>Claude・ChatGPT・Gemini が同時に応答。互いの発言を読みながら議論を深める。</p>
       </div>
       <div class="feature">
-        <div class="ico">02</div>
-        <h4>5つの議論モード</h4>
-        <p>標準・ディベート・ブレスト・事実検証・結論まとめ。目的に応じて切替可能。</p>
+        <div class="ico">🏛️</div>
+        <h4>最終ジャッジ（裁定）</h4>
+        <p>中立 AI が対立点ごとに判定し、確信度つきで結論を出す。「整理」で終わらせない。</p>
       </div>
       <div class="feature">
-        <div class="ico">03</div>
-        <h4>自動サマリー</h4>
-        <p>合意点・対立点・未解決事項・立場の変化を、ラウンド毎に自動分析。</p>
+        <div class="ico">⚔️</div>
+        <h4>ストレステスト＋再ジャッジ</h4>
+        <p>結論に最強の反論をぶつけて検証。覆ればワンクリックで再裁定し、結論を鍛える。</p>
       </div>
       <div class="feature">
-        <div class="ico">04</div>
+        <div class="ico">📌</div>
+        <h4>現在の到達点カード</h4>
+        <p>合意・対立・未解決と各AIの立場を常時ピン留め。スクロールせず結論が掴める。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🎛️</div>
+        <h4>7つの議論モード</h4>
+        <p>標準・ディベート・ブレスト・事実検証・合意形成・意思決定・中立まとめ。目的で切替。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🔄</div>
+        <h4>立場の変化を可視化</h4>
+        <p>議論の中で意見を変えたAIを検出。「心変わり」こそ熟議が起きている証拠。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🎙️</div>
+        <h4>司会者として介入</h4>
+        <p>あなたがいつでも議論に割り込める。未解決点はワンクリックで深掘り指示。</p>
+      </div>
+      <div class="feature">
+        <div class="ico">🗺️</div>
         <h4>マインドマップ可視化</h4>
         <p>議論の構造をひと目で。テーマ別・AI別の立場が一覧できる。</p>
       </div>
       <div class="feature">
-        <div class="ico">05</div>
+        <div class="ico">✅</div>
         <h4>アクションプラン生成</h4>
         <p>議論の結論から、優先度・期限付きの実行可能タスクを自動抽出。</p>
       </div>
       <div class="feature">
-        <div class="ico">06</div>
+        <div class="ico">💬</div>
         <h4>50問のおすすめ質問</h4>
         <p>自己分析・キャリア・お金・事業・哲学など9カテゴリ。クリックで議題が始まる。</p>
       </div>
       <div class="feature">
-        <div class="ico">07</div>
+        <div class="ico">⚙️</div>
         <h4>ペルソナ・憲法</h4>
         <p>各AIに役割を与え、あなたの価値観を「憲法」としてシステムに注入できる。</p>
       </div>
       <div class="feature">
-        <div class="ico">08</div>
+        <div class="ico">🔍</div>
         <h4>履歴・クラウド同期</h4>
         <p>過去の議論を保存・全文検索。過去の結論を今回の議論に文脈として注入できる。</p>
       </div>
       <div class="feature">
-        <div class="ico">09</div>
+        <div class="ico">📤</div>
         <h4>共有リンク・エクスポート</h4>
-        <p>HTML / Markdown / 共有URL で、議論結果をチームに渡せる。個人情報は自動除去。</p>
+        <p>HTML / Markdown / 共有URL で。裁定とアクションプランも一緒に渡せる。個人情報は自動除去。</p>
       </div>
     </div>
   </div>
@@ -1798,34 +2003,44 @@
 <!-- ── Modes ────────────────────────────────────── -->
 <section class="modes" id="modes">
   <div class="container">
-    <h2>5つのモードで、議論の質をコントロール。</h2>
+    <h2>7つのモードで、議論の質をコントロール。</h2>
     <p class="sub">同じ議題でも、モードを変えれば違う答えが出る。目的に応じて使い分けよう。</p>
 
     <div class="mode-list">
       <div class="mode">
-        <div class="num">01</div>
+        <div class="num" aria-hidden="true">💬</div>
         <h5>標準</h5>
         <p>バランスの取れた建設的な議論。迷ったらこれ。</p>
       </div>
       <div class="mode">
-        <div class="num">02</div>
+        <div class="num" aria-hidden="true">⚔️</div>
         <h5>ディベート</h5>
         <p>各AIが対立しながら論点を掘り下げる。</p>
       </div>
       <div class="mode">
-        <div class="num">03</div>
+        <div class="num" aria-hidden="true">💡</div>
         <h5>ブレスト</h5>
         <p>否定せずアイデアを発散。Yes, and の姿勢。</p>
       </div>
       <div class="mode">
-        <div class="num">04</div>
+        <div class="num" aria-hidden="true">🔍</div>
         <h5>事実検証</h5>
         <p>根拠とデータ重視で互いの発言を検証。</p>
       </div>
       <div class="mode">
-        <div class="num">05</div>
-        <h5>結論まとめ</h5>
-        <p>1つのAIが中立記録者として全体を統合。</p>
+        <div class="num" aria-hidden="true">🤝</div>
+        <h5>合意形成</h5>
+        <p>対立を歩み寄り、第三案で合意を目指す。</p>
+      </div>
+      <div class="mode">
+        <div class="num" aria-hidden="true">⚖️</div>
+        <h5>意思決定</h5>
+        <p>選択肢を評価軸で比較し、推奨を出す。</p>
+      </div>
+      <div class="mode">
+        <div class="num" aria-hidden="true">🧾</div>
+        <h5>中立まとめ</h5>
+        <p>1つのAIが中立記録者として全体を統合（裁定なし）。</p>
       </div>
     </div>
   </div>
@@ -1904,7 +2119,7 @@
 
           <p class="eng-quote">
             <strong>Multi-Agent Discussion を、コード書かずに実験できる唯一のSaaS。</strong><br />
-            5モード切替・ペルソナ注入・憲法注入・履歴文脈注入まで実装済み。
+            7モード切替・裁定＋ストレステスト・ペルソナ注入・憲法注入・履歴文脈注入まで実装済み。
             車輪の再発明をやめて、議論結果に集中しよう。
           </p>
 
@@ -1919,7 +2134,8 @@
 <span class="check">✓</span> Google OAuth + JWT (HS256)<br>
 <span class="check">✓</span> Refresh Token (SHA-256 hashed)<br>
 <span class="check">✓</span> SSE Streaming (3 LLM providers)<br>
-<span class="check">✓</span> React 18 + Vite + Vitest (58 tests)<br>
+<span class="check">✓</span> Verdict + Stress-test + Re-judge loop<br>
+<span class="check">✓</span> React 18 + Vite + Vitest (210 tests)<br>
 <span class="check">✓</span> AES-GCM 256bit Backup<br>
 <span class="check">✓</span> SRI (Subresource Integrity)<br>
 <span class="check">✓</span> 5-Layer Defense in Depth<br>
@@ -2005,9 +2221,9 @@
         <ul>
           <li>API キー不要（サーバープロキシ）</li>
           <li>Google ログインで30秒で開始</li>
+          <li>最終ジャッジ＋ストレステスト＋再ジャッジ</li>
           <li>クラウド履歴同期 + 全文検索</li>
           <li>共有リンク・公開URL生成</li>
-          <li>使用量ダッシュボード</li>
           <li>過去議論の文脈注入</li>
         </ul>
         <a href="/" class="btn btn-primary">Premium を ¥980 で始める →</a>
@@ -2039,7 +2255,12 @@
 
       <details class="faq">
         <summary>本当に Claude / ChatGPT / Gemini の最新モデルが使えますか?</summary>
-        <p>はい。Claude Opus 4.8 / GPT-5.5 / Gemini 2.5 Pro など、各社の最新モデルを使用しています。高速モードでは Sonnet 4.6 / GPT-5.4 mini / Gemini 3.1 Flash-Lite に切替可能です。</p>
+        <p>はい。最強モードでは Claude Opus 4.8 / GPT-5.5 / Gemini 3.5 Flash、高速モード（既定）では Sonnet 4.6 / GPT-5.4 mini / Gemini 3.1 Flash-Lite を使用しています。新モデルが各社から出れば随時アップデートします。</p>
+      </details>
+
+      <details class="faq">
+        <summary>「最終ジャッジ」と「中立まとめ」は何が違いますか?</summary>
+        <p>中立まとめは合意点・対立点・結論を中立的に「整理」するモードで、裁定はしません。最終ジャッジは中立 AI が対立点ごとに<strong>どちらが妥当かを判定</strong>し、全体の推奨を確信度（高 / 中 / 低）つきで出します。さらにその結論に最強の反論をぶつける<strong>ストレステスト</strong>を行い、覆ればワンクリックで再ジャッジできます。「整理」で終わらせず「決める」ためのものです。</p>
       </details>
 
       <details class="faq">
@@ -2080,7 +2301,7 @@
 <section id="examples" class="examples-section" aria-labelledby="examples-title">
   <div class="container">
     <h2 id="examples-title">実議論サンプル、全文公開予定。</h2>
-    <p class="sub">実際に3つのAIが議論した結果を、最後まで読めるサンプルです。<br />結論モードで Gemini が「合意点・対立点・最終結論」まで一気にまとめます。</p>
+    <p class="sub">実際に3つのAIが議論した結果を、最後まで読めるサンプルです。<br />中立AIの裁定・確信度・ストレステストまで、結論に至る過程をすべて公開します。</p>
 
     <div class="examples-grid">
       <!-- TODO(phase5-fill): 本物の共有URLが揃ったら href と snippet・meta を差し替え、`disabled` クラスを外す -->
