@@ -136,27 +136,40 @@ npx wrangler pages deploy dist --project-name ai-discussion
 ## 使用モデル
 | モード | Claude | ChatGPT | Gemini |
 |--------|--------|---------|--------|
-| 🧠最強 | claude-opus-4-7 | gpt-5.4 | gemini-2.5-pro |
-| ⚡高速 | claude-sonnet-4-6 | gpt-5.4-mini | gemini-2.5-flash |
+| 🧠最強 | claude-opus-4-8 | gpt-5.5 | gemini-3.5-flash |
+| ⚡高速（既定） | claude-sonnet-4-6 | gpt-5.4-mini | gemini-3.1-flash-lite |
+
+> モデル定義の単一ソースは `src/models.config.js`。新モデルが各社から出れば随時更新します。
 
 ## 機能
 
 ### ディスカッション
 - 3AIへの並列送信・ストリーミング表示
 - 複数ラウンドのディスカッション
-- 5つの議論モード（standard / debate / brainstorm / factcheck / conclusion）
-  - **conclusion（結論まとめ）モード**: 選択した1つのAI（デフォルト Claude）が中立的な記録者として、3者の議論を「合意点 / 相違点 / 最終結論」に統合。実行後は自動的に standard モードに復帰
+- 7つの議論モード（standard / debate / brainstorm / factcheck / consensus / decision / conclusion）
+  - **consensus（合意形成）モード**: 対立を歩み寄らせ、第三案で合意を目指す
+  - **decision（意思決定）モード**: 選択肢を評価軸で比較し、推奨を出す
+  - **conclusion（中立まとめ）モード**: 選択した1つのAI（デフォルト Claude）が中立的な記録者として、3者の議論を「合意点 / 相違点 / 最終結論」に統合（裁定はしない）。実行後は自動的に standard モードに復帰
 - **おすすめ質問集（50問）**: 自己分析・キャリア・お金・事業・哲学・創作・時事・思考実験・軽めテーマの9カテゴリ。クリックで議題と推奨モードが自動セット。議題欄プレースホルダーも自動ローテーションで質問例を提示
 - ユーザー介入機能（ラウンド間で司会者として介入可能）
 - ペルソナ設定（各AIに役割を付与）
 - コンスティテューション（AIの行動指針を設定）
 - 途中停止ボタン
 
+### 裁定・検証（差別化の核）
+- **最終ジャッジ（裁定）**: 中立AIが対立点ごとに「どちらが妥当か」を判定し、全体の推奨を確信度（高/中/低）つきで出す。「整理」で終わらせず「決める」
+- **ストレステスト**: 出した結論に別AIがあえて全力で反論し、「主要な反論に耐えるか」を 耐える/条件付き/覆る で評価
+- **ワンクリック再ジャッジ**: 反論で結論が覆ったら、その反論を材料として差し戻し、より強い結論へ再裁定
+- エクスポート（HTML/Markdown）・共有時は、裁定とアクションプランを成果物の冒頭に含める
+
 ### 分析・可視化
+- **現在の到達点カード**: 合意・対立・未解決と各AIの立場を常時ピン留め。未解決点はワンクリックで深掘り（司会者介入に流し込み）
 - ラウンドサマリー（合意点・対立点・未解決・立場変化・各AIの立場を自動分析）
+- **立場の変化（心変わり）検出**: 議論中に意見を変えたAIを可視化（熟議の証拠）
 - 詳細分析（テーマ抽出・合意形成・未解決事項）
 - アクションプラン生成
 - マインドマップ可視化（Mermaid.js）
+- 共有リンクの動的OG画像（議論ごとの結論カードをPNG生成）
 
 ### コスト最適化
 - **会話履歴の要約圧縮**: 4ラウンド以降、古いラウンドを要約で置換し直近2Rのみ全文保持
@@ -191,19 +204,23 @@ npm test               # 全テスト実行
 npm test -- --watch    # 監視モード
 ```
 
-主要なテスト対象（vitest、計106テスト）:
+主要なテスト対象（vitest、計210テスト）:
 
 | 対象 | 内容 |
 |------|------|
-| `prompt.js` | モード別プロンプト生成・字数制限・モデル名解決・履歴圧縮 |
+| `prompt.js` | モード別プロンプト生成（consensus/decision含む）・字数制限・モデル名解決・履歴圧縮 |
+| `consensus.js` | 到達点カードのロジック（合意/対立/未解決の集約・立場変化検出） |
 | `compressHistory` | 会話履歴圧縮ロジック（要約置換・フォールバック・ペルソナ） |
+| `export.js` | HTML/Markdown エクスポート（裁定・アクションプランの埋め込み・HTMLエスケープ） |
+| `ogCard.js` | 動的OG画像のカード派生・グリフ抽出 |
+| `shareMeta` | 共有メタタグ生成（og:image=動的OG・寸法・alt） |
+| `share-sanitize` | 共有時のホワイトリストサニタイズ（ペルソナ/憲法/キー除外） |
+| `search.js` | FTS5 全文検索クエリ生成・ハイライト |
 | `suggestedQuestions.js` | 質問データ整合性（ID重複・mode/category参照・字数上限） |
-| `storage.js` | localStorage 保存/復元・バリデーション |
-| `crypto.js` | AES-GCM 暗号化バックアップ/復元 |
-| `actionPlan.js` | アクションプラン生成プロンプト・パース |
-| `export.js` | HTML/Markdown エクスポート |
-| `constitution.js` | 議論の憲法バリデーション |
-| `billing-helpers` | USD→microdollar変換・プラン別上限・月末計算 |
+| `fileParser` | 添付ファイル（PDF/docx等）パース |
+| `storage.js` / `crypto.js` | localStorage 保存/復元・AES-GCM 暗号化バックアップ |
+| `actionPlan.js` / `constitution.js` | アクションプラン生成・議論の憲法バリデーション |
+| `billing-helpers` / `apiProxy` | USD→microdollar変換・プラン別上限・プロキシ判定 |
 
 ### ビルド
 ```bash

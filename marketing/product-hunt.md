@@ -4,12 +4,12 @@
 **3 AI Discussion**
 
 ## Tagline (60 chars max)
-> 3 frontier AIs debate your question, then summarize for you.
+> 3 frontier AIs debate, then a neutral AI judges & stress-tests it.
 
 代替候補:
-- `Claude, ChatGPT & Gemini debate your question — for ¥980/mo`
-- `One question, three frontier AIs, one synthesized answer`
-- `Multi-Agent LLM Playground for everyone — ¥980/mo`
+- `Claude, ChatGPT & Gemini debate — then judge & stress-test it`
+- `Not just a summary. A verdict, stress-tested by a counter-AI`
+- `3 AIs debate your decision, judged with confidence — ¥980/mo`
 
 ## Topics / Tags
 `Artificial Intelligence` · `Productivity` · `Open Source` · `Decision Making` · `Chatbots`
@@ -21,7 +21,7 @@
 
 ## Description (260 chars max for the gallery card)
 
-> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.7, GPT-5.4, and Gemini 2.5 Pro debate the same topic in parallel — then auto-summarizes the agreements, conflicts, and final conclusion. ¥980/month, no API keys required. Open-source.
+> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.8, GPT-5.5, and Gemini 3.5 Flash debate the same topic in parallel — then a neutral AI **judges it with a confidence level** and **stress-tests the verdict against the strongest counter-argument**. One click re-judges if it breaks. ¥980/month, no API keys. Open-source.
 
 ---
 
@@ -35,7 +35,7 @@ I'm @hideosugimoto, an indie developer from Tokyo.
 Whenever I had a hard decision — should I quit my job? should I bootstrap or raise? — asking ChatGPT alone always gave me a wishy-washy "both have pros and cons" answer. Asking Claude separately, then GPT, then Gemini, then comparing manually was exhausting.
 
 **What I built:**
-A web app where the same question gets sent to **all three frontier models in parallel**, they read each other's responses, and debate over multiple rounds. Then a summary AI extracts the agreements, conflicts, and unresolved points — and offers an action plan.
+A web app where the same question gets sent to **all three frontier models in parallel**, they read each other's responses, and debate over multiple rounds. Then it goes further than a summary: a neutral AI **judges** the debate (with a confidence level and a per-conflict ruling), **stress-tests** that verdict against the strongest counter-argument, and lets you **re-judge in one click** if the conclusion breaks. You're the moderator — you can interject any round, and one-click deep-dive any unresolved point. Action plan included.
 
 **Why ¥980/month (~$6.50):**
 Subscribing to Claude Pro + ChatGPT Plus + Gemini Advanced separately would cost ~$60/month. Most people don't need three full subscriptions. We share API costs across the user base and pass on the savings. **No API keys to manage.**
@@ -46,15 +46,19 @@ Subscribing to Claude Pro + ChatGPT Plus + Gemini Advanced separately would cost
 - Stripe subscriptions + one-time payments
 - Google OAuth + JWT
 - React 18 + Vite
+- Verdict → stress-test → re-judge loop
+- Dynamic per-discussion OG image (workers-og)
 - 5-layer defense in depth + SRI
 - **Source-available** under BSL 1.1 → MIT in 2030
 
-**5 discussion modes:**
+**7 discussion modes:**
 1. Standard — balanced
 2. Debate — adversarial
 3. Brainstorm — Yes-and divergent
 4. Fact-check — evidence-first
-5. Conclusion — neutral synthesis
+5. Consensus — meet in the middle / third option
+6. Decision — weigh options, recommend
+7. Neutral summary — synthesis only (no verdict)
 
 **What's free vs paid:**
 - Free: bring your own API keys
@@ -69,10 +73,11 @@ I'd love to hear what kinds of decisions you'd want 3 AIs to debate. Roast it, b
 
 1. **Hero shot** — `public/og.png`: "1つの問いに、3つの最強AI"
 2. **The 3-column discussion view** — Claude / ChatGPT / Gemini side-by-side responses
-3. **The auto-summary** — agreements, conflicts, unresolved
-4. **Mind map view** — visualized stance per AI per theme
-5. **Pricing page** — ¥980 vs ¥9,000 comparison
-6. **Trust & Safety** — open source, source-available, 5-layer defense
+3. **The "current standing" card** — agreements, conflicts, unresolved + each AI's stance, pinned
+4. **The verdict + stress-test** — neutral AI's ruling with confidence, then the counter-AI's strongest objection → one-click re-judge
+5. **Mind map view** — visualized stance per AI per theme
+6. **Pricing page** — ¥980 vs ¥9,000 comparison
+7. **Trust & Safety** — open source, source-available, 5-layer defense
 
 ---
 
