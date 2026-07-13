@@ -12,6 +12,9 @@ export const MODEL_PRICING = {
   "claude-opus-4-7":         { input: 5.00, output: 25.00 },
   "claude-sonnet-4-6":       { input: 3.00, output: 15.00 },
   // OpenAI
+  "gpt-5.6-sol":             { input: 5.00, output: 30.00 },
+  "gpt-5.6-terra":           { input: 2.50, output: 15.00 },
+  "gpt-5.6-luna":            { input: 1.00, output: 6.00  },
   "gpt-5.5":                 { input: 5.00, output: 30.00 },
   "gpt-5.4":                 { input: 2.50, output: 15.00 },
   "gpt-5.4-mini":            { input: 0.75, output: 4.50  },
@@ -25,7 +28,7 @@ export const MODEL_PRICING = {
 export const MODE_MODELS = {
   best: {
     claude:  { tag: "claude-opus-4-8",        label: "Opus 4.8" },
-    chatgpt: { tag: "gpt-5.5",                label: "GPT-5.5" },
+    chatgpt: { tag: "gpt-5.6-sol",            label: "GPT-5.6 Sol" },
     gemini:  { tag: "gemini-3.5-flash",       label: "3.5 Flash" },
   },
   fast: {
