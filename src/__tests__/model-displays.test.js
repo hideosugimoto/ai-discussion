@@ -7,6 +7,21 @@ import {
   retiredDisplayLabels,
   TARGET_FILES,
 } from "../../scripts/sync-model-displays.mjs";
+import {
+  MODE_MODELS,
+  MODEL_LABELS,
+  SUMMARY_MODEL,
+  VALIDATION_MODELS,
+} from "../models.config.js";
+
+// Every model tag actually routed somewhere (best/fast/summary/validation).
+function routedTags() {
+  return new Set([
+    ...Object.values(MODE_MODELS).flatMap((m) => Object.values(m).map((c) => c.tag)),
+    SUMMARY_MODEL,
+    ...Object.values(VALIDATION_MODELS),
+  ]);
+}
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -54,6 +69,14 @@ describe("model display sync", () => {
       }
     }
     expect(leaks).toEqual([]);
+  });
+
+  it("every routed model tag has a MODEL_LABELS entry", () => {
+    // Guards the labelFor() fallback: without a label a routed model would
+    // render its raw tag (e.g. "gpt-5.7-x") in the UI/LP and no other test
+    // would catch it (sync stays idempotent on the raw tag).
+    const missing = [...routedTags()].filter((tag) => !(tag in MODEL_LABELS));
+    expect(missing).toEqual([]);
   });
 
   it("applyMarkers rewrites a marked region from config", () => {

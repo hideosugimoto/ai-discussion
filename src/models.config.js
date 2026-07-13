@@ -50,9 +50,11 @@ export const MODEL_LABELS = {
   "gemini-3.1-flash-lite":     "3.1 Flash-Lite",
 };
 
-// Display label for any model tag. Falls back to the raw tag if unmapped
-// (so a newly-routed model still renders something sensible before its label
-// is added — the drift test flags the missing label).
+// Display label for any model tag. Falls back to the raw tag if unmapped —
+// this only guards transient/unrouted lookups. Every *routed* tag must have a
+// MODEL_LABELS entry; the "every routed model tag has a MODEL_LABELS entry"
+// test (src/__tests__/model-displays.test.js) enforces that, so a routed model
+// never renders its raw tag.
 export function labelFor(tag) {
   return MODEL_LABELS[tag] || tag;
 }
