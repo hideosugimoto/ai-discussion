@@ -47,9 +47,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_TITLE: "🤖 新しい AI モデルを検出"
         run: |
-          month=$(date -u +%Y-%m)
-          title="${ISSUE_TITLE} (${month})"
-          existing=$(gh issue list --label "model-update" --state open --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          today=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          title="${ISSUE_TITLE} (${today})"
+          # 重複防止はタイトルに依存させず「オープンな model-update Issue の有無」で判定する。
+          # (件名を日次にしても未解決Issueへコメント追記され、新Issueが量産されない)
+          existing=$(gh issue list --label "model-update" --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing" ]; then
             echo "Existing open issue #$existing — appending comment instead of duplicating"
             gh issue comment "$existing" --body-file report.md

@@ -172,12 +172,47 @@ async function collectUnknown() {
   return result;
 }
 
+// 検出時刻を JST の "YYYY-MM-DD HH:mm" で返す。
+function detectedAtJst() {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} (JST)`;
+}
+
+// GitHub Actions の既定環境変数から実行ランへのリンクを組み立てる（ローカル実行時は null）。
+function runLink() {
+  const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } = process.env;
+  if (GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID) {
+    return `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`;
+  }
+  return null;
+}
+
 function buildReport(result) {
   const sections = [];
   for (const [provider, ids] of Object.entries(result.unknown)) {
     const label = FAMILIES[provider].label;
     sections.push(`### ${label}\n` + ids.map((id) => `- \`${id}\``).join("\n"));
   }
+
+  const total = Object.values(result.unknown).reduce((n, ids) => n + ids.length, 0);
+  const link = runLink();
+
+  const meta = [`**検出日時:** ${detectedAtJst()}　・　**検出数:** ${total} 件`];
+  if (link) meta.push(`**実行ログ:** ${link}`);
+
+  const checklist = [
+    "### 対応チェックリスト",
+    "- [ ] 各モデルが汎用チャットの主力モデルか公式ドキュメントで確認（コードネーム系はバリアントの可能性あり）",
+    "- [ ] `MODEL_PRICING` に input/output 価格を登録（Anthropic はキャッシュ課金の登録も忘れずに）",
+    "- [ ] `MODE_MODELS` の推奨マッピングを更新",
+    "- [ ] `VALIDATION_MODELS` を更新",
+    "- [ ] 対応不要と判断した場合は本Issueをクローズ",
+  ];
 
   const footer = [];
   if (result.skipped.length) {
@@ -190,11 +225,15 @@ function buildReport(result) {
   const body = [
     "## 未登録のモデルを検出しました",
     "",
+    ...meta,
+    "",
     "以下のモデルが各社のAPIで提供されていますが、`src/models.config.js` に登録されていません。",
     "新しい主力モデルであれば `MODEL_PRICING` / `MODE_MODELS` / `VALIDATION_MODELS` を更新してください。",
     "価格・推奨マッピングは公式ドキュメントで確認すること。",
     "",
     ...sections,
+    "",
+    ...checklist,
     "",
     ...footer,
   ].filter(Boolean).join("\n");
