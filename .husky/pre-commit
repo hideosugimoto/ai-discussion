@@ -1,0 +1,5 @@
+echo "🔄 Pre-commit: モデル表示を models.config.js から同期..."
+# config のモデル変更が LP/README のマーカー領域へ自動反映される。変更が出たら
+# 同じコミットに含める（表示名を手で追いかけなくて済む）。
+npm run sync:models || exit 1
+git add public/lp.html README.md

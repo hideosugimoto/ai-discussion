@@ -1,3 +1,8 @@
+echo "🔨 Pre-push: モデル表示の同期チェック..."
+# LP/README のモデル名が models.config.js と一致しているか検査（不一致なら
+# `npm run sync:models` を促してブロック）。
+npm run sync:models:check || exit 1
+
 echo "🔨 Pre-push: フロントエンドビルドチェック..."
 npx vite build || exit 1
 
