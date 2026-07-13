@@ -1,6 +1,6 @@
 // Re-exported from the single source of truth (src/models.config.js) so
 // existing `from "./constants"` imports keep working without churn.
-export { MODE_MODELS } from "./models.config";
+export { MODE_MODELS, modeModelSummary, labelFor } from "./models.config";
 
 export const MODELS = [
   { id: "claude",  name: "Claude",  color: "var(--claude-color)",  dimColor: "var(--claude-bd)",  bg: "var(--claude-bg)",  icon: "◆" },

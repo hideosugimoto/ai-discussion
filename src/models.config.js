@@ -25,18 +25,61 @@ export const MODEL_PRICING = {
   "gemini-3.1-flash-lite":   { input: 0.25, output: 1.50  },
 };
 
+// Human-readable display label for each model tag. SINGLE SOURCE for every
+// on-screen model name: UI badges/tooltips, the LP, and the README all derive
+// their displayed names from here (via labelFor / modeModelSummary and the
+// scripts/sync-model-displays.mjs generator). Change a routing tag below and
+// every surface follows — no hunting for hardcoded strings.
+export const MODEL_LABELS = {
+  // Anthropic
+  "claude-opus-4-8":           "Opus 4.8",
+  "claude-opus-4-7":           "Opus 4.7",
+  "claude-sonnet-4-6":         "Sonnet 4.6",
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+  // OpenAI
+  "gpt-5.6-sol":               "GPT-5.6 Sol",
+  "gpt-5.6-terra":             "GPT-5.6 Terra",
+  "gpt-5.6-luna":              "GPT-5.6 Luna",
+  "gpt-5.5":                   "GPT-5.5",
+  "gpt-5.4":                   "GPT-5.4",
+  "gpt-5.4-mini":              "GPT-5.4 mini",
+  // Google
+  "gemini-3.5-flash":          "3.5 Flash",
+  "gemini-2.5-pro":            "2.5 Pro",
+  "gemini-2.5-flash":          "2.5 Flash",
+  "gemini-3.1-flash-lite":     "3.1 Flash-Lite",
+};
+
+// Display label for any model tag. Falls back to the raw tag if unmapped
+// (so a newly-routed model still renders something sensible before its label
+// is added — the drift test flags the missing label).
+export function labelFor(tag) {
+  return MODEL_LABELS[tag] || tag;
+}
+
+const mm = (tag) => ({ tag, label: labelFor(tag) });
+
 export const MODE_MODELS = {
   best: {
-    claude:  { tag: "claude-opus-4-8",        label: "Opus 4.8" },
-    chatgpt: { tag: "gpt-5.6-sol",            label: "GPT-5.6 Sol" },
-    gemini:  { tag: "gemini-3.5-flash",       label: "3.5 Flash" },
+    claude:  mm("claude-opus-4-8"),
+    chatgpt: mm("gpt-5.6-sol"),
+    gemini:  mm("gemini-3.5-flash"),
   },
   fast: {
-    claude:  { tag: "claude-sonnet-4-6",      label: "Sonnet 4.6" },
-    chatgpt: { tag: "gpt-5.4-mini",           label: "GPT-5.4 mini" },
-    gemini:  { tag: "gemini-3.1-flash-lite",  label: "3.1 Flash-Lite" },
+    claude:  mm("claude-sonnet-4-6"),
+    chatgpt: mm("gpt-5.4-mini"),
+    gemini:  mm("gemini-3.1-flash-lite"),
   },
 };
+
+// "Claude / ChatGPT / Gemini" model names for a mode, e.g. "Opus 4.8 / GPT-5.6
+// Sol / 3.5 Flash". Used by tooltips/marketing copy so the listed names always
+// match the routing table above.
+export function modeModelSummary(modeId) {
+  const m = MODE_MODELS[modeId];
+  if (!m) return "";
+  return [m.claude.label, m.chatgpt.label, m.gemini.label].join(" / ");
+}
 
 // Cheapest model per provider, used for API key reachability checks.
 export const VALIDATION_MODELS = {

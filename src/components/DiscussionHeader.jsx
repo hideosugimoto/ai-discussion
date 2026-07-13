@@ -1,9 +1,11 @@
-import { MODELS, THEMES } from "../constants";
+import { MODELS, THEMES, modeModelSummary } from "../constants";
 import ModelBadge from "./ModelBadge";
 
+// Model names in the tooltips are derived from MODE_MODELS (single source), so
+// a routing change in models.config.js updates them automatically.
 const MODE_OPTIONS = [
-  { id:"best", label:"🧠 最強", title:"各社の最上位モデル（Opus 4.8 / GPT-5.6 Sol / 3.5 Flash）。深い洞察・複雑な論点・微妙なニュアンスに強い。消費が多め（目安 約7議論/月）。" },
-  { id:"fast", label:"⚡ 高速", title:"軽量・高速モデル（Sonnet 4.6 / GPT-5.4 mini / 3.1 Flash-Lite）。日常の議論には十分な品質で、たくさん回せる（目安 約25議論/月）。" },
+  { id:"best", label:"🧠 最強", title:`各社の最上位モデル（${modeModelSummary("best")}）。深い洞察・複雑な論点・微妙なニュアンスに強い。消費が多め（目安 約7議論/月）。` },
+  { id:"fast", label:"⚡ 高速", title:`軽量・高速モデル（${modeModelSummary("fast")}）。日常の議論には十分な品質で、たくさん回せる（目安 約25議論/月）。` },
 ];
 
 const SEARCH_OPTIONS = [

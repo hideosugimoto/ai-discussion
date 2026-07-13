@@ -21,7 +21,7 @@
 
 ## Description (260 chars max for the gallery card)
 
-> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.8, GPT-5.5, and Gemini 3.5 Flash debate the same topic in parallel — then a neutral AI **judges it with a confidence level** and **stress-tests the verdict against the strongest counter-argument**. One click re-judges if it breaks. ¥980/month, no API keys. Open-source.
+> Stop asking just one AI. **3 AI Discussion** lets Claude Opus 4.8, GPT-5.6 Sol, and Gemini 3.5 Flash debate the same topic in parallel — then a neutral AI **judges it with a confidence level** and **stress-tests the verdict against the strongest counter-argument**. One click re-judges if it breaks. ¥980/month, no API keys. Open-source.
 
 ---
 
