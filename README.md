@@ -136,7 +136,7 @@ npx wrangler pages deploy dist --project-name ai-discussion
 ## 使用モデル
 | モード | Claude | ChatGPT | Gemini |
 |--------|--------|---------|--------|
-| 🧠最強 | claude-opus-4-8 | gpt-5.5 | gemini-3.5-flash |
+| 🧠最強 | claude-opus-4-8 | gpt-5.6-sol | gemini-3.5-flash |
 | ⚡高速（既定） | claude-sonnet-4-6 | gpt-5.4-mini | gemini-3.1-flash-lite |
 
 > モデル定義の単一ソースは `src/models.config.js`。新モデルが各社から出れば随時更新します。
