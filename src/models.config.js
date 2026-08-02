@@ -19,6 +19,7 @@ export const MODEL_PRICING = {
   "gpt-5.4":                 { input: 2.50, output: 15.00 },
   "gpt-5.4-mini":            { input: 0.75, output: 4.50  },
   // Google
+  "gemini-3.6-flash":        { input: 1.50, output: 7.50  },
   "gemini-3.5-flash":        { input: 1.50, output: 9.00  },
   "gemini-2.5-pro":          { input: 1.25, output: 10.00 },
   "gemini-2.5-flash":        { input: 0.30, output: 2.50  },
@@ -44,6 +45,7 @@ export const MODEL_LABELS = {
   "gpt-5.4":                   "GPT-5.4",
   "gpt-5.4-mini":              "GPT-5.4 mini",
   // Google
+  "gemini-3.6-flash":          "3.6 Flash",
   "gemini-3.5-flash":          "3.5 Flash",
   "gemini-2.5-pro":            "2.5 Pro",
   "gemini-2.5-flash":          "2.5 Flash",
@@ -65,7 +67,7 @@ export const MODE_MODELS = {
   best: {
     claude:  mm("claude-opus-4-8"),
     chatgpt: mm("gpt-5.6-sol"),
-    gemini:  mm("gemini-3.5-flash"),
+    gemini:  mm("gemini-3.6-flash"),
   },
   fast: {
     claude:  mm("claude-sonnet-4-6"),
@@ -75,7 +77,7 @@ export const MODE_MODELS = {
 };
 
 // "Claude / ChatGPT / Gemini" model names for a mode, e.g. "Opus 4.8 / GPT-5.6
-// Sol / 3.5 Flash". Used by tooltips/marketing copy so the listed names always
+// Sol / 3.6 Flash". Used by tooltips/marketing copy so the listed names always
 // match the routing table above.
 export function modeModelSummary(modeId) {
   const m = MODE_MODELS[modeId];
