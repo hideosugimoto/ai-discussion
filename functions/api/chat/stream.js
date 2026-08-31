@@ -207,7 +207,7 @@ async function callGoogle(apiKey, model, system, message, nativeSearch) {
   const body = {
     system_instruction: { parts: [{ text: system }] },
     contents: [{ parts: [{ text: message }] }],
-    // thinkingLevel "low": Gemini 3.6 Flash defaults to "medium" thinking, whose
+    // thinkingLevel "low": Gemini 3.7 Flash defaults to "medium" thinking, whose
     // hidden thought tokens (billed as output) far exceed the visible answer for
     // short turns. "low" keeps useful reasoning while cutting cost. (Gemini 3.x
     // uses thinkingLevel, not the 2.x thinkingBudget — setting both errors.)

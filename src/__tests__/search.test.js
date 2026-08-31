@@ -6,7 +6,7 @@ import {
   SEARCH_PRICING,
   nativeSearchPricingKey,
   calcAnthropicCacheCostMicro,
-  MODEL_PRICING,
+  pricingFor,
 } from "../models.config.js";
 import { buildSearchBlock } from "../prompt.js";
 
@@ -85,7 +85,7 @@ describe("calcSearchCostMicro", () => {
 });
 
 describe("calcAnthropicCacheCostMicro", () => {
-  const inRate = MODEL_PRICING["claude-opus-4-8"].input; // µ$/token
+  const inRate = pricingFor("claude-opus-4-8").input; // µ$/token
 
   it("bills cache writes at 1.25x and reads at 0.1x of base input", () => {
     // 20513 write + 2672 read on opus-4-8 (the measured native-search case)

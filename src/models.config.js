@@ -6,6 +6,13 @@
 // The same number doubles as microdollars per token
 // (USD/1M_tokens × 1_000_000 microdollars/USD ÷ 1_000_000 tokens = identity),
 // so calcCostUSD and calcCostMicro read the same table.
+//
+// An entry may carry a time-limited introductory price:
+//   { input, output, until: <ISO8601>, after: { input, output } }
+// `input`/`output` apply through `until`; `after` applies from the instant it
+// passes. Never read `.input`/`.output` off this table directly for billing —
+// go through pricingFor(), or a promo that has expired keeps under-charging
+// (i.e. the proxy eats the difference).
 export const MODEL_PRICING = {
   // Anthropic
   "claude-opus-4-8":         { input: 5.00, output: 25.00 },
@@ -19,7 +26,13 @@ export const MODEL_PRICING = {
   "gpt-5.4":                 { input: 2.50, output: 15.00 },
   "gpt-5.4-mini":            { input: 0.75, output: 4.50  },
   // Google
-  "gemini-3.6-flash":        { input: 1.50, output: 7.50  },
+  // 3.6 / 3.7 Flash share one introductory price that Google applies to both:
+  // $0.75/$3.75 through 2026-12-31, then the $1.50/$7.50 list price. `until` is
+  // pinned to UTC although Google states the date without a zone — UTC expires
+  // ~8h before US Pacific, so the switch to list price can only ever land early
+  // (over-charging the proxy's own budget, never under).
+  "gemini-3.7-flash":        { input: 0.75, output: 3.75, until: "2026-12-31T23:59:59Z", after: { input: 1.50, output: 7.50 } },
+  "gemini-3.6-flash":        { input: 0.75, output: 3.75, until: "2026-12-31T23:59:59Z", after: { input: 1.50, output: 7.50 } },
   "gemini-3.5-flash":        { input: 1.50, output: 9.00  },
   "gemini-2.5-pro":          { input: 1.25, output: 10.00 },
   "gemini-2.5-flash":        { input: 0.30, output: 2.50  },
@@ -45,6 +58,7 @@ export const MODEL_LABELS = {
   "gpt-5.4":                   "GPT-5.4",
   "gpt-5.4-mini":              "GPT-5.4 mini",
   // Google
+  "gemini-3.7-flash":          "3.7 Flash",
   "gemini-3.6-flash":          "3.6 Flash",
   "gemini-3.5-flash":          "3.5 Flash",
   "gemini-2.5-pro":            "2.5 Pro",
@@ -67,7 +81,7 @@ export const MODE_MODELS = {
   best: {
     claude:  mm("claude-opus-4-8"),
     chatgpt: mm("gpt-5.6-sol"),
-    gemini:  mm("gemini-3.6-flash"),
+    gemini:  mm("gemini-3.7-flash"),
   },
   fast: {
     claude:  mm("claude-sonnet-4-6"),
@@ -77,7 +91,7 @@ export const MODE_MODELS = {
 };
 
 // "Claude / ChatGPT / Gemini" model names for a mode, e.g. "Opus 4.8 / GPT-5.6
-// Sol / 3.6 Flash". Used by tooltips/marketing copy so the listed names always
+// Sol / 3.7 Flash". Used by tooltips/marketing copy so the listed names always
 // match the routing table above.
 export function modeModelSummary(modeId) {
   const m = MODE_MODELS[modeId];
@@ -152,8 +166,21 @@ export function detectProvider(model) {
   return null;
 }
 
-export function calcCostUSD(model, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[model];
+// The rates in force for a model at a given instant. Returns { input, output }
+// (never the raw table entry's promo/list wrapper), or null for an unpriced
+// model. `now` is injectable so pricing is a pure function of time in tests;
+// callers in production omit it.
+export function pricingFor(model, now = Date.now()) {
+  const entry = MODEL_PRICING[model];
+  if (!entry) return null;
+  if (entry.until && entry.after && now > Date.parse(entry.until)) {
+    return { input: entry.after.input, output: entry.after.output };
+  }
+  return { input: entry.input, output: entry.output };
+}
+
+export function calcCostUSD(model, inputTokens, outputTokens, now = Date.now()) {
+  const pricing = pricingFor(model, now);
   if (!pricing) return 0;
   return (inputTokens  / 1_000_000) * pricing.input
        + (outputTokens / 1_000_000) * pricing.output;
@@ -161,8 +188,8 @@ export function calcCostUSD(model, inputTokens, outputTokens) {
 
 // Cost in microdollars (integer). Used by the Premium proxy for D1 storage
 // to avoid floating-point accumulation across many requests.
-export function calcCostMicro(model, inputTokens, outputTokens) {
-  const pricing = MODEL_PRICING[model];
+export function calcCostMicro(model, inputTokens, outputTokens, now = Date.now()) {
+  const pricing = pricingFor(model, now);
   if (!pricing) return 0;
   return Math.round(inputTokens * pricing.input + outputTokens * pricing.output);
 }
@@ -178,8 +205,8 @@ export const ANTHROPIC_CACHE_READ_MULTIPLIER = 0.1;
 // reports cache_creation_input_tokens / cache_read_input_tokens SEPARATELY from
 // input_tokens. Those must be billed explicitly or the proxy under-charges
 // (the cache write at 1.25x is a real cost, especially with native web search).
-export function calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheReadTokens) {
-  const pricing = MODEL_PRICING[model];
+export function calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheReadTokens, now = Date.now()) {
+  const pricing = pricingFor(model, now);
   if (!pricing) return 0;
   return Math.round(
     (cacheCreationTokens || 0) * pricing.input * ANTHROPIC_CACHE_WRITE_MULTIPLIER +
@@ -190,8 +217,8 @@ export function calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheRea
 // Pre-debit upper-bound estimate (500 input + 1500 output tokens), used to
 // reserve budget before the upstream call so concurrent requests can't race
 // past the monthly cap.
-export function estimateMaxCostMicro(model) {
-  const pricing = MODEL_PRICING[model];
+export function estimateMaxCostMicro(model, now = Date.now()) {
+  const pricing = pricingFor(model, now);
   if (!pricing) return 0;
   return Math.round(500 * pricing.input + 1500 * pricing.output);
 }
