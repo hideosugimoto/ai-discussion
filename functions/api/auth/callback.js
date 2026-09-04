@@ -71,6 +71,10 @@ async function createRefreshToken(db, userId) {
 }
 
 export async function onRequestGet(context) {
+  // Which stage the handler reached, for the catch below. The 500 response
+  // stays opaque to the client (Layer 5); this only narrows the failure down
+  // in the Cloudflare logs, where the swallowed exception was invisible before.
+  let step = "init";
   try {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -92,6 +96,7 @@ export async function onRequestGet(context) {
   }
 
   // Verify CSRF state (mandatory)
+  step = "kv_get_state";
   const stored = await env.KV.get(`oauth_state:${state}`);
   if (!stored) {
     return redirectWithError("Invalid state (CSRF check failed)", url.origin);
@@ -99,6 +104,7 @@ export async function onRequestGet(context) {
   await env.KV.delete(`oauth_state:${state}`);
 
   // Exchange code for tokens
+  step = "token_exchange";
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -116,9 +122,11 @@ export async function onRequestGet(context) {
     return redirectWithError("Token exchange failed", url.origin);
   }
 
+  step = "parse_token_response";
   const tokens = await tokenRes.json();
 
   // Get user info
+  step = "fetch_userinfo";
   const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
@@ -127,12 +135,14 @@ export async function onRequestGet(context) {
     return redirectWithError("Failed to get user info", url.origin);
   }
 
+  step = "parse_userinfo";
   const googleUser = await userRes.json();
 
   // Upsert user in D1
   const userId = crypto.randomUUID();
   const now = new Date().toISOString();
 
+  step = "db_select_user";
   const existing = await env.DB.prepare(
     "SELECT id, plan FROM users WHERE email = ?"
   )
@@ -141,6 +151,7 @@ export async function onRequestGet(context) {
 
   let user;
   if (existing) {
+    step = "db_update_user";
     await env.DB.prepare(
       "UPDATE users SET name = ?, picture = ?, updated_at = ? WHERE id = ?"
     )
@@ -148,6 +159,7 @@ export async function onRequestGet(context) {
       .run();
     user = { id: existing.id, plan: existing.plan };
   } else {
+    step = "db_insert_user";
     await env.DB.prepare(
       "INSERT INTO users (id, email, name, picture, plan, created_at, updated_at) VALUES (?, ?, ?, ?, 'free', ?, ?)"
     )
@@ -157,6 +169,7 @@ export async function onRequestGet(context) {
   }
 
   // Issue JWT (short-lived, 15 min)
+  step = "sign_jwt";
   const jwt = await signJWT(
     {
       sub: user.id,
@@ -168,9 +181,11 @@ export async function onRequestGet(context) {
   );
 
   // Issue refresh token (long-lived, 30 days)
+  step = "create_refresh_token";
   const refreshToken = await createRefreshToken(env.DB, user.id);
 
   // Store both tokens in KV with a one-time exchange code (60s TTL)
+  step = "kv_put_auth_code";
   const exchangeCode = crypto.randomUUID();
   await env.KV.put(
     `auth_code:${exchangeCode}`,
@@ -184,6 +199,15 @@ export async function onRequestGet(context) {
   return Response.redirect(redirectUrl.toString(), 302);
 
   } catch (e) {
+    // Log to Cloudflare only — the client still gets an opaque 500. Deliberately
+    // no email/token/code in here: `step` plus the error identity is enough to
+    // locate the failure without putting user identifiers into the log.
+    console.error(
+      `[auth/callback] failed at step=${step}`,
+      e && e.name,
+      e && e.message,
+      e && e.stack,
+    );
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
