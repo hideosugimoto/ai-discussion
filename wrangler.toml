@@ -18,3 +18,11 @@ database_id = "bee06353-84d4-4300-bcad-179f43c55101"
 [[kv_namespaces]]
 binding = "KV"
 id = "bba6c8c77e3a45bda98480b265016b5e"
+
+# Discussion bodies (discussions.data_json) live here, not in D1: a D1 database
+# is capped at 10 GB and that limit cannot be raised, while R2 has no practical
+# ceiling and charges $0.015/GB-month. D1 keeps only the metadata and the
+# full-text index, so list/search never touch R2.
+[[r2_buckets]]
+binding = "DISCUSSION_STORE"
+bucket_name = "ai-discussion-data"

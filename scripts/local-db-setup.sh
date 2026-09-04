@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 DB=ai-discussion-db
 FILES=(schema.sql schema-v2.sql schema-v3.sql schema-v4.sql schema-v5.sql \
-       schema-v6.sql schema-v7.sql schema-v8.sql schema-v9.sql)
+       schema-v6.sql schema-v7.sql schema-v8.sql schema-v9.sql schema-v10.sql)
 
 for f in "${FILES[@]}"; do
   echo "== applying functions/$f =="

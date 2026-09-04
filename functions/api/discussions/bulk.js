@@ -18,6 +18,7 @@ import {
   MAX_DISCUSSIONS_PER_USER,
   MAX_BULK_ITEMS,
 } from "./_lib.js";
+import { writeBody, MIGRATED_PLACEHOLDER } from "./_lib_store.js";
 
 export async function onRequestPost(context) {
   const { env, data, request } = context;
@@ -57,7 +58,7 @@ export async function onRequestPost(context) {
 
   const created = [];
   const skipped = [];
-  const stmts = [];
+  const accepted = [];
 
   for (const item of body.items) {
     const clientId = item?.clientId;
@@ -70,21 +71,36 @@ export async function onRequestPost(context) {
       skipped.push({ clientId, reason: validationError });
       continue;
     }
-    const id = crypto.randomUUID();
-    const tagsCsv = normalizeTags(item.tags);
-    const sizeBytes = computeSizeBytes(item.data_json);
-    const roundCount = countRounds(item.data_json);
-
-    stmts.push(
-      env.DB.prepare(
-        "INSERT INTO discussions (id, user_id, topic, data_json, tags, round_count, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)"
-      ).bind(id, userId, item.topic, item.data_json, tagsCsv, roundCount, sizeBytes)
-    );
-    stmts.push(...ftsUpsertStatements(env.DB, id, userId, item.topic, item.data_json, tagsCsv));
-
-    created.push({ clientId, id });
+    accepted.push({
+      clientId,
+      item,
+      id: crypto.randomUUID(),
+      tagsCsv: normalizeTags(item.tags),
+      sizeBytes: computeSizeBytes(item.data_json),
+      roundCount: countRounds(item.data_json),
+    });
     remaining--;
   }
+
+  // All bodies to R2 first, in parallel (capped at MAX_BULK_ITEMS = 30 per
+  // request). If any write fails the whole request fails before D1 is touched,
+  // so no row can end up pointing at a body that isn't there. Objects already
+  // written are orphaned but harmless — their keys are deterministic, so a
+  // retry overwrites them.
+  const r2Keys = await Promise.all(
+    accepted.map((a) => writeBody(env.DISCUSSION_STORE, userId, a.id, a.item.data_json)),
+  );
+
+  const stmts = [];
+  accepted.forEach((a, i) => {
+    stmts.push(
+      env.DB.prepare(
+        "INSERT INTO discussions (id, user_id, topic, data_json, r2_key, tags, round_count, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(a.id, userId, a.item.topic, MIGRATED_PLACEHOLDER, r2Keys[i], a.tagsCsv, a.roundCount, a.sizeBytes)
+    );
+    stmts.push(...ftsUpsertStatements(env.DB, a.id, userId, a.item.topic, a.item.data_json, a.tagsCsv));
+    created.push({ clientId: a.clientId, id: a.id });
+  });
 
   if (stmts.length > 0) {
     await env.DB.batch(stmts);

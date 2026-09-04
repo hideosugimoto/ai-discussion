@@ -1,6 +1,7 @@
 // Usage query API - returns current month's usage and remaining credit
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
 import { sumByModel } from "../_lib_usage.js";
+import { maybePruneRequestLog } from "../_lib_retention.js";
 
 export async function onRequestGet(context) {
   try {
@@ -13,6 +14,10 @@ export async function onRequestGet(context) {
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
+
+  // Opportunistic analytics-log retention, only for authenticated callers.
+  // Runs after the response via waitUntil, so it costs the user nothing.
+  maybePruneRequestLog(context, env);
 
   // Get current plan from DB (not from JWT)
   const dbUser = await env.DB.prepare("SELECT plan FROM users WHERE id = ?")

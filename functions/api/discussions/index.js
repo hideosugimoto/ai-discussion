@@ -12,6 +12,7 @@ import {
   ftsUpsertStatements,
   MAX_DISCUSSIONS_PER_USER,
 } from "./_lib.js";
+import { writeBody, MIGRATED_PLACEHOLDER } from "./_lib_store.js";
 
 export async function onRequestGet(context) {
   const { env, data, request } = context;
@@ -91,10 +92,14 @@ export async function onRequestPost(context) {
   const sizeBytes = computeSizeBytes(body.data_json);
   const roundCount = countRounds(body.data_json);
 
+  // Body to R2 before the row is written — see _lib_store.js for why the order
+  // matters. FTS still indexes the real text, so search is unaffected.
+  const r2Key = await writeBody(env.DISCUSSION_STORE, userId, id, body.data_json);
+
   const stmts = [
     env.DB.prepare(
-      "INSERT INTO discussions (id, user_id, topic, data_json, tags, round_count, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).bind(id, userId, body.topic, body.data_json, tagsCsv, roundCount, sizeBytes),
+      "INSERT INTO discussions (id, user_id, topic, data_json, r2_key, tags, round_count, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, userId, body.topic, MIGRATED_PLACEHOLDER, r2Key, tagsCsv, roundCount, sizeBytes),
     ...ftsUpsertStatements(env.DB, id, userId, body.topic, body.data_json, tagsCsv),
   ];
   await env.DB.batch(stmts);
