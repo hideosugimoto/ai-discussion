@@ -3,6 +3,8 @@ import { MODELS, MODE_MODELS, DISCUSSION_MODES, INTERVENTION_QUICKFILLS } from "
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
+import { authErrorMessage } from "./authErrors";
+import NoticeBanner from "./components/NoticeBanner";
 import RoundSection from "./components/RoundSection";
 import useKeyValidation from "./hooks/useKeyValidation";
 import { downloadMarkdown, downloadHtml } from "./export";
@@ -361,6 +363,19 @@ export default function App() {
           プラン情報を確認中...
         </div>
       )}
+      {/* Plan read failed: say so plainly. Critically, we must NOT fall back to
+          showing the plan picker — a subscriber would read that as "your
+          subscription is gone". */}
+      {auth.planError && !auth.planLoading && auth.user && (
+        <NoticeBanner actionLabel="再試行" onAction={auth.retryPlan}>
+          プラン情報を取得できませんでした。ご契約は失われていません — 一時的な接続エラーです。
+        </NoticeBanner>
+      )}
+      {auth.authError && (
+        <NoticeBanner actionLabel="閉じる" onAction={auth.dismissAuthError}>
+          {authErrorMessage(auth.authError)}
+        </NoticeBanner>
+      )}
       {auth.isPremium && !auth.planLoading && (
         <PlanBadge plan={auth.plan} usage={usage} estimate={roundEstimate} token={auth.token} onCreditPurchase={startCreditPurchase} usingOwnKeys={useOwnKeys} />
       )}
@@ -377,8 +392,10 @@ export default function App() {
 
       <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
 
-        {/* ── 初見オンボーディング（開始できない時＝キー未設定・非課金） ── */}
-        {!canStart && !started && (
+        {/* ── 初見オンボーディング（開始できない時＝キー未設定・非課金） ──
+            planError / planLoading の間は出さない。プランが読めていないだけの
+            契約者に「未契約」の画面を見せないため。 */}
+        {!canStart && !started && !auth.planError && !auth.planLoading && (
           <Onboarding
             isLoggedIn={!!auth.user}
             onLogin={auth.login}

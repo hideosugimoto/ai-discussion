@@ -26,7 +26,11 @@ function getJWTExpiry(token) {
   }
 }
 
-async function fetchPlanFromServer(token, retries = 5) {
+// Resolves to { plan } on success, or { error: true } when the plan could not
+// be read at all. Never resolves to a plan value on failure: a server-side
+// outage (e.g. the D1 daily-read limit) must not be reported as "free", or a
+// paying user is shown the upgrade/plan-picker screen as though unsubscribed.
+async function fetchPlanFromServer(token, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch("/api/usage", {
@@ -34,14 +38,28 @@ async function fetchPlanFromServer(token, retries = 5) {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.plan) return data.plan;
+        if (data.plan) return { plan: data.plan };
       }
     } catch {
       // retry
     }
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 1500));
   }
-  return "free";
+  return { error: true };
+}
+
+// Exported for tests. `plan === null` means "not determined yet / failed to
+// read", which is deliberately distinct from the "free" plan.
+export function planStateFrom(result) {
+  if (!result || result.error || !result.plan) return { plan: null, planError: true };
+  return { plan: result.plan, planError: false };
+}
+
+// Premium requires a *known* paid plan. An undetermined plan is never premium
+// (the server re-checks the plan on every billable call anyway, so this only
+// governs what the UI offers).
+export function isPremiumPlan(plan) {
+  return plan != null && plan !== "free";
 }
 
 async function refreshTokens(refreshToken) {
@@ -58,8 +76,15 @@ export default function useAuth() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [plan, setPlan] = useState("free");
+  // True when the plan could not be read from the server. The UI must not
+  // offer a plan/upgrade screen in this state — we don't know what they have.
+  const [planError, setPlanError] = useState(false);
+  // Set when the OAuth callback bounced back with ?auth_error=...
+  const [authError, setAuthError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [planLoading, setPlanLoading] = useState(() => !!localStorage.getItem(TOKEN_KEY));
+  // Bumped by retryPlan() to re-run the plan fetch effect.
+  const [planReloadKey, setPlanReloadKey] = useState(0);
   const refreshTimerRef = useRef(null);
 
   // Schedule auto-refresh 2 minutes before JWT expiry
@@ -88,6 +113,7 @@ export default function useAuth() {
         setUser(null);
         setToken(null);
         setPlan("free");
+        setPlanError(false);
       }
     }, refreshIn);
   }, []);
@@ -107,6 +133,7 @@ export default function useAuth() {
     }
 
     if (authError) {
+      setAuthError(authError);
       setLoading(false);
       return;
     }
@@ -152,8 +179,12 @@ export default function useAuth() {
 
         if (checkoutResult === "success") {
           setPlanLoading(true);
-          fetchPlanFromServer(storedToken, 5).then((p) => {
-            setPlan(p);
+          // Right after checkout the plan row may lag the webhook, so retry
+          // more times here than on a normal load.
+          fetchPlanFromServer(storedToken, 5).then((result) => {
+            const next = planStateFrom(result);
+            setPlan(next.plan);
+            setPlanError(next.planError);
             setPlanLoading(false);
           });
         }
@@ -192,15 +223,28 @@ export default function useAuth() {
   // Fetch current plan from server
   useEffect(() => {
     if (!token) {
+      // Signed out: "free" is the truth here, not a failed read. Clear the
+      // loading flag too — the UI hides the onboarding card while it is set,
+      // so leaving it on after a sign-out would blank the login prompt.
       setPlan("free");
+      setPlanError(false);
+      setPlanLoading(false);
       return;
     }
+    // An in-flight fetch outlives a sign-out (or a token change). Without this
+    // guard its late response would re-apply the *previous* account's plan.
+    let cancelled = false;
     setPlanLoading(true);
-    fetchPlanFromServer(token, 3).then((p) => {
-      setPlan(p);
+    setPlanError(false);
+    fetchPlanFromServer(token, 3).then((result) => {
+      if (cancelled) return;
+      const next = planStateFrom(result);
+      setPlan(next.plan);
+      setPlanError(next.planError);
       setPlanLoading(false);
     });
-  }, [token]);
+    return () => { cancelled = true; };
+  }, [token, planReloadKey]);
 
   const login = useCallback(() => {
     window.location.href = "/api/auth/google";
@@ -213,9 +257,18 @@ export default function useAuth() {
     setUser(null);
     setToken(null);
     setPlan("free");
+    setPlanError(false);
   }, []);
 
-  const isPremium = plan !== "free";
+  // Re-run the plan fetch after a failed read (the "再試行" button).
+  const retryPlan = useCallback(() => setPlanReloadKey((k) => k + 1), []);
 
-  return { user, token, loading, isPremium, plan, planLoading, login, logout };
+  const dismissAuthError = useCallback(() => setAuthError(null), []);
+
+  const isPremium = isPremiumPlan(plan);
+
+  return {
+    user, token, loading, isPremium, plan, planLoading, planError,
+    authError, dismissAuthError, retryPlan, login, logout,
+  };
 }

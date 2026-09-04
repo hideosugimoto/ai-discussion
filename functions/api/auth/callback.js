@@ -199,19 +199,35 @@ export async function onRequestGet(context) {
   return Response.redirect(redirectUrl.toString(), 302);
 
   } catch (e) {
-    // Log to Cloudflare only — the client still gets an opaque 500. Deliberately
-    // no email/token/code in here: `step` plus the error identity is enough to
-    // locate the failure without putting user identifiers into the log.
+    // Log to Cloudflare only. Deliberately no email/token/code in here: `step`
+    // plus the error identity is enough to locate the failure without putting
+    // user identifiers into the log.
     console.error(
       `[auth/callback] failed at step=${step}`,
       e && e.name,
       e && e.message,
       e && e.stack,
     );
+    // Send the user back to the app rather than leaving them on a raw JSON
+    // body. The reason stays a fixed code — the exception text never reaches
+    // the client — and the app maps it to a message (src/authErrors.js).
+    const origin = safeOrigin(context);
+    if (origin) return redirectWithError("server_error", origin);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
+  }
+}
+
+// The origin for the error redirect. Parsing the URL is itself inside the try
+// above, so recompute it defensively here: if even this fails there is nowhere
+// safe to redirect to, and the caller falls back to a plain 500.
+function safeOrigin(context) {
+  try {
+    return new URL(context.request.url).origin;
+  } catch {
+    return null;
   }
 }
 
