@@ -30,10 +30,14 @@ function getJWTExpiry(token) {
 // be read at all. Never resolves to a plan value on failure: a server-side
 // outage (e.g. the D1 daily-read limit) must not be reported as "free", or a
 // paying user is shown the upgrade/plan-picker screen as though unsubscribed.
+//
+// Hits /api/plan (a single row read) rather than /api/usage, whose monthly
+// aggregates scan every usage row for the month — cost we don't need here, and
+// paid on every login, refresh and retry.
 async function fetchPlanFromServer(token, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      const res = await fetch("/api/usage", {
+      const res = await fetch("/api/plan", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {

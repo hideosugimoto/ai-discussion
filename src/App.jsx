@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { MODELS, MODE_MODELS, DISCUSSION_MODES, INTERVENTION_QUICKFILLS } from "./constants";
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
@@ -172,10 +172,23 @@ export default function App() {
     setAutoFollow(true);
   };
 
-  // Fetch usage on login and after each round
+  // Fetch usage once on login.
   useEffect(() => {
     if (auth.isPremium) fetchUsage();
-  }, [auth.isPremium, discussion.length, fetchUsage]);
+  }, [auth.isPremium, fetchUsage]);
+
+  // ...and again when a round finishes. This used to key off discussion.length,
+  // which ticks on *every* AI turn — so a single discussion fired /api/usage a
+  // dozen times, and each call re-scanned the month's usage rows. Usage only
+  // changes once the round's calls have settled, so refetch on the running
+  // edge instead.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running) { wasRunning.current = true; return; }
+    if (!wasRunning.current) return;
+    wasRunning.current = false;
+    if (auth.isPremium) fetchUsage();
+  }, [running, auth.isPremium, fetchUsage]);
 
   const handleStart = async () => {
     setActivePanel(null);

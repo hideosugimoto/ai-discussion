@@ -1,5 +1,6 @@
 // Usage query API - returns current month's usage and remaining credit
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
+import { sumByModel } from "../_lib_usage.js";
 
 export async function onRequestGet(context) {
   try {
@@ -24,19 +25,17 @@ export async function onRequestGet(context) {
     await getEffectiveLimitMicro(env.DB, env, user.sub, currentPlan);
   const limitUSD = limitMicro / 1_000_000;
 
-  // Monthly total (microdollars)
-  const monthly = await env.DB.prepare(
-    "SELECT COALESCE(SUM(cost_micro), 0) as total_cost, COALESCE(SUM(input_tokens), 0) as total_input, COALESCE(SUM(output_tokens), 0) as total_output, COUNT(*) as request_count FROM usage_monthly WHERE user_id = ? AND year_month = ?"
-  )
-    .bind(user.sub, yearMonth)
-    .first();
-
-  // Per-model breakdown
+  // Per-model breakdown. The month's grand total is derived from these rows
+  // rather than queried separately: both statements scanned the exact same
+  // usage_monthly rows under the same WHERE, so asking twice doubled the rows
+  // read for a number we can just add up.
   const byModel = await env.DB.prepare(
     "SELECT model, SUM(input_tokens) as input_tokens, SUM(output_tokens) as output_tokens, SUM(cost_micro) as cost_micro, COUNT(*) as requests FROM usage_monthly WHERE user_id = ? AND year_month = ? GROUP BY model"
   )
     .bind(user.sub, yearMonth)
     .all();
+
+  const monthly = sumByModel(byModel?.results);
 
   // Daily history (last 30 days)
   const daily = await env.DB.prepare(
