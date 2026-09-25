@@ -1,4 +1,4 @@
-import { MODELS } from "./constants";
+import { MODELS, RESEARCH_CONFIG } from "./constants";
 import { buildAttachmentsBlock } from "./lib/fileParser";
 import { formatPlanForModel } from "./research/plan";
 
@@ -269,7 +269,7 @@ export function buildResearchBlocks(research, modelId, nameOf) {
   // budget 0 = this round has no search tool (own-keys / non-premium). Say so
   // plainly: a prompt that promises tools the model does not have is an
   // invitation to fill the ledger from memory.
-  const budget = Number.isInteger(research?.searchBudget) ? research.searchBudget : 3;
+  const budget = Number.isInteger(research?.searchBudget) ? research.searchBudget : RESEARCH_CONFIG.searchBudget;
   const toolText = budget > 0
     ? `\n\n【使えるツール】このターンの検索は最大${budget}回、ページ取得(web_fetch)も最大${budget}回までです。`
       + `検索結果の要約だけで値を埋めず、個別ページを開いて確認してください。`

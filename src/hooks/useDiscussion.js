@@ -469,7 +469,11 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     const initMessages = targetModels.map((m) => ({ modelId:m.id, text:"", error:null, loading:true }));
     setDiscussion((d) => [...d, { messages:initMessages, userIntervention, isConclusion: isConclusionRound, searchSources }]);
 
-    const models = MODE_MODELS[mode];
+    // 調査モードは常に fast。best(Opus $5/$25)で回すと1回の調査が$1.5〜2に達し、
+    // Premiumの月次枠($3)の半分以上を1回で消費する。調査は検索して読んで書き
+    // 写す作業で、実測でも sonnet/mini/flash-lite で十分な品質が出ている。
+    // UI側だけで塞ぐと履歴復元などで抜けるので、ここで強制する。
+    const models = MODE_MODELS[isResearchRound ? "fast" : mode];
 
     // Summarise attachments before the round if mode demands it. Sets summary
     // on the original attachment records so subsequent rounds reuse them and
@@ -634,7 +638,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setReportLoading(true);
     setReport("");
     const target = MODELS.find((m) => m.id === (conclusionTarget || "claude")) || MODELS[0];
-    const tag = MODE_MODELS[mode][target.id].tag;
+    const tag = MODE_MODELS["fast"][target.id].tag;
     const user = buildReportPrompt(topic, serializeLedger(entries), profile, constitution);
     const opts = { maxTokens: RESEARCH_CONFIG.reportMaxTokens };
     let full = "";

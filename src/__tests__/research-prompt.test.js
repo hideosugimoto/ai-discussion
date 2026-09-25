@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPrompt, buildReportPrompt, buildResearchBlocks } from "../prompt";
 import { parsePlan } from "../research/plan";
+import { RESEARCH_CONFIG } from "../constants";
 import { mergeLedger, parseLedgerBlock, ledgerIndex, serializeLedger } from "../research/ledger";
 
 const IDS = ["claude", "chatgpt", "gemini"];
@@ -98,9 +99,9 @@ describe("プロキシの入力上限", () => {
 });
 
 describe("buildResearchBlocks", () => {
-  it("検索予算が未指定なら既定値で説明する", () => {
+  it("検索予算が未指定なら RESEARCH_CONFIG の既定値で説明する（値の二重管理を防ぐ）", () => {
     const { toolText } = buildResearchBlocks({ plan }, "claude");
-    expect(toolText).toContain("最大3回");
+    expect(toolText).toContain(`最大${RESEARCH_CONFIG.searchBudget}回`);
   });
 
   it("前ラウンドの未確認項目を引き継ぐ", () => {

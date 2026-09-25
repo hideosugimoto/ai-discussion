@@ -18,7 +18,7 @@ const segBtn = (active) => ({ padding:"6px 12px", border:"none", cursor:"pointer
 
 // App title, the 3 model badges, and the mode / theme / web-search segmented
 // toggles. Pure presentational — all state lives in App.
-export default function DiscussionHeader({ cm, mode, setMode, theme, setTheme, isPremium, searchMode, setSearchMode, useOwnKeys }) {
+export default function DiscussionHeader({ cm, mode, setMode, theme, setTheme, isPremium, searchMode, setSearchMode, useOwnKeys, researchMode }) {
   return (
     <div style={{ textAlign:"center", marginBottom:20, width:"100%", maxWidth:900 }}>
       <div style={{ fontSize:11, color:"var(--text3)", letterSpacing:"0.3em", marginBottom:6 }}>AI ROUNDTABLE</div>
@@ -37,9 +37,20 @@ export default function DiscussionHeader({ cm, mode, setMode, theme, setTheme, i
       </div>
       <div style={{ display:"flex", justifyContent:"center", gap:8, flexWrap:"wrap" }}>
         <div role="radiogroup" aria-label="モード選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
-          {MODE_OPTIONS.map(({ id, label, title }) => (
-            <button key={id} role="radio" aria-checked={mode===id} title={title} onClick={() => setMode(id)} style={segBtn(mode===id)}>{label}</button>
-          ))}
+          {/* 調査モードは常に高速モデルで走る（useDiscussion 側で強制）。最強を
+              選べるままにすると、選んだのに効かない・でも高額という最悪の組み
+              合わせになるので、選べないことと理由をここで示す。 */}
+          {MODE_OPTIONS.map(({ id, label, title }) => {
+            const locked = researchMode && id === "best";
+            return (
+              <button key={id} role="radio" aria-checked={locked ? false : mode===id} aria-disabled={locked || undefined}
+                title={locked ? "調査モードは高速モデル固定です（最強モデルだと1回の調査で月の上限の半分以上を消費するため）" : title}
+                onClick={() => { if (!locked) setMode(id); }}
+                style={{ ...segBtn(locked ? false : mode===id), cursor: locked ? "not-allowed" : "pointer", opacity: locked ? 0.4 : 1 }}>
+                {label}
+              </button>
+            );
+          })}
         </div>
         <div role="radiogroup" aria-label="テーマ選択" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
           {THEMES.map(({ id, label }) => (

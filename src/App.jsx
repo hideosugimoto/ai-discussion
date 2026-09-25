@@ -408,6 +408,7 @@ export default function App() {
         isPremium={auth.isPremium}
         searchMode={searchMode} setSearchMode={setSearchMode}
         useOwnKeys={useOwnKeys}
+        researchMode={discussionMode === "research"}
       />
 
       <div style={{ width:"100%", maxWidth:1400, padding:"0 8px" }}>
