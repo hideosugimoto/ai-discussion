@@ -43,7 +43,7 @@ function buildClaudeUserMessages(user, userParts) {
   return [{ role: "user", content: user }];
 }
 
-export async function callClaude(apiKey, model, sys, user, onChunk, signal, userParts) {
+export async function callClaude(apiKey, model, sys, user, onChunk, signal, userParts, opts) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -53,7 +53,7 @@ export async function callClaude(apiKey, model, sys, user, onChunk, signal, user
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model, max_tokens: 1500, stream: true,
+      model, max_tokens: opts?.maxTokens || 1500, stream: true,
       system: [{ type: "text", text: sys, cache_control: { type: "ephemeral" } }],
       messages: buildClaudeUserMessages(user, userParts),
     }),
@@ -99,12 +99,12 @@ export async function validateClaude(apiKey) {
 
 // ── ChatGPT ───────────────────────────────────────────────────
 
-export async function callChatGPT(apiKey, model, sys, user, onChunk, signal) {
+export async function callChatGPT(apiKey, model, sys, user, onChunk, signal, opts) {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model, max_completion_tokens: 8192, stream: true,
+      model, max_completion_tokens: Math.max(opts?.maxTokens || 0, 8192), stream: true,
       // OpenAI auto-caches matching prompt prefixes (50% input cost reduction)
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
     }),
@@ -144,7 +144,7 @@ export async function validateChatGPT(apiKey) {
 
 // ── Gemini ────────────────────────────────────────────────────
 
-export async function callGemini(apiKey, model, sys, user, onChunk, signal) {
+export async function callGemini(apiKey, model, sys, user, onChunk, signal, opts) {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`,
     {
@@ -153,7 +153,7 @@ export async function callGemini(apiKey, model, sys, user, onChunk, signal) {
       body: JSON.stringify({
         system_instruction: { parts: [{ text: sys }] },
         contents: [{ parts: [{ text: user }] }],
-        generationConfig: { maxOutputTokens: 8192 },
+        generationConfig: { maxOutputTokens: Math.max(opts?.maxTokens || 0, 8192) },
       }),
       signal,
     }

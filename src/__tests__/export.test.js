@@ -115,3 +115,50 @@ describe("exportToMarkdown", () => {
     expect(html).toContain("&lt;b&gt;結論&lt;/b&gt;");
   });
 });
+
+describe("調査モードの成果物エクスポート", () => {
+  const rounds = [{ messages: [{ modelId: "claude", text: "調査しました", error: null }], userIntervention: "" }];
+  const research = {
+    report: "# 調査レポート\n\n雲海閣は源泉かけ流しです。",
+    ledger: [
+      { target: "雲海閣", field: "泉質", value: "単純酸性硫黄温泉", confidence: "確実", url: "https://example.com/u" },
+      { target: "雲海閣", field: "価格", value: "4,875円", confidence: "要確認", url: "" },
+      { target: "渓雲閣", field: "価格", value: "15,400円|税込", confidence: "確実", url: "https://example.com/k", conflict: true },
+    ],
+  };
+
+  it("Markdownにレポートと台帳を含める（アプリ外へ持ち出せること）", () => {
+    const md = exportToMarkdown("宿を調べて", rounds, [], {}, null, null, research);
+    expect(md).toContain("調査レポート");
+    expect(md).toContain("雲海閣は源泉かけ流しです。");
+    expect(md).toContain("確定事実台帳（3件）");
+    expect(md).toContain("https://example.com/u");
+    expect(md).toContain("出典なし");
+  });
+
+  it("値に含まれる | が表を壊さない", () => {
+    const md = exportToMarkdown("宿", rounds, [], {}, null, null, research);
+    const row = md.split("\n").find((l) => l.includes("15,400円"));
+    expect(row).toContain("15,400円\\|税込");
+    // エスケープ済みの \| をセル区切りに数えない＝列数が崩れていない
+    const cells = row.split(/(?<!\\)\|/);
+    expect(cells.length).toBe(7); // 先頭/末尾の空セル + 5列
+  });
+
+  // 注: レポート本文とAI発言のMarkdown描画は DOMPurify を通るため、DOMのない
+  // このテスト環境では実行できない（既存テストも rounds=[] で回避している）。
+  // ここでは台帳テーブル側＝エスケープとhrefの生成だけを検証する。
+  it("HTMLの台帳テーブルに値と出典リンクを出す", () => {
+    const html = exportToHtml("宿を調べて", [], [], {}, null, null, { ...research, report: "" });
+    expect(html).toContain("単純酸性硫黄温泉");
+    expect(html).toContain('href="https://example.com/u"');
+    expect(html).toContain("出典なし");
+  });
+
+  it("調査でないときは調査セクションを出さない（既存の出力を変えない）", () => {
+    const md = exportToMarkdown("普通の議論", rounds, [], {}, null, null, undefined);
+    expect(md).not.toContain("確定事実台帳");
+    const html = exportToHtml("普通の議論", [], [], {}, null, null, undefined);
+    expect(html).not.toContain("確定事実台帳");
+  });
+});

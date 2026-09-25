@@ -1,5 +1,6 @@
 import { MODELS } from "./constants";
 import { buildAttachmentsBlock } from "./lib/fileParser";
+import { formatPlanForModel } from "./research/plan";
 
 const QUALITY_GUIDE = "読みやすさを重視してください。候補・列挙・手順・比較など箇条書きにできる部分は箇条書きで示し、考察・理由・論証は文章で述べます。具体例や根拠を含め、一般論だけでなくあなた独自の視点を加えてください。指定された文字数を目安にしつつ、最低でも200字以上は述べてください。冗長な前置きや同じ主張の繰り返しは避け、新しい論点・反論・譲歩のいずれかを必ず1つ以上含めてください。";
 
@@ -157,6 +158,40 @@ export function compressHistory(history, summaries, personas, rollingSummary) {
   return "\n\n【これまでの議論】\n" + parts.join("\n\n");
 }
 
+const RESEARCH_INSTRUCTION = `あなたは調査担当者です。意見を述べる場ではありません。実際に検索して一次情報にあたり、読み取れた事実を台帳に追記することがあなたの仕事です。
+
+【このターンでやること】
+1. 担当項目のうち、台帳にまだ無い対象を選ぶ（欲張らず2〜3対象。件数より確度）
+2. Web検索で対象を特定し、見つけた個別ページのURLを開いて（web_fetch）値を実際に読む
+3. 読めた事実を【台帳】に1行1事実で書く
+4. 読めなかった項目を【未確認】に書く
+
+【禁止】
+- 進め方・方針・分担の提案（計画は確定済み。議論しない）
+- 他AIへの同意表明・反論
+- 台帳の「済」にある「対象×項目」を調べ直して同じ値を書くこと（重複として捨てられ、そのターンの検索が無駄になります）。済んでいない対象・項目へ進んでください
+- 裏の取れていない値を「確実」と書くこと。画像ファイル・検索結果ページ・まとめサイトを出典にした「確実」も不可（本文に値が書かれたページを開いて読めた場合のみ）
+- 「これから調べます」という予告だけで終わること
+
+【例外：台帳の値を覆すとき】既存の値が誤っていると別の一次情報で反証できる場合に限り、同じ「対象×項目」を書いてよい。確度は「要確認」、値の末尾に「（台帳の値と相違：<既存の値>）」と添え、読んだ出典URLを示すこと。
+
+【出力形式】厳密に従うこと
+本文（100〜300字。今回どの対象の何を確認できたか・つまずいた点だけを書く。前置き・要約・あいさつ不要）
+
+【台帳】
+- 対象 | 項目 | 値 | 確度 | 出典URL
+
+【未確認】
+- 対象 | 項目 | 確認できなかった理由
+
+台帳の書き方:
+- 行は箇条書き（- 対象 | 項目 | ...）でも Markdown の表でも構いません。列の順番だけ守ってください
+- 「対象」は施設名・製品名・制度名など固有名詞。「項目」は価格・泉質・評価件数など属性名
+- 「値」は読み取った実際の値（数値・単位・条件をそのまま。日付や人数の条件があれば値に含める）
+- 「確度」は 確実 / 要確認 / 推測 のいずれか。「確実」は出典URLのページにその値が実際に書かれている場合のみ
+- 「出典URL」は実際に開いた、または検索結果に出たURLをそのまま書く。組み立てたURLや存在しないURLは書かない
+- 台帳に書く行が無いターンがあってもよい。その場合は【台帳】の下を空にし、【未確認】に理由を書く`;
+
 const MODE_INSTRUCTIONS = {
   standard: {
     round1: `議題に対して自分の見解を250〜350字で述べてください。他のAIとの違いが出るよう、あなた自身の視点・特徴を活かして答えてください。${QUALITY_GUIDE}`,
@@ -181,6 +216,17 @@ const MODE_INSTRUCTIONS = {
   decision: {
     round1: `議題を「意思決定」として扱ってください。250〜350字で、取りうる選択肢を洗い出し、評価軸（例: コスト・リスク・実現性・期間など）を立てて各選択肢を簡潔に評価し、最後に現時点での暫定推奨を示してください。${QUALITY_GUIDE}`,
     roundN: `他のAIが挙げた選択肢・評価軸・評価に対して200〜300字で反論または補強し、見落とされたトレードオフや前提を指摘してください。そのうえで「どの条件ならどの選択肢が最適か」を条件付きで具体的に示してください。${QUALITY_GUIDE}`,
+  },
+  // 調査モード: this is not a discussion instruction — it is a work order. The
+  // panel modes above all end in "反論・譲歩を1つ以上含めて200〜300字" (see
+  // QUALITY_GUIDE), which is exactly what turns a research request into rounds
+  // of methodology debate: the model is being asked for an argument, so it
+  // produces one. Research rounds get no character budget, no rebuttal duty,
+  // and a fixed output contract instead (本文 + 【台帳】 + 【未確認】), because
+  // what has to survive the round is the facts, not the position.
+  research: {
+    round1: RESEARCH_INSTRUCTION,
+    roundN: RESEARCH_INSTRUCTION,
   },
   conclusion: {
     round1: `あなたは3者の議論を統合する中立的な記録者です。まだ他AIの発言は無いため、議題に対して論点整理と暫定的な結論を400〜600字で述べてください。自分個人の主張ではなく、想定される多角的な視点を踏まえた中立的な視点でまとめてください。「## 論点」「## 暫定結論」の見出しを使ってください。${QUALITY_GUIDE}`,
@@ -212,7 +258,55 @@ export function buildSearchBlock(searchContext) {
   return `\n\n【最新のWeb検索結果（参考・全${n}件）】\n以下を踏まえ「具体的」に答えてください。\n【ルール】\n- 営業時間・価格・固有名詞などの事実は検索結果に明記がある場合のみ記載。無い値は推測せず【要確認】。\n- 出典は[1]〜[${n}]のみ。存在しない番号・店名・数値を創作しない。\n- 各推薦に確度ラベルを付ける：【確実】=結果に明記／【候補】=名称はあるが詳細要確認／【推測】=結果に根拠なし。\n- 検索結果に無い事項を【確実】や出典付きにしない。自分の知識による補足は【推測】とし出典番号を付けない（検索由来と知識を区別）。\n- 固有名詞・数値を積極的に挙げ、抽象論や「要確認」だけで終わらせない。\n- 推薦は箇条書きで「・名称 ［ラベル］（あれば営業時間/出典[番号]）」とし、理由・考察は文章で述べる。\n- 鵜呑みにせず取捨選択し、他AIと異なる切り口を出す。\n${lines.join("\n\n")}`;
 }
 
-export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext, nativeSearch) {
+// Research rounds carry the plan (stable) and the ledger index (grows) instead
+// of the discussion transcript. Keeping the transcript out is both the cost win
+// and the quality win: the previous round's prose is the part that pulled the
+// panel back into arguing about method, and it is also the largest block we
+// would otherwise re-send every round.
+export function buildResearchBlocks(research, modelId, nameOf) {
+  const plan = research?.plan;
+  const planText = plan ? formatPlanForModel(plan, modelId, nameOf) : "";
+  // budget 0 = this round has no search tool (own-keys / non-premium). Say so
+  // plainly: a prompt that promises tools the model does not have is an
+  // invitation to fill the ledger from memory.
+  const budget = Number.isInteger(research?.searchBudget) ? research.searchBudget : 3;
+  const toolText = budget > 0
+    ? `\n\n【使えるツール】このターンの検索は最大${budget}回、ページ取得(web_fetch)も最大${budget}回までです。`
+      + `検索結果の要約だけで値を埋めず、個別ページを開いて確認してください。`
+      + `予算内で終わる範囲に対象を絞り、残りは【未確認】に回してください。`
+    : `\n\n【使えるツール】このターンはWeb検索・ページ取得を利用できません。`
+      + `記憶や推論で台帳を埋めないでください。出典URLを示せない項目はすべて【未確認】に回し、`
+      + `台帳に書く場合は確度を「推測」とし出典を空にしてください。`;
+  const index = (research?.ledgerIndex || "").trim();
+  const ledgerText = index
+    ? `\n\n【確定事実台帳】以下は3者が確認を終えた項目です。`
+      + `「済」に挙がっている項目は調べ直さないでください（重複は捨てられます）。`
+      + `URLは web_fetch で開けるので、同じ対象の"別の"項目を調べるときの起点に使えます。\n${index}`
+    : "\n\n【確定事実台帳】まだ空です。あなたの担当項目の1件目から着手してください。";
+  const open = Array.isArray(research?.openItems) ? research.openItems.filter(Boolean) : [];
+  const openText = open.length
+    ? `\n\n【前ラウンド時点の未確認項目（あなたの担当分があれば優先）】\n${open.map((o) => `- ${o}`).join("\n")}`
+    : "";
+  return { planText, toolText, ledgerText: `${ledgerText}${openText}` };
+}
+
+// Final research report: one call, no tools, the full ledger as the only source.
+export function buildReportPrompt(topic, ledgerText, profile, constitution) {
+  const safeTopic = (topic || "").slice(0, 2000);
+  const prof = (profile || "").trim()
+    ? `\n\n【依頼者のプロフィール】\n${profile.slice(0, 5000).trim()}`
+    : "";
+  const constText = (constitution || "").trim()
+    ? `\n\n【依頼者の判断基準】\n${constitution.slice(0, 2000).trim()}`
+    : "";
+  const ledger = (ledgerText || "").trim();
+  const user = `【議題（依頼内容と出力形式の指定）】\n${safeTopic}${prof}${constText}`
+    + `\n\n【確定事実台帳（この内容だけを根拠にできる）】\n${ledger || "（台帳が空です。この場合は「調査結果なし」と述べ、何も確認できていないことを報告してください）"}`
+    + `\n\n上記の台帳だけを根拠に、最終レポートを作成してください。`;
+  return user;
+}
+
+export function buildPrompt(modelId, topic, profile, history, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summaries, rollingSummary, attachments, searchContext, nativeSearch, research) {
   const model = MODELS.find((m) => m.id === modelId);
   if (!model) throw new Error(`Unknown model: ${modelId}`);
   const modelName = model.name;
@@ -253,9 +347,16 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
     : "";
 
   const displayName = myPersona ? `${modelName}（${myPersona}）` : modelName;
-  const sys = `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}${nativeText}`;
+  const isResearch = modeKey === "research";
+  const nameOf = (id) => MODELS.find((m) => m.id === id)?.name ?? id;
+  const rb = isResearch ? buildResearchBlocks(research, modelId, nameOf) : null;
 
-  const histText = compressHistory(history, summaries, personas, rollingSummary);
+  const sys = isResearch
+    ? `あなたは${displayName}です。${othersDesc}と3者で分担して1件の調査を進めています。${instruction}${rb.planText}${rb.toolText}${personaInstruction}${prof}${constText}`
+    : `あなたは${displayName}です。${othersDesc}と3者でパネルディスカッションを行っています。${instruction}${personaInstruction}${prof}${constText}${contextText}${nativeText}`;
+
+  // Research mode drops the transcript entirely — the ledger carries the state.
+  const histText = isResearch ? "" : compressHistory(history, summaries, personas, rollingSummary);
   const attachText = buildAttachmentsBlock(attachments);
 
   const safeIntervention = (userIntervention || "").slice(0, 1000);
@@ -273,7 +374,9 @@ export function buildPrompt(modelId, topic, profile, history, roundNum, userInte
   // re-paying for it every round.
   const searchText = nativeSearch ? "" : buildSearchBlock(searchContext);
   const userCachePrefix = `【議題】${safeTopic}${attachText}${searchText}`;
-  const userVariable = `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
+  const userVariable = isResearch
+    ? `${rb.ledgerText}${interventionText}\n\nあなた（${modelName}）の担当分の調査を実行し、結果を出力してください。`
+    : `${histText}${interventionText}\n\nあなた（${modelName}）の発言をどうぞ。`;
   const user = `${userCachePrefix}${userVariable}`;
   return { sys, user, userCachePrefix, userVariable };
 }

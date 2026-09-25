@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { MODELS, MODE_MODELS, DISCUSSION_MODES, INTERVENTION_QUICKFILLS } from "./constants";
+import ResearchPanel from "./components/ResearchPanel";
+import ResearchSetup from "./components/ResearchSetup";
 import { PLACEHOLDER_ROTATION } from "./suggestedQuestions";
 import SuggestedQuestions from "./components/SuggestedQuestions";
 import { saveSettings } from "./storage";
@@ -81,6 +83,10 @@ export default function App() {
   // instead of the plan budget. Only effective when keys are complete, so the
   // direct-call path never fails on a missing key.
   const useOwnKeys = auth.isPremium && preferOwnKeys && allKeysSet;
+  // 調査モードは各AI自身の検索ツールを使うため、プラン経由（プロキシ）が必須。
+  // 自前キー利用時はサーバー側の検索経路を通らないので、無言で「検索なしの調査」に
+  // ならないよう、開始前に警告を出す。
+  const canUseNativeSearch = auth.isPremium && !!auth.token && !useOwnKeys;
 
   const [topic, setTopic]       = useState("");
   // Default to "fast": good quality at ~1/3 the cost, so casual use doesn't burn
@@ -123,6 +129,7 @@ export default function App() {
           running, started, intervention, setIntervention, showIntervention,
           sidePanel, setSidePanel,
           actionPlan, actionPlanLoading,
+          research,
           verdict, verdictLoading, handleGenerateVerdict,
           bottomRef,
           handleStart: startDiscussion, handleNextRound, handleStop, handleReset,
@@ -252,8 +259,9 @@ export default function App() {
     }
   };
 
-  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas, verdict, actionPlan); };
-  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas, verdict, actionPlan); };
+  const researchExport = { ledger: research.ledger, report: research.report };
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas, verdict, actionPlan, researchExport); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas, verdict, actionPlan, researchExport); };
 
   // Turn an open question into the next round's focus: stage it as a moderator
   // intervention and scroll the input into view so the user just hits "次へ".
@@ -535,8 +543,17 @@ export default function App() {
                       ・<b>事実検証</b>: 根拠・データ重視で互いの発言を検証<br />
                       ・<b>合意形成</b>: 歩み寄り・第三案で「落とし所」へ収束。対立より合意づくり<br />
                       ・<b>意思決定</b>: 選択肢を評価軸で比較・採点し、条件別の推奨を出す（最終ジャッジと好相性）<br />
-                      ・<b>中立まとめ</b>: 1つのAIが中立記録者として全体を「合意/相違/結論」に整理（裁定はしない）
+                      ・<b>中立まとめ</b>: 1つのAIが中立記録者として全体を「合意/相違/結論」に整理（裁定はしない）<br />
+                      ・<b>調査</b>: 議論ではなく実査。3AIが担当を分けてWeb検索・ページ確認を行い、確認できた事実を台帳に積み上げ、最後に1本のレポートにまとめる
                     </div>
+                  )}
+                  {discussionMode === "research" && (
+                    <ResearchSetup
+                      conclusionTarget={conclusionTarget}
+                      setConclusionTarget={setConclusionTarget}
+                      canUseNativeSearch={canUseNativeSearch}
+                      isPremium={auth.isPremium}
+                    />
                   )}
                   {discussionMode === "conclusion" && (
                     <div style={{ marginTop:8, padding:"8px 10px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:8 }}>
@@ -644,7 +661,7 @@ export default function App() {
         )}
 
         {/* 現在の到達点（結論ファースト）: 議論本文の上に常時表示 */}
-        {started && discussion.length > 0 && consensusSummary && (
+        {started && discussionMode !== "research" && discussion.length > 0 && consensusSummary && (
           <ConsensusCard
             summary={consensusSummary}
             summaries={summaries}
@@ -655,8 +672,14 @@ export default function App() {
           />
         )}
 
+        {/* 調査モード: 台帳と最終レポート。議論用の合意カード・最終ジャッジは
+            調査では意味を持たないので、この2つと入れ替える。 */}
+        {started && discussionMode === "research" && (
+          <ResearchPanel research={research} running={running} helpMode={help.helpMode} />
+        )}
+
         {/* 最終ジャッジ（検証付き単一結論）: 議論が1ラウンド以上・停止中に提供 */}
-        {started && discussion.length > 0 && !running && (
+        {started && discussionMode !== "research" && discussion.length > 0 && !running && (
           <FinalVerdict verdict={verdict} loading={verdictLoading} onGenerate={handleGenerateVerdict} onSaveImage={handleSaveVerdictImage} />
         )}
 
@@ -713,9 +736,9 @@ export default function App() {
                     </button>
                   ))}
                 </div>
-                {discussionMode === "conclusion" && (
+                {(discussionMode === "conclusion" || discussionMode === "research") && (
                   <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:6, flexWrap:"wrap" }}>
-                    <span style={{ fontSize:10, color:"var(--text3)" }}>まとめ担当:</span>
+                    <span style={{ fontSize:10, color:"var(--text3)" }}>{discussionMode === "research" ? "レポート担当:" : "まとめ担当:"}</span>
                     {MODELS.map((m) => (
                       <button key={m.id} role="radio" aria-checked={conclusionTarget===m.id} onClick={() => setConclusionTarget(m.id)}
                         style={{ padding:"3px 9px", border:`1px solid ${conclusionTarget===m.id?m.color:"var(--border)"}`, borderRadius:14, cursor:"pointer", fontSize:10, fontWeight:600, background:conclusionTarget===m.id?m.bg:"transparent", color:conclusionTarget===m.id?m.color:"var(--text3)" }}>
@@ -726,13 +749,17 @@ export default function App() {
                 )}
                 <div style={{ textAlign:"center" }}>
                   <button onClick={handleNextRound} style={{ background:"none", border:"1px solid var(--accent)", borderRadius:20, padding:"10px 28px", color:"var(--accent-light)", cursor:"pointer", fontSize:13, fontWeight:600 }}>
-                    ↻ {discussionMode === "conclusion" ? `中立まとめを生成（${MODELS.find(m=>m.id===conclusionTarget)?.name}）` : `次のラウンドへ（Round ${discussion.length+1}）`}
+                    ↻ {discussionMode === "conclusion"
+                        ? `中立まとめを生成（${MODELS.find(m=>m.id===conclusionTarget)?.name}）`
+                        : discussionMode === "research"
+                          ? `調査を続ける（Round ${discussion.length+1}）`
+                          : `次のラウンドへ（Round ${discussion.length+1}）`}
                   </button>
                 </div>
               </div>
             )}
 
-            {!running && discussion.length > 0 && (
+            {!running && discussionMode !== "research" && discussion.length > 0 && (
               <ActionPlanView plan={actionPlan} loading={actionPlanLoading} onGenerate={handleGenerateActionPlan} />
             )}
 

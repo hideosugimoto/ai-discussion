@@ -49,15 +49,20 @@ export async function callProxySearch(token, queries, signal, sessionId) {
   }
 }
 
-export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts, nativeSearch, searchMaxUses) {
+// `opts` carries the research-round levers: { searchMaxUses, nativeFetch,
+// maxTokens }. All three are re-validated and clamped server-side — they map
+// straight onto billable upstream limits.
+export async function callProxyClaude(token, model, sys, user, onChunk, signal, sessionId, turnNumber, userParts, nativeSearch, opts) {
   const body = { model, system: sys, message: user, sessionId, turnNumber };
   if (userParts && userParts.cachePrefix && userParts.variable) {
     body.userParts = { cachePrefix: userParts.cachePrefix, variable: userParts.variable };
   }
   if (nativeSearch) {
     body.nativeSearch = true;
-    if (searchMaxUses) body.searchMaxUses = searchMaxUses;
+    if (opts?.searchMaxUses) body.searchMaxUses = opts.searchMaxUses;
+    if (opts?.nativeFetch) body.nativeFetch = true;
   }
+  if (opts?.maxTokens) body.maxTokens = opts.maxTokens;
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
@@ -91,9 +96,10 @@ export function extractChatGPTChunk(json) {
   return json?.choices?.[0]?.delta?.content ?? "";
 }
 
-export async function callProxyChatGPT(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch) {
+export async function callProxyChatGPT(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch, opts) {
   const body = { model, system: sys, message: user, sessionId, turnNumber };
   if (nativeSearch) body.nativeSearch = true;
+  if (opts?.maxTokens) body.maxTokens = opts.maxTokens;
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {
@@ -118,9 +124,10 @@ export async function callProxyChatGPT(token, model, sys, user, onChunk, signal,
   return full;
 }
 
-export async function callProxyGemini(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch) {
+export async function callProxyGemini(token, model, sys, user, onChunk, signal, sessionId, turnNumber, nativeSearch, opts) {
   const body = { model, system: sys, message: user, sessionId, turnNumber };
   if (nativeSearch) body.nativeSearch = true;
+  if (opts?.maxTokens) body.maxTokens = opts.maxTokens;
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: {

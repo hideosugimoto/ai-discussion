@@ -186,6 +186,10 @@ export default function HistoryPanel({
         discussionMode: parsed.discussionMode || "standard",
         conclusionTarget: parsed.conclusionTarget || "claude",
         personas: parsed.personas || { claude:"", chatgpt:"", gemini:"" },
+        // 調査モードの計画とレポート。落とすとクラウド復元した調査が担当分けを
+        // やり直し（＝同じ対象を再調査）、レポートも消える。
+        researchPlan: parsed.researchPlan || null,
+        researchReport: typeof parsed.researchReport === "string" ? parsed.researchReport : "",
         roundCount: full.roundCount,
         createdAt: full.createdAt,
       });

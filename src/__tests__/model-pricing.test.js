@@ -105,6 +105,15 @@ describe("cost functions honour the promo boundary", () => {
     expect(estimateMaxCostMicro(M, AFTER_PROMO)).toBe(Math.round(500 * 1.5 + 1500 * 7.5));
   });
 
+  it("estimateMaxCostMicro は要求した出力上限で見積もる（調査/レポートの事前引当）", () => {
+    // 調査ラウンドやレポートは max_tokens を上げて呼ぶので、事前引当も同じ数字で
+    // ないと月次上限をすり抜ける。
+    expect(estimateMaxCostMicro(M, DURING_PROMO, 8000)).toBe(Math.round(500 * 0.75 + 8000 * 3.75));
+    // 不正値は既定の1500にフォールバックする
+    expect(estimateMaxCostMicro(M, DURING_PROMO, 0)).toBe(estimateMaxCostMicro(M, DURING_PROMO));
+    expect(estimateMaxCostMicro(M, DURING_PROMO, NaN)).toBe(estimateMaxCostMicro(M, DURING_PROMO));
+  });
+
   it("keeps non-promo models stable across the boundary", () => {
     const before = calcCostMicro("claude-opus-4-8", 1000, 1000, DURING_PROMO);
     const after = calcCostMicro("claude-opus-4-8", 1000, 1000, AFTER_PROMO);

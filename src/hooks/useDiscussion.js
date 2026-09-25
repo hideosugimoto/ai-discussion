@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { MODELS, MODE_MODELS } from "../constants";
+import { MODELS, MODE_MODELS, RESEARCH_CONFIG } from "../constants";
 import { SUMMARY_MODEL } from "../models.config";
-import { buildPrompt } from "../prompt";
+import { buildPrompt, buildReportPrompt } from "../prompt";
+import { parseLedgerBlock, parseOpenItems, mergeLedger, ledgerIndex, serializeLedger, sanitizeLedger, sanitizeOpenItems } from "../research/ledger";
+import { generateResearchPlan } from "../research/plan";
 import { callClaude, callChatGPT, callGemini } from "../api";
 import { callProxyClaude, callProxyChatGPT, callProxyGemini, callProxySearch } from "../apiProxy";
 import { saveDiscussion } from "../history";
@@ -9,6 +11,8 @@ import { buildActionPlanPrompt, parseActionPlan } from "../actionPlan";
 import { shouldSummarize } from "../lib/fileParser";
 import actionPlanPromptText from "../prompts/action-plan.txt?raw";
 import combinedSummaryPromptText from "../prompts/combined-summary.txt?raw";
+import researchPlanPromptText from "../prompts/research-plan.txt?raw";
+import researchReportPromptText from "../prompts/research-report.txt?raw";
 import detailedPromptText from "../prompts/detailed-analysis.txt?raw";
 import finalVerdictPromptText from "../prompts/final-verdict.txt?raw";
 import finalVerdictCritiquePromptText from "../prompts/final-verdict-critique.txt?raw";
@@ -252,7 +256,7 @@ async function generateVerdictCritique(apiKey, authToken, viaProxy, recommendati
 // Intentionally excludes profile, constitution, and API keys — only the
 // discussion artifact itself is uploaded. (Personas are part of the
 // discussion record because they affect the message content.)
-function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget) {
+function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget, research) {
   return {
     topic,
     data_json: JSON.stringify({
@@ -262,6 +266,8 @@ function buildCloudPayload(topic, discussion, summaries, mode, discussionMode, p
       discussionMode,
       personas,
       conclusionTarget,
+      researchPlan: research?.plan || null,
+      researchReport: research?.report || "",
     }),
     tags: [],
   };
@@ -287,6 +293,14 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const [verdictLoading, setVerdictLoading] = useState(false);
   const [discussionId, setDiscussionId] = useState(null);
   const [rollingSummary, setRollingSummary] = useState(null);
+  // 調査モード state. `ledger` is derived from the rounds (each round stores the
+  // facts it added), so reload and history load rebuild it instead of trusting
+  // a separate blob.
+  const [ledger, setLedger] = useState([]);
+  const [openItems, setOpenItems] = useState([]);
+  const [researchPlan, setResearchPlan] = useState(null);
+  const [report, setReport] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
 
   const abortRef = useRef(null);
   // Last search results, reused across rounds that don't search fresh (cost opt).
@@ -299,6 +313,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const attachmentsRef = useRef(attachments);
   const summaryModeRef = useRef(summaryMode);
   const setAttachmentsRef = useRef(setAttachments);
+  const ledgerRef = useRef(ledger);
+  const openItemsRef = useRef(openItems);
+  const researchPlanRef = useRef(researchPlan);
+  const reportRef = useRef(report);
 
   useEffect(() => { discussionRef.current = discussion; }, [discussion]);
   useEffect(() => { summariesRef.current = summaries; }, [summaries]);
@@ -307,6 +325,10 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   useEffect(() => { attachmentsRef.current = attachments; }, [attachments]);
   useEffect(() => { summaryModeRef.current = summaryMode; }, [summaryMode]);
   useEffect(() => { setAttachmentsRef.current = setAttachments; }, [setAttachments]);
+  useEffect(() => { ledgerRef.current = ledger; }, [ledger]);
+  useEffect(() => { openItemsRef.current = openItems; }, [openItems]);
+  useEffect(() => { researchPlanRef.current = researchPlan; }, [researchPlan]);
+  useEffect(() => { reportRef.current = report; }, [report]);
 
   const cloudUpsertRef = useRef(cloudUpsertFn);
   useEffect(() => { cloudUpsertRef.current = cloudUpsertFn; }, [cloudUpsertFn]);
@@ -320,14 +342,15 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
 
   const autoSave = useCallback(() => {
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget)
+      const research = { plan: researchPlan, report };
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget, research)
         .then((id) => {
           if (!discussionId) setDiscussionId(id);
-          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget));
+          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget, research));
         })
         .catch(() => {});
     }
-  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget, syncToCloud]);
+  }, [topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget, syncToCloud, researchPlan, report]);
 
   useEffect(() => {
     const handler = () => { autoSave(); };
@@ -378,9 +401,27 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setVerdict(null); // a new round invalidates any prior final verdict
 
     const isConclusionRound = discussionMode === "conclusion";
+    const isResearchRound = discussionMode === "research";
     const targetModels = isConclusionRound
       ? MODELS.filter((m) => m.id === (conclusionTarget || "claude"))
       : MODELS;
+
+    // 調査モード: the plan is produced once, by the cheap summary model, and then
+    // reused verbatim every round — it is what keeps the three AIs on disjoint
+    // slices instead of all verifying the same first item.
+    let plan = researchPlanRef.current;
+    if (isResearchRound && !plan) {
+      plan = await generateResearchPlan(
+        (sys, user) => callGPTMini(keys.chatgpt, authToken, viaProxy, sys, user, discussionIdRef.current, 0),
+        researchPlanPromptText,
+        topic,
+        profile,
+        MODELS.map((m) => m.id),
+      );
+      if (controller.signal.aborted) { setRunning(false); abortRef.current = null; return; }
+      researchPlanRef.current = plan;
+      setResearchPlan(plan);
+    }
 
     // Search modes (premium-only, skipped on conclusion rounds):
     //  - "shared":  Architecture B — one server-side search, same evidence
@@ -395,14 +436,17 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     const shouldSearchFreshRound = roundNum === 1 || !!(userIntervention && userIntervention.trim());
     // Native search runs per-AI this round only when fresh search is warranted;
     // reuse rounds rely on conversation history instead of new tool calls.
-    const useNativeThisRound = canSearch && searchMode === "native" && shouldSearchFreshRound;
+    // 調査モード always searches natively, every round: each AI works its own
+    // lane, so a shared result set would be the wrong evidence for two of them,
+    // and a round that cannot search cannot add a fact.
+    const useNativeThisRound = canSearch && (isResearchRound || (searchMode === "native" && shouldSearchFreshRound));
 
     // Architecture B shared search. Cost optimization: only search fresh on
     // Round 1 and when the user intervenes; other rounds REUSE the last results
     // so we don't re-pay grounding calls + injection every round. The reused
     // block stays stable, so it also stays in the cacheable prefix.
     let searchContext = null;
-    if (searchMode === "shared" && canSearch) {
+    if (searchMode === "shared" && canSearch && !isResearchRound) {
       const shouldSearchFresh = shouldSearchFreshRound;
       if (shouldSearchFresh) {
         try {
@@ -442,16 +486,38 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       setAttachmentsRef.current(effectiveAttachments);
     }
 
+    // Same for all three AIs this round — built once, not per model.
+    const research = isResearchRound
+      ? {
+          plan,
+          ledgerIndex: ledgerIndex(ledgerRef.current),
+          openItems: openItemsRef.current,
+          // 0 when this round has no search path (own keys / 非Premium): the
+          // prompt then tells the AI it cannot search, instead of inviting it
+          // to fill the ledger from memory.
+          searchBudget: useNativeThisRound ? RESEARCH_CONFIG.searchBudget : 0,
+        }
+      : undefined;
+    // Research rounds need room for the ledger block after the tool calls; the
+    // panel default (1500) truncates it mid-table.
+    const callOpts = isResearchRound
+      ? { searchMaxUses: RESEARCH_CONFIG.searchBudget, nativeFetch: true, maxTokens: RESEARCH_CONFIG.roundMaxTokens }
+      : undefined;
+
     const results = await Promise.all(
       targetModels.map(async (model) => {
-        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext, useNativeThisRound);
+        const { sys, user, userCachePrefix, userVariable } = buildPrompt(model.id, topic, profile, currentHistory, roundNum, userIntervention, discussionMode, personas, constitution, contextDiscussions, summariesRef.current, rollingSummaryRef.current, effectiveAttachments, searchContext, useNativeThisRound, research);
         const tag = models[model.id].tag;
         // Pass userParts to Claude when the cacheable prefix is large enough to
         // benefit from cache_control: when there are attachments OR injected
         // search results (both live in the prefix and are stable across reuse
         // rounds). Otherwise the prefix is too small to be worth a cache block.
+        // 調査モード always splits: the topic block is re-sent unchanged every
+        // round and research runs several rounds, so the 1.25x write pays back
+        // from round 2 (and is silently ignored if the prefix is under the
+        // model's cache minimum).
         const hasSearch = Array.isArray(searchSources) && searchSources.length > 0;
-        const userParts = ((effectiveAttachments && effectiveAttachments.length > 0) || hasSearch)
+        const userParts = ((effectiveAttachments && effectiveAttachments.length > 0) || hasSearch || isResearchRound)
           ? { cachePrefix: userCachePrefix, variable: userVariable }
           : undefined;
 
@@ -473,14 +539,14 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
           if (viaProxy) {
             // Premium: server-side proxy (no API keys needed)
             const sid = discussionIdRef.current;
-            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts, useNativeThisRound);
-            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound);
-            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound);
+            if (model.id === "claude")  text = await callProxyClaude(authToken, tag, sys, user, onChunk, sig, sid, roundNum, userParts, useNativeThisRound, callOpts);
+            if (model.id === "chatgpt") text = await callProxyChatGPT(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound, callOpts);
+            if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound, callOpts);
           } else {
             // Free: direct API calls (user's own keys)
-            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts);
-            if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig);
-            if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig);
+            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts, callOpts);
+            if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig, callOpts);
+            if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig, callOpts);
           }
           return { modelId:model.id, text, error:null, loading:false };
         } catch (e) {
@@ -490,9 +556,27 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       })
     );
 
+    // 調査モード: pull each AI's 【台帳】 / 【未確認】 blocks out of its own turn.
+    // Parsing client-side (rather than asking a summariser model to extract
+    // them) keeps values verbatim — a paraphrased price or URL is worthless —
+    // and adds no extra call to the round.
+    const ledgerAdds = isResearchRound
+      ? results.flatMap((r) => parseLedgerBlock(r.text, { modelId: r.modelId, round: roundNum }))
+      : [];
+    const roundOpenItems = isResearchRound
+      ? results.flatMap((r) => parseOpenItems(r.text))
+      : [];
+    if (isResearchRound) {
+      const nextLedger = mergeLedger(ledgerRef.current, ledgerAdds);
+      ledgerRef.current = nextLedger;
+      openItemsRef.current = roundOpenItems;
+      setLedger(nextLedger);
+      setOpenItems(roundOpenItems);
+    }
+
     setDiscussion((d) => {
       const u = [...d];
-      u[u.length - 1] = { ...u[u.length - 1], messages:results };
+      u[u.length - 1] = { ...u[u.length - 1], messages:results, ledgerAdds, openItems: roundOpenItems };
       return u;
     });
 
@@ -502,7 +586,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     if (!controller.signal.aborted) {
       setShowIntervention(true);
       // 中立まとめラウンドはサマリー生成をスキップ（3AI前提の機能のため）
-      if (!isConclusionRound) {
+      // 調査モードも同様。合意/対立/未解決の要約は調査の役に立たないうえ、
+      // ラウンドごとに要約モデルの呼び出しが1回増えるだけになる。
+      if (!isConclusionRound && !isResearchRound) {
         runSummary(results, roundNum, discussionIdRef.current);
       } else {
         // プレースホルダ（インデックス整合性のため）
@@ -511,12 +597,13 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
       const curDisc = discussionRef.current;
       const curSummaries = summariesRef.current;
       const curId = discussionIdRef.current;
-      const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound, searchSources };
+      const researchState = { plan: researchPlanRef.current, report: reportRef.current };
+      const newRound = { messages: results, userIntervention, isConclusion: isConclusionRound, searchSources, ledgerAdds, openItems: roundOpenItems };
       const finalDiscussion = curDisc.length > 0 ? [...curDisc.slice(0, -1), newRound] : [newRound];
-      saveDiscussion(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, curId, conclusionTarget)
+      saveDiscussion(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, curId, conclusionTarget, researchState)
         .then((id) => {
           if (!curId) setDiscussionId(id);
-          syncToCloud(id, buildCloudPayload(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, conclusionTarget));
+          syncToCloud(id, buildCloudPayload(topic, finalDiscussion, curSummaries, mode, discussionMode, personas, conclusionTarget, researchState));
         })
         .catch(() => {});
       // 結論ラウンド完了後は自動でstandardモードに戻す
@@ -526,6 +613,61 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     }
   }, [mode, keys, topic, profile, discussionMode, setDiscussionMode, conclusionTarget, personas, constitution, contextDiscussions, runSummary, isPremium, authToken, useOwnKeys, searchMode, syncToCloud]);
 
+  const resetResearch = () => {
+    ledgerRef.current = [];
+    openItemsRef.current = [];
+    researchPlanRef.current = null;
+    reportRef.current = "";
+    setLedger([]); setOpenItems([]); setResearchPlan(null); setReport("");
+  };
+
+  // 最終レポート: one call, no tools, the ledger as the only source material.
+  // This is the deliverable the panel never produced — the rounds gather facts,
+  // this turns them into the document the topic actually asked for.
+  const handleGenerateReport = async () => {
+    if (reportLoading || running) return;
+    const entries = ledgerRef.current;
+    if (!entries.length) {
+      setReport("台帳が空です。調査ラウンドを実行してから作成してください。");
+      return;
+    }
+    setReportLoading(true);
+    setReport("");
+    const target = MODELS.find((m) => m.id === (conclusionTarget || "claude")) || MODELS[0];
+    const tag = MODE_MODELS[mode][target.id].tag;
+    const user = buildReportPrompt(topic, serializeLedger(entries), profile, constitution);
+    const opts = { maxTokens: RESEARCH_CONFIG.reportMaxTokens };
+    let full = "";
+    const onChunk = (chunk) => { full += chunk; setReport((prev) => prev + chunk); };
+    try {
+      const sid = discussionIdRef.current;
+      const turn = discussionRef.current.length || 1;
+      if (viaProxy) {
+        if (target.id === "claude")  await callProxyClaude(authToken, tag, researchReportPromptText, user, onChunk, undefined, sid, turn, undefined, false, opts);
+        if (target.id === "chatgpt") await callProxyChatGPT(authToken, tag, researchReportPromptText, user, onChunk, undefined, sid, turn, false, opts);
+        if (target.id === "gemini")  await callProxyGemini(authToken, tag, researchReportPromptText, user, onChunk, undefined, sid, turn, false, opts);
+      } else {
+        if (target.id === "claude")  await callClaude(keys.claude, tag, researchReportPromptText, user, onChunk, undefined, undefined, opts);
+        if (target.id === "chatgpt") await callChatGPT(keys.chatgpt, tag, researchReportPromptText, user, onChunk, undefined, opts);
+        if (target.id === "gemini")  await callGemini(keys.gemini, tag, researchReportPromptText, user, onChunk, undefined, opts);
+      }
+      // Persist as soon as it exists: a report is the session's deliverable and
+      // must survive a reload without waiting for another round.
+      reportRef.current = full;
+      const curId = discussionIdRef.current;
+      const researchState = { plan: researchPlanRef.current, report: full };
+      if (curId && discussionRef.current.length) {
+        saveDiscussion(topic, discussionRef.current, summariesRef.current, mode, discussionMode, personas, curId, conclusionTarget, researchState)
+          .then((id) => syncToCloud(id, buildCloudPayload(topic, discussionRef.current, summariesRef.current, mode, discussionMode, personas, conclusionTarget, researchState)))
+          .catch(() => {});
+      }
+    } catch (e) {
+      setReport(`レポートの生成に失敗しました: ${e.message}`);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const handleStart = async () => {
     if (!topic.trim() || running) return;
     setDiscussion([]);
@@ -534,6 +676,7 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setRollingSummary(null);
     setActionPlan(null);
     setVerdict(null);
+    resetResearch();
     lastSearchSourcesRef.current = [];
     setStarted(true);
     await runRound([], 1, "");
@@ -549,13 +692,15 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
   const handleReset = () => {
     abortRef.current?.abort();
     if (discussion.length > 0 && topic.trim()) {
-      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget)
+      const research = { plan: researchPlan, report };
+      saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, discussionId, conclusionTarget, research)
         .then((id) => {
-          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget));
+          syncToCloud(id, buildCloudPayload(topic, discussion, summaries, mode, discussionMode, personas, conclusionTarget, research));
         })
         .catch(() => {});
     }
     lastSearchSourcesRef.current = [];
+    resetResearch();
     setDiscussion([]); setSummaries([]); setDetailedAnalyses([]); setRollingSummary(null); setActionPlan(null); setVerdict(null); setStarted(false); setShowIntervention(false); setSidePanel(false); setDiscussionId(null);
   };
 
@@ -599,6 +744,25 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     setTopic(item.topic.slice(0, 2000));
     setDiscussion(item.discussion);
     setSummaries(Array.isArray(item.summaries) ? item.summaries : []);
+    // 調査モード: the ledger is derived state — rebuild it from the rounds so a
+    // loaded session can keep researching (and report) from where it stopped.
+    // Re-sanitize here, not only in history.js: the cloud path builds the item
+    // by hand (HistoryPanel → handleLoadCloud) and never passes through
+    // validateDiscussion, so this is the one place every restore path crosses.
+    // sanitizeLedger is also what guarantees `url` is http(s) — the ledger's
+    // URLs are rendered as links in the panel and in the HTML export.
+    const rebuilt = item.discussion.reduce((acc, r) => mergeLedger(acc, sanitizeLedger(r?.ledgerAdds)), []);
+    const lastOpen = sanitizeOpenItems(
+      [...item.discussion].reverse().find((r) => (r?.openItems || []).length)?.openItems,
+    );
+    ledgerRef.current = rebuilt;
+    openItemsRef.current = lastOpen;
+    researchPlanRef.current = item.researchPlan || null;
+    reportRef.current = typeof item.researchReport === "string" ? item.researchReport.slice(0, 60000) : "";
+    setLedger(rebuilt);
+    setOpenItems(lastOpen);
+    setResearchPlan(item.researchPlan || null);
+    setReport(reportRef.current);
     setDiscussionMode(item.discussionMode || "standard");
     if (setConclusionTarget) {
       setConclusionTarget(["claude", "chatgpt", "gemini"].includes(item.conclusionTarget) ? item.conclusionTarget : "claude");
@@ -622,6 +786,8 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     running, started, intervention, setIntervention, showIntervention,
     sidePanel, setSidePanel,
     actionPlan, actionPlanLoading,
+    // 調査モードの状態はひとまとめで返す（個別に7つ返すとApp側の受け渡しが散る）
+    research: { plan: researchPlan, ledger, openItems, report, reportLoading, generateReport: handleGenerateReport },
     verdict, verdictLoading, handleGenerateVerdict,
     bottomRef,
     handleStart, handleNextRound, handleStop, handleReset,

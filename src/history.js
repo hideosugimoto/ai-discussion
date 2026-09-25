@@ -1,3 +1,5 @@
+import { sanitizeLedger, sanitizeOpenItems } from "./research/ledger";
+
 const DB_NAME = "ai-discussion-history";
 const DB_VERSION = 1;
 const STORE_NAME = "discussions";
@@ -38,7 +40,26 @@ function validateRound(round) {
       ? round.userIntervention.slice(0, 1000)
       : "",
     isConclusion: round.isConclusion === true,
+    // 調査モード: facts this round added to the ledger, and what it could not
+    // confirm. Persisted per round (not as one blob) so the ledger is always
+    // reconstructible from the rounds — reload, history, and cloud sync then
+    // need no separate migration.
+    ledgerAdds: sanitizeLedger(round.ledgerAdds),
+    openItems: sanitizeOpenItems(round.openItems),
   };
+}
+
+function validatePlan(plan) {
+  if (!plan || typeof plan !== "object" || !Array.isArray(plan.items)) return null;
+  const items = plan.items
+    .map((it) => ({
+      id: typeof it?.id === "string" ? it.id.slice(0, 8) : "",
+      label: typeof it?.label === "string" ? it.label.slice(0, 100) : "",
+      owner: ["claude", "chatgpt", "gemini"].includes(it?.owner) ? it.owner : "claude",
+    }))
+    .filter((it) => it.id && it.label)
+    .slice(0, 12);
+  return items.length ? { items, fallback: plan.fallback === true } : null;
 }
 
 function validateDiscussion(data) {
@@ -57,12 +78,14 @@ function validateDiscussion(data) {
     personas: data.personas && typeof data.personas === "object"
       ? { claude: typeof data.personas.claude === "string" ? data.personas.claude : "", chatgpt: typeof data.personas.chatgpt === "string" ? data.personas.chatgpt : "", gemini: typeof data.personas.gemini === "string" ? data.personas.gemini : "" }
       : { claude: "", chatgpt: "", gemini: "" },
+    researchPlan: validatePlan(data.researchPlan),
+    researchReport: typeof data.researchReport === "string" ? data.researchReport.slice(0, 60000) : "",
     createdAt: typeof data.createdAt === "string" ? data.createdAt : new Date().toISOString(),
     roundCount: validDiscussion.length,
   };
 }
 
-export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, existingId, conclusionTarget) {
+export async function saveDiscussion(topic, discussion, summaries, mode, discussionMode, personas, existingId, conclusionTarget, research) {
   const db = await openDB();
   const id = existingId || crypto.randomUUID();
 
@@ -87,6 +110,8 @@ export async function saveDiscussion(topic, discussion, summaries, mode, discuss
     conclusionTarget,
     personas,
     createdAt,
+    researchPlan: research?.plan || null,
+    researchReport: research?.report || "",
   });
   if (!entry) throw new Error("Invalid discussion data");
 

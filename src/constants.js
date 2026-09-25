@@ -66,5 +66,21 @@ export const DISCUSSION_MODES = [
   { id: "factcheck", label: "🔍 事実検証",  description: "根拠・正確性を重視" },
   { id: "consensus", label: "🤝 合意形成",  description: "対立を歩み寄り・第三案で合意へ" },
   { id: "decision",  label: "⚖️ 意思決定",  description: "選択肢を評価軸で比較し推奨を出す" },
+  { id: "research",  label: "🔬 調査",     description: "3AIが分担してWeb調査・事実を台帳に蓄積しレポート化（要Premium）" },
   { id: "conclusion", label: "🧾 中立まとめ", description: "1AIが合意/相違/結論に中立整理（裁定なし）" },
 ];
+
+// 調査モードの実行パラメータ。検索・取得の回数と出力上限はそのままコストなので、
+// 1か所に集約して「どこを緩めるといくら増えるか」を追えるようにしておく。
+export const RESEARCH_CONFIG = {
+  // 1ターン・1AIあたりの検索回数とページ取得回数。サーバ側で1〜5にクランプされる。
+  // 検索は1回$0.01（Anthropic/OpenAI）、web_fetchは従量課金なしでトークン分のみ。
+  searchBudget: 3,
+  // web_fetch1回あたりの取り込みトークン上限。ページ全文は数万トークンになるため必須。
+  fetchContentTokens: 6000,
+  // 調査ラウンドの出力上限。本文＋台帳行がツール呼び出しと同じ出力枠を共有するので、
+  // 通常ラウンド（1500）では台帳が途中で切れる。
+  roundMaxTokens: 3000,
+  // 最終レポートの出力上限。表を含む成果物1本分。
+  reportMaxTokens: 8000,
+};

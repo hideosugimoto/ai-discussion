@@ -214,11 +214,14 @@ export function calcAnthropicCacheCostMicro(model, cacheCreationTokens, cacheRea
   );
 }
 
-// Pre-debit upper-bound estimate (500 input + 1500 output tokens), used to
-// reserve budget before the upstream call so concurrent requests can't race
-// past the monthly cap.
-export function estimateMaxCostMicro(model, now = Date.now()) {
+// Pre-debit upper-bound estimate (500 input + the call's output ceiling), used
+// to reserve budget before the upstream call so concurrent requests can't race
+// past the monthly cap. `maxOutputTokens` defaults to the panel-turn ceiling;
+// calls that raise max_tokens (research rounds, the research report) must pass
+// the same number they send upstream, or they under-reserve.
+export function estimateMaxCostMicro(model, now = Date.now(), maxOutputTokens = 1500) {
   const pricing = pricingFor(model, now);
   if (!pricing) return 0;
-  return Math.round(500 * pricing.input + 1500 * pricing.output);
+  const out = Number.isFinite(maxOutputTokens) && maxOutputTokens > 0 ? maxOutputTokens : 1500;
+  return Math.round(500 * pricing.input + out * pricing.output);
 }

@@ -11,14 +11,26 @@ import {
   calcAnthropicCacheCostMicro,
 } from "../../../src/models.config.js";
 
+// Output ceiling any single call may request. 1500 stays the default (panel
+// turns); research rounds and the research report ask for more explicitly.
+const MAX_OUTPUT_TOKENS = 16000;
+const DEFAULT_OUTPUT_TOKENS = 1500;
+// Per-fetch cap on how much of a page enters the context. A large page is
+// ~25k tokens; without this, one fetch can cost more than the whole round.
+const MAX_FETCH_CONTENT_TOKENS = 6000;
+
 // Layer 4: Input validation
 function validateRequest(body) {
   if (!body || typeof body !== "object") return "Invalid request body";
   if (typeof body.model !== "string" || !MODEL_PRICING[body.model]) {
     return "Invalid or unsupported model";
   }
-  if (typeof body.system !== "string" || body.system.length > 10000) {
-    return "Invalid system prompt (max 10000 chars)";
+  // 16000: 調査モードの system は「作業指示＋計画と分担＋ツール予算」に加えて
+  // ユーザーのプロフィール(最大5000)と憲法(最大2000)を載せるため、旧上限10000を
+  // 超えうる。超えると400でそのラウンドが丸ごと失敗するので、message(50000)との
+  // 整合が取れる値まで引き上げる。
+  if (typeof body.system !== "string" || body.system.length > 16000) {
+    return "Invalid system prompt (max 16000 chars)";
   }
   if (typeof body.message !== "string" || body.message.length > 50000) {
     return "Invalid message (max 50000 chars)";
@@ -32,6 +44,20 @@ function validateRequest(body) {
   if (body.searchMaxUses !== undefined) {
     if (!Number.isInteger(body.searchMaxUses) || body.searchMaxUses < 1 || body.searchMaxUses > 5) {
       return "Invalid searchMaxUses (must be an integer 1-5)";
+    }
+  }
+  // nativeFetch adds the web_fetch server tool (research mode). Fetch itself has
+  // no per-use fee, but fetched page text lands in input/cache tokens, so it is
+  // bounded by the same max_uses and by MAX_FETCH_CONTENT_TOKENS below.
+  if (body.nativeFetch !== undefined && typeof body.nativeFetch !== "boolean") {
+    return "Invalid nativeFetch";
+  }
+  // maxTokens raises the output ceiling for research rounds and the final
+  // report. Output is the expensive half of the bill, so clamp it here as well
+  // as at the caller, and feed the same number into the pre-debit estimate.
+  if (body.maxTokens !== undefined) {
+    if (!Number.isInteger(body.maxTokens) || body.maxTokens < 256 || body.maxTokens > MAX_OUTPUT_TOKENS) {
+      return `Invalid maxTokens (must be an integer 256-${MAX_OUTPUT_TOKENS})`;
     }
   }
   if (body.userParts !== undefined) {
@@ -127,10 +153,10 @@ function buildAnthropicUserMessages(message, userParts) {
 
 // Provider-specific API calls. `nativeSearch` enables each provider's own web
 // search tool (searchMode === "native"); maxUses bounds the agentic loop.
-async function callAnthropic(apiKey, model, system, message, userParts, nativeSearch, maxUses) {
+async function callAnthropic(apiKey, model, system, message, userParts, nativeSearch, maxUses, nativeFetch, maxTokens) {
   const body = {
     model,
-    max_tokens: 1500,
+    max_tokens: maxTokens || DEFAULT_OUTPUT_TOKENS,
     stream: true,
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: buildAnthropicUserMessages(message, userParts),
@@ -139,7 +165,23 @@ async function callAnthropic(apiKey, model, system, message, userParts, nativeSe
     // Default to a single search: each Anthropic web_search injects large
     // results that are billed as cache_creation at 1.25x, so extra loops are
     // expensive. One search is enough for the panel; callers can raise maxUses.
-    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: maxUses || 1 }];
+    const uses = maxUses || 1;
+    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: uses }];
+    if (nativeFetch) {
+      // Research mode: search finds the page, fetch reads it. Without fetch the
+      // model only ever sees result snippets, which is why a panel can name the
+      // right page and still not know the number printed on it.
+      // Basic web_fetch (not the 2026 dynamic-filtering variants) on purpose:
+      // dynamic filtering runs the code execution tool, whose cost this proxy
+      // does not meter. max_content_tokens is the deterministic, fully-billed
+      // lever instead. Fetch itself carries no per-use fee.
+      body.tools.push({
+        type: "web_fetch_20250910",
+        name: "web_fetch",
+        max_uses: uses,
+        max_content_tokens: MAX_FETCH_CONTENT_TOKENS,
+      });
+    }
   }
   return fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -152,7 +194,7 @@ async function callAnthropic(apiKey, model, system, message, userParts, nativeSe
   });
 }
 
-async function callOpenAI(apiKey, model, system, message) {
+async function callOpenAI(apiKey, model, system, message, maxTokens) {
   // Chat Completions path (shared / no-search mode). Native search uses the
   // Responses API instead (callOpenAIResponses) — web_search isn't available here.
   return fetch("https://api.openai.com/v1/chat/completions", {
@@ -163,7 +205,7 @@ async function callOpenAI(apiKey, model, system, message) {
     },
     body: JSON.stringify({
       model,
-      max_completion_tokens: 8192,
+      max_completion_tokens: Math.max(maxTokens || 0, 8192),
       stream: true,
       stream_options: { include_usage: true },
       // Reasoning effort "low": GPT-5.x defaults to "medium", whose hidden
@@ -183,7 +225,7 @@ async function callOpenAI(apiKey, model, system, message) {
 // OpenAI native search: Responses API (/v1/responses) with the web_search tool.
 // Streaming emits response.output_text.delta events; usage + web_search tool
 // calls arrive on the response.completed event.
-async function callOpenAIResponses(apiKey, model, system, message) {
+async function callOpenAIResponses(apiKey, model, system, message, maxTokens) {
   return fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -193,7 +235,7 @@ async function callOpenAIResponses(apiKey, model, system, message) {
     body: JSON.stringify({
       model,
       stream: true,
-      max_output_tokens: 8192,
+      max_output_tokens: Math.max(maxTokens || 0, 8192),
       // Same cost lever as the Chat path; "low" still reasons over search results.
       reasoning: { effort: "low" },
       instructions: system,
@@ -203,7 +245,7 @@ async function callOpenAIResponses(apiKey, model, system, message) {
   });
 }
 
-async function callGoogle(apiKey, model, system, message, nativeSearch) {
+async function callGoogle(apiKey, model, system, message, nativeSearch, maxTokens) {
   const body = {
     system_instruction: { parts: [{ text: system }] },
     contents: [{ parts: [{ text: message }] }],
@@ -211,7 +253,7 @@ async function callGoogle(apiKey, model, system, message, nativeSearch) {
     // hidden thought tokens (billed as output) far exceed the visible answer for
     // short turns. "low" keeps useful reasoning while cutting cost. (Gemini 3.x
     // uses thinkingLevel, not the 2.x thinkingBudget — setting both errors.)
-    generationConfig: { maxOutputTokens: 8192, thinkingConfig: { thinkingLevel: "low" } },
+    generationConfig: { maxOutputTokens: Math.max(maxTokens || 0, 8192), thinkingConfig: { thinkingLevel: "low" } },
   };
   if (nativeSearch) {
     body.tools = [{ google_search: {} }];
@@ -284,8 +326,11 @@ export async function onRequestPost(context) {
     );
   }
 
-  // Pre-debit estimated cost to prevent race condition (#2,3)
-  const estimatedMicro = estimateMaxCostMicro(body.model);
+  // Pre-debit estimated cost to prevent race condition (#2,3). The estimate has
+  // to follow the requested output ceiling, or a research/report call reserves
+  // a panel-sized amount and the monthly cap can be raced past.
+  const requestedMaxTokens = Number.isInteger(body.maxTokens) ? body.maxTokens : DEFAULT_OUTPUT_TOKENS;
+  const estimatedMicro = estimateMaxCostMicro(body.model, Date.now(), requestedMaxTokens);
   const preDebitRowId = await preDebitUsage(env.DB, user.sub, body.model, estimatedMicro);
 
   const provider = detectProvider(body.model);
@@ -309,18 +354,21 @@ export async function onRequestPost(context) {
 
   // Native search mode: enable each provider's own web search tool this call.
   const nativeSearch = body.nativeSearch === true;
+  // Page fetching only makes sense alongside search (the fetch tool may only
+  // open URLs that already appeared in the conversation).
+  const nativeFetch = nativeSearch && body.nativeFetch === true;
 
   // Call upstream API
   let upstream;
   try {
     if (provider === "anthropic") {
-      upstream = await callAnthropic(apiKey, body.model, body.system, body.message, body.userParts, nativeSearch, body.searchMaxUses);
+      upstream = await callAnthropic(apiKey, body.model, body.system, body.message, body.userParts, nativeSearch, body.searchMaxUses, nativeFetch, requestedMaxTokens);
     } else if (provider === "openai") {
       upstream = nativeSearch
-        ? await callOpenAIResponses(apiKey, body.model, body.system, body.message)
-        : await callOpenAI(apiKey, body.model, body.system, body.message);
+        ? await callOpenAIResponses(apiKey, body.model, body.system, body.message, requestedMaxTokens)
+        : await callOpenAI(apiKey, body.model, body.system, body.message, requestedMaxTokens);
     } else if (provider === "google") {
-      upstream = await callGoogle(apiKey, body.model, body.system, body.message, nativeSearch);
+      upstream = await callGoogle(apiKey, body.model, body.system, body.message, nativeSearch, requestedMaxTokens);
     }
   } catch (e) {
     return new Response(
