@@ -104,9 +104,12 @@ describe("初回の対象衝突を散らす（実機で発覚: 2体が同一施�
     const forClaude = formatPlanForModel(plan, "claude", (id) => id);
     const forGemini = formatPlanForModel(plan, "gemini", (id) => id);
     expect(forClaude).toContain("3者のうち1番目");
-    expect(forClaude).toContain("1番目の候補を選んで");
+    expect(forClaude).toContain("残った候補の1番目を選んで");
     expect(forGemini).toContain("3者のうち3番目");
-    expect(forGemini).toContain("3番目の候補を選んで");
+    expect(forGemini).toContain("残った候補の3番目を選んで");
+    // 実測でラウンド2に衝突が再発したため、「初回だけ」の条件は外してある
+    expect(forClaude).toContain("毎回");
+    expect(forClaude).not.toContain("台帳が空の初回");
   });
 
   it("未知のAIには順位指示を出さない", () => {

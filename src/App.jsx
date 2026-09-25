@@ -259,9 +259,8 @@ export default function App() {
     }
   };
 
-  const researchExport = { ledger: research.ledger, report: research.report };
-  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas, verdict, actionPlan, researchExport); };
-  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas, verdict, actionPlan, researchExport); };
+  const handleExportMd = () => { downloadMarkdown(topic, discussion, summaries, personas, verdict, actionPlan, research); };
+  const handleExportHtml = () => { downloadHtml(topic, discussion, summaries, personas, verdict, actionPlan, research); };
 
   // Turn an open question into the next round's focus: stage it as a moderator
   // intervention and scroll the input into view so the user just hits "次へ".
@@ -689,7 +688,8 @@ export default function App() {
             {discussion.map((round, i) => (
               <div key={i}>
                 <RoundSection round={round} roundNum={i+1} isLatest={i===discussion.length-1} personas={personas} summary={summaries[i]} />
-                {!sidePanel && summaries[i] !== undefined && !round.isConclusion && (
+                {/* 調査モードは要約を生成せず summaries[i] が null のまま積まれる。弾かないと RoundSummary がスケルトンを永久に描く（実機で発覚）。代わりを担うのは調査台帳パネル */}
+                {!sidePanel && discussionMode !== "research" && summaries[i] !== undefined && !round.isConclusion && (
                   <SummaryPanel
                     summary={summaries[i]}
                     roundNum={i+1}
@@ -766,7 +766,7 @@ export default function App() {
             <div ref={bottomRef} />
           </div>
 
-          {sidePanel && latestSummary !== undefined && (
+          {sidePanel && discussionMode !== "research" && latestSummary !== undefined && (
             <SummaryPanel
               summary={latestSummary}
               roundNum={discussion.length}

@@ -8,6 +8,7 @@ import {
   ledgerStats,
   sanitizeLedger,
   isDocumentUrl,
+  coreValue,
   CONFIDENCE,
 } from "../research/ledger";
 
@@ -231,5 +232,36 @@ describe("出典の質（実機で発覚: 画像URLを根拠に「確実」と�
     expect(isDocumentUrl("not a url")).toBe(false);
     expect(isDocumentUrl("https://example.com/a.PNG")).toBe(false);
     expect(isDocumentUrl("https://example.com/doc.html")).toBe(true);
+  });
+});
+
+describe("矛盾判定の偽陽性を減らす（実機で発覚）", () => {
+  const conflictOf = (a, b) => {
+    const mk = (v, m) => parseLedgerBlock(`【台帳】\n- X施設 | 定休日 | ${v} | 確実 | https://example.com/x`, { modelId: m, round: 1 });
+    return mergeLedger(mergeLedger([], mk(a, "claude")), mk(b, "gemini"));
+  };
+
+  it("確度のメタ注記が付いただけの値は矛盾にしない", () => {
+    const merged = conflictOf("年中無休", "年中無休（要確認：店舗一覧スニペット記載、帰属が不確定）");
+    expect(merged.some((e) => e.conflict)).toBe(false);
+  });
+
+  it("桁区切りや空白のゆれは矛盾にしない", () => {
+    expect(conflictOf("1,050円", "1050円").some((e) => e.conflict)).toBe(false);
+    expect(conflictOf("平日 1,050円", "平日1050円").some((e) => e.conflict)).toBe(false);
+  });
+
+  it("括弧の中が実データなら矛盾として残す（70分 vs 90分は別物）", () => {
+    const merged = conflictOf("1,500円（90分コース）", "1,500円（70分）");
+    expect(merged.every((e) => e.conflict)).toBe(true);
+  });
+
+  it("値そのものが違えば従来どおり矛盾", () => {
+    expect(conflictOf("平日950円", "平日1,050円").every((e) => e.conflict)).toBe(true);
+  });
+
+  it("coreValue はメタ注記だけを落とす", () => {
+    expect(coreValue("年中無休（要確認：帰属不明）")).toBe("年中無休");
+    expect(coreValue("1,500円（90分コース）")).toBe("1500円（90分コース）");
   });
 });
