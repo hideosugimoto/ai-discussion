@@ -83,10 +83,11 @@ export default function App() {
   // instead of the plan budget. Only effective when keys are complete, so the
   // direct-call path never fails on a missing key.
   const useOwnKeys = auth.isPremium && preferOwnKeys && allKeysSet;
-  // 調査モードは各AI自身の検索ツールを使うため、プラン経由（プロキシ）が必須。
-  // 自前キー利用時はサーバー側の検索経路を通らないので、無言で「検索なしの調査」に
-  // ならないよう、開始前に警告を出す。
-  const canUseNativeSearch = auth.isPremium && !!auth.token && !useOwnKeys;
+  // 調査モードは各AI自身の検索ツール（web_search / google_search）を使う。これは
+  // 各社APIの機能なので、プラン経由でも自前キーでも通せる（自前キー時は検索料も
+  // ユーザーのキーに課金される）。使えないのは非Premiumのときだけなので、無言で
+  // 「検索なしの調査」にならないよう、そのときだけ開始前に警告を出す。
+  const canUseNativeSearch = useOwnKeys || (auth.isPremium && !!auth.token);
 
   const [topic, setTopic]       = useState("");
   // Default to "fast": good quality at ~1/3 the cost, so casual use doesn't burn
@@ -553,6 +554,7 @@ export default function App() {
                       setConclusionTarget={setConclusionTarget}
                       canUseNativeSearch={canUseNativeSearch}
                       isPremium={auth.isPremium}
+                      useOwnKeys={useOwnKeys}
                     />
                   )}
                   {discussionMode === "conclusion" && (

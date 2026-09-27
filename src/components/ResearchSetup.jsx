@@ -5,7 +5,7 @@ import { MODELS, RESEARCH_CONFIG } from "../constants";
 // 出しているのは2つ: レポートを書くAIの選択と、コスト・前提の開示。
 // 「検索モード」の設定に関わらず毎ラウンド検索する＝通常ラウンドより高くつく、
 // という挙動はユーザーが選ぶ前に分かっている必要があるので黙って始めない。
-export default function ResearchSetup({ conclusionTarget, setConclusionTarget, canUseNativeSearch, isPremium }) {
+export default function ResearchSetup({ conclusionTarget, setConclusionTarget, canUseNativeSearch, isPremium, useOwnKeys }) {
   const budget = RESEARCH_CONFIG.searchBudget;
   return (
     <div style={{ marginTop:8, padding:"8px 10px", background:"var(--accent-bg)", border:"1px solid var(--accent-bd)", borderRadius:8 }}>
@@ -22,8 +22,13 @@ export default function ResearchSetup({ conclusionTarget, setConclusionTarget, c
       {!canUseNativeSearch && (
         <div role="alert" style={{ marginTop:8, fontSize:11.5, color:"var(--warning)", lineHeight:1.6 }}>
           ⚠️ 現在の設定では調査モードのWeb検索が使えません（{isPremium
-            ? "自分のAPIキー利用中はサーバー側の検索経路を使えません。設定でプラン経由に切り替えてください"
+            ? "ログイン状態を確認できません。再ログインしてください"
             : "Premiumプランが必要です"}）。このまま実行すると、AIは検索できないため台帳はほとんど埋まりません。
+        </div>
+      )}
+      {canUseNativeSearch && useOwnKeys && (
+        <div style={{ marginTop:8, fontSize:11.5, color:"var(--text3)", lineHeight:1.6 }}>
+          ℹ️ 「自分のキーを優先」がON中です。検索とページ取得も各AIのツールで実行され、費用はプランの枠ではなくご自身のAPIキーに課金されます。
         </div>
       )}
       <div style={{ marginTop:8, fontSize:11, color:"var(--text3)", lineHeight:1.6 }}>

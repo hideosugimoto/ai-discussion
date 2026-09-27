@@ -430,23 +430,30 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
     //    richer debate). No shared injection.
     // Cost optimization (both modes): search only on Round 1 and after a user
     // intervention (focus shifts); other rounds carry context forward.
-    // Web search runs only through the plan proxy (operator grounding); there is
-    // no own-key search path, so it is disabled when using own keys.
-    const canSearch = viaProxy && !isConclusionRound;
+    //
+    // Two different gates, because the two modes need different things:
+    //  - native: each provider's own search tool, so it works on ANY path that
+    //    can reach the provider — the plan proxy or the user's own keys (the
+    //    search is then billed to their key, not the plan budget).
+    //  - shared: Architecture B retrieval runs on the operator's grounding key
+    //    behind /api/search/query, so it needs the plan proxy. On own keys the
+    //    mode stays unavailable (the UI says so) rather than silently no-op.
+    const canNativeSearch = (viaProxy || useOwnKeys) && !isConclusionRound;
+    const canSharedSearch = viaProxy && !isConclusionRound;
     const shouldSearchFreshRound = roundNum === 1 || !!(userIntervention && userIntervention.trim());
     // Native search runs per-AI this round only when fresh search is warranted;
     // reuse rounds rely on conversation history instead of new tool calls.
     // 調査モード always searches natively, every round: each AI works its own
     // lane, so a shared result set would be the wrong evidence for two of them,
     // and a round that cannot search cannot add a fact.
-    const useNativeThisRound = canSearch && (isResearchRound || (searchMode === "native" && shouldSearchFreshRound));
+    const useNativeThisRound = canNativeSearch && (isResearchRound || (searchMode === "native" && shouldSearchFreshRound));
 
     // Architecture B shared search. Cost optimization: only search fresh on
     // Round 1 and when the user intervenes; other rounds REUSE the last results
     // so we don't re-pay grounding calls + injection every round. The reused
     // block stays stable, so it also stays in the cacheable prefix.
     let searchContext = null;
-    if (searchMode === "shared" && canSearch && !isResearchRound) {
+    if (searchMode === "shared" && canSharedSearch && !isResearchRound) {
       const shouldSearchFresh = shouldSearchFreshRound;
       if (shouldSearchFresh) {
         try {
@@ -496,9 +503,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
           plan,
           ledgerIndex: ledgerIndex(ledgerRef.current),
           openItems: openItemsRef.current,
-          // 0 when this round has no search path (own keys / 非Premium): the
-          // prompt then tells the AI it cannot search, instead of inviting it
-          // to fill the ledger from memory.
+          // 0 when this round has no search path (非Premium, or a conclusion
+          // round): the prompt then tells the AI it cannot search, instead of
+          // inviting it to fill the ledger from memory.
           searchBudget: useNativeThisRound ? RESEARCH_CONFIG.searchBudget : 0,
         }
       : undefined;
@@ -548,9 +555,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
             if (model.id === "gemini")  text = await callProxyGemini(authToken, tag, sys, user, onChunk, sig, sid, roundNum, useNativeThisRound, callOpts);
           } else {
             // Free: direct API calls (user's own keys)
-            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts, callOpts);
-            if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig, callOpts);
-            if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig, callOpts);
+            if (model.id === "claude")  text = await callClaude(keys.claude, tag, sys, user, onChunk, sig, userParts, useNativeThisRound, callOpts);
+            if (model.id === "chatgpt") text = await callChatGPT(keys.chatgpt, tag, sys, user, onChunk, sig, useNativeThisRound, callOpts);
+            if (model.id === "gemini")  text = await callGemini(keys.gemini, tag, sys, user, onChunk, sig, useNativeThisRound, callOpts);
           }
           return { modelId:model.id, text, error:null, loading:false };
         } catch (e) {
@@ -651,9 +658,9 @@ export default function useDiscussion({ keys, topic, profile, mode, discussionMo
         if (target.id === "chatgpt") await callProxyChatGPT(authToken, tag, researchReportPromptText, user, onChunk, undefined, sid, turn, false, opts);
         if (target.id === "gemini")  await callProxyGemini(authToken, tag, researchReportPromptText, user, onChunk, undefined, sid, turn, false, opts);
       } else {
-        if (target.id === "claude")  await callClaude(keys.claude, tag, researchReportPromptText, user, onChunk, undefined, undefined, opts);
-        if (target.id === "chatgpt") await callChatGPT(keys.chatgpt, tag, researchReportPromptText, user, onChunk, undefined, opts);
-        if (target.id === "gemini")  await callGemini(keys.gemini, tag, researchReportPromptText, user, onChunk, undefined, opts);
+        if (target.id === "claude")  await callClaude(keys.claude, tag, researchReportPromptText, user, onChunk, undefined, undefined, false, opts);
+        if (target.id === "chatgpt") await callChatGPT(keys.chatgpt, tag, researchReportPromptText, user, onChunk, undefined, false, opts);
+        if (target.id === "gemini")  await callGemini(keys.gemini, tag, researchReportPromptText, user, onChunk, undefined, false, opts);
       }
       // Persist as soon as it exists: a report is the session's deliverable and
       // must survive a reload without waiting for another round.

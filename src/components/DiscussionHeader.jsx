@@ -8,9 +8,13 @@ const MODE_OPTIONS = [
   { id:"fast", label:"⚡ 高速", title:`軽量・高速モデル（${modeModelSummary("fast")}）。日常の議論には十分な品質で、たくさん回せる（目安 約25議論/月）。` },
 ];
 
+// `ownKeysUnsupported`: 自前キー（「自分のキーを優先」ON）では選べないモード。
+// 共通検索は運営のグラウンディングキーでサーバー側検索を1回だけ走らせる仕組みな
+// ので、自前キー経路には存在しない。各AI個別は各社APIのツールなので自前キーでも
+// そのまま通る。
 const SEARCH_OPTIONS = [
   { id:"off",    label:"🔎 検索なし", title:"Web検索を使いません" },
-  { id:"shared", label:"共通",        title:"議題に関する最新情報を1回検索し、3AIに同じ事実を渡して議論させます" },
+  { id:"shared", label:"共通",        title:"議題に関する最新情報を1回検索し、3AIに同じ事実を渡して議論させます", ownKeysUnsupported:true },
   { id:"native", label:"各AI個別",    title:"各AIが自分のWeb検索ツールで個別に調べ、別ソースを引いて議論を発達させます" },
 ];
 
@@ -58,17 +62,26 @@ export default function DiscussionHeader({ cm, mode, setMode, theme, setTheme, i
           ))}
         </div>
         {isPremium && (
-          <div role="radiogroup" aria-label="Web検索モード" title={useOwnKeys ? "「自分のキーを優先」がON中はWeb検索は使えません（検索は運営側機能のため）" : undefined} style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden", opacity:useOwnKeys?0.45:1 }}>
-            {SEARCH_OPTIONS.map(({ id, label, title }) => (
-              <button key={id} role="radio" aria-checked={searchMode===id} title={useOwnKeys ? "自分のキー使用中はWeb検索は無効です" : title}
-                disabled={useOwnKeys} onClick={() => setSearchMode(id)}
-                style={{ ...segBtn(searchMode===id), cursor:useOwnKeys?"not-allowed":"pointer" }}>
-                {label}
-              </button>
-            ))}
+          <div role="radiogroup" aria-label="Web検索モード" style={{ display:"flex", background:"var(--surface)", border:"1px solid var(--border)", borderRadius:8, overflow:"hidden" }}>
+            {SEARCH_OPTIONS.map(({ id, label, title, ownKeysUnsupported }) => {
+              const blocked = useOwnKeys && ownKeysUnsupported;
+              return (
+                <button key={id} role="radio" aria-checked={blocked ? false : searchMode===id} aria-disabled={blocked || undefined}
+                  title={blocked ? "共通検索は運営側の検索経路を使うため、「自分のキーを優先」がON中は選べません（「各AI個別」は自分のキーで使えます）" : title}
+                  onClick={() => { if (!blocked) setSearchMode(id); }}
+                  style={{ ...segBtn(blocked ? false : searchMode===id), cursor:blocked?"not-allowed":"pointer", opacity:blocked?0.4:1 }}>
+                  {label}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
+      {isPremium && useOwnKeys && searchMode === "shared" && (
+        <div role="alert" style={{ textAlign:"center", fontSize:11, color:"var(--warning)", marginTop:6, lineHeight:1.6 }}>
+          ⚠️ 「共通」検索は自分のキーでは使えないため、このままだと検索なしで議論します。「各AI個別」を選ぶか、設定でプラン経由に戻してください。
+        </div>
+      )}
       <div className="mode-hint-line" style={{ textAlign:"center", fontSize:11, color:"var(--text3)", marginTop:6, maxWidth:560, marginLeft:"auto", marginRight:"auto" }}>
         {mode === "best"
           ? "🧠 最強：各社の最上位モデルで深く議論（複雑な論点・微妙な判断に強い）。消費は多めで目安 約7議論/月。"
