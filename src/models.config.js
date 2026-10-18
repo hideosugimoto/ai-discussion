@@ -126,10 +126,13 @@ export const MODE_MODELS = {
     gemini:  mm("gemini-3.8-flash"),
   },
   fast: {
-    // Sonnet 5.5 is 33% cheaper per token than Sonnet 4.6, but it uses the
-    // 4.7+ tokenizer (~30% more tokens for the same text), so the real saving
-    // is ~13%. 3.8 Flash has no Flash-Lite sibling yet (only a TTS variant),
-    // so the cheapest Gemini stays 3.1 Flash-Lite.
+    // Sonnet 5.5 is 33% cheaper per token than Sonnet 4.6. The docs' warning
+    // that the 4.7+ tokenizer produces ~30% more tokens does not apply to this
+    // app's Japanese prompts: count_tokens on one panel turn (2026-10-18) gave
+    // 88 tokens on Sonnet 5.5 and Opus 5.5, 88 on Sonnet 4.6 and 86 on Opus
+    // 4.8 — re-measure with count_tokens (free) before assuming otherwise.
+    // 3.8 Flash has no Flash-Lite sibling yet (only a TTS variant), so the
+    // cheapest Gemini stays 3.1 Flash-Lite.
     claude:  mm("claude-sonnet-5-5"),
     chatgpt: mm("gpt-6-luna"),
     gemini:  mm("gemini-3.1-flash-lite"),
