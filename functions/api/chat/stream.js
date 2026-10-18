@@ -3,6 +3,7 @@
 import { getEffectiveLimitMicro } from "../_lib_billing.js";
 import {
   MODEL_PRICING,
+  ANTHROPIC_EFFORT,
   detectProvider,
   calcCostMicro,
   estimateMaxCostMicro,
@@ -158,6 +159,8 @@ async function callAnthropic(apiKey, model, system, message, userParts, nativeSe
     model,
     max_tokens: maxTokens || DEFAULT_OUTPUT_TOKENS,
     stream: true,
+    // Claude 5.x always thinks; effort is the only lever. See ANTHROPIC_EFFORT.
+    output_config: { effort: ANTHROPIC_EFFORT },
     system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: buildAnthropicUserMessages(message, userParts),
   };
@@ -249,10 +252,12 @@ async function callGoogle(apiKey, model, system, message, nativeSearch, maxToken
   const body = {
     system_instruction: { parts: [{ text: system }] },
     contents: [{ parts: [{ text: message }] }],
-    // thinkingLevel "low": Gemini 3.7 Flash defaults to "medium" thinking, whose
+    // thinkingLevel "low": Gemini 3.8 Flash defaults to "medium" thinking, whose
     // hidden thought tokens (billed as output) far exceed the visible answer for
     // short turns. "low" keeps useful reasoning while cutting cost. (Gemini 3.x
     // uses thinkingLevel, not the 2.x thinkingBudget — setting both errors.)
+    // 3.8 Flash accepts low/medium/high only: it dropped the "minimal" level
+    // that 3.6 Flash had, so don't reach for "minimal" to cut cost further.
     generationConfig: { maxOutputTokens: Math.max(maxTokens || 0, 8192), thinkingConfig: { thinkingLevel: "low" } },
   };
   if (nativeSearch) {

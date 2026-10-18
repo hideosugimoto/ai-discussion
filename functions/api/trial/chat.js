@@ -13,7 +13,7 @@
 // 任意プロンプト送信は遮断（topicId のみ受け、本文は server 側 topics.js で確定）
 
 import { topicById } from "./topics.js";
-import { MODE_MODELS, detectProvider } from "../../../src/models.config.js";
+import { MODE_MODELS, ANTHROPIC_EFFORT, detectProvider } from "../../../src/models.config.js";
 
 const TRIAL_DAILY_LIMIT        = 10;          // IP per 24h
 const TRIAL_DAILY_TTL_SEC      = 86400;
@@ -125,6 +125,11 @@ async function callClaudeOnce(apiKey, model, system, message, signal) {
     body: JSON.stringify({
       model,
       max_tokens: 400,
+      // Without a low effort, Claude 5.x spends this whole 400-token budget on
+      // thinking before writing an answer: measured on Sonnet 5.5, the default
+      // effort returned thinking=318 and stop_reason "max_tokens" with the
+      // answer cut off, where effort "low" answered in 237 tokens.
+      output_config: { effort: ANTHROPIC_EFFORT },
       system,
       messages: [{ role: "user", content: message }],
     }),
@@ -132,7 +137,10 @@ async function callClaudeOnce(apiKey, model, system, message, signal) {
   });
   if (!res.ok) throw new Error(`anthropic_${res.status}`);
   const json = await res.json();
-  return json.content?.[0]?.text || "";
+  // Find the text block — do NOT assume content[0] is one. Claude 5.x can put a
+  // thinking block first (its text is empty by default), which made
+  // `content[0].text` undefined and showed the trial slot as blank.
+  return (json.content || []).find((b) => b.type === "text")?.text || "";
 }
 
 async function callOpenAIOnce(apiKey, model, system, message, signal) {

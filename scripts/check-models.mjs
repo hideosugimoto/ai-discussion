@@ -60,11 +60,16 @@ function isVariant(provider, id) {
   return false;
 }
 
-// Only the main chat-completion series count as "main": Claude opus/sonnet/haiku,
-// gpt-*, gemini-*. Anything else (Anthropic doesn't expose other series, OpenAI
-// has many side products, Google has gemma/imagen/etc.) is filtered out.
+// Only the main chat-completion series count as "main": Claude
+// opus/sonnet/haiku/fable/mythos, gpt-*, gemini-*. Anything else (OpenAI has
+// many side products, Google has gemma/imagen/etc.) is filtered out.
+// fable/mythos are in the list because Anthropic does expose series beyond
+// opus/sonnet/haiku now (the API lists claude-fable-5-1); without them a whole
+// Anthropic series can ship and never be reported.
+const CLAUDE_SERIES = "opus|sonnet|haiku|fable|mythos";
+
 function isMainSeries(provider, id) {
-  if (provider === "anthropic") return /^claude-(opus|sonnet|haiku)-/.test(id);
+  if (provider === "anthropic") return new RegExp(`^claude-(${CLAUDE_SERIES})-`).test(id);
   if (provider === "openai")    return /^gpt-/.test(id) && !isVariant(provider, id);
   if (provider === "google")    return /^gemini-/.test(id) && !isVariant(provider, id);
   return false;
@@ -75,8 +80,12 @@ function isMainSeries(provider, id) {
 // for unparseable IDs).
 function extractVersion(id) {
   if (id.startsWith("claude-")) {
-    const m = id.match(/^claude-(?:opus|sonnet|haiku)-(\d+)-(\d+)/);
-    if (m) return parseFloat(`${m[1]}.${m[2]}`);
+    // The minor is optional: Anthropic ships both "claude-opus-5-5" (5.5) and
+    // "claude-opus-5" (5.0). Requiring the minor made every x.0 release
+    // unparseable, so claude-opus-5 / claude-sonnet-5 / claude-fable-5 were
+    // silently dropped instead of reported.
+    const m = id.match(new RegExp(`^claude-(?:${CLAUDE_SERIES})-(\\d+)(?:-(\\d+))?(?:$|-)`));
+    if (m) return parseFloat(`${m[1]}.${m[2] || 0}`);
     return null;
   }
   if (id.startsWith("gpt-")) {

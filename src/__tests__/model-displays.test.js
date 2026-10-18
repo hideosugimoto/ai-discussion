@@ -81,7 +81,7 @@ describe("model display sync", () => {
 
   it("applyMarkers rewrites a marked region from config", () => {
     const out = applyMarkers(`x <!--M:best.chatgpt-->STALE<!--/M--> y`);
-    expect(out).toContain("GPT-5.6 Sol");
+    expect(out).toContain("GPT-6.1 Sol");
     expect(out).not.toContain("STALE");
   });
 });

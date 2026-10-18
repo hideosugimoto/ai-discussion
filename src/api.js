@@ -1,4 +1,4 @@
-import { VALIDATION_MODELS } from "./models.config";
+import { VALIDATION_MODELS, ANTHROPIC_EFFORT } from "./models.config";
 import { RESEARCH_CONFIG } from "./constants";
 import { extractChatGPTChunk } from "./apiProxy";
 
@@ -83,6 +83,9 @@ export async function callClaude(apiKey, model, sys, user, onChunk, signal, user
   const tools = buildClaudeSearchTools(nativeSearch, opts);
   const body = {
     model, max_tokens: opts?.maxTokens || 1500, stream: true,
+    // Same lever as the proxy path: Claude 5.x cannot disable thinking, so a
+    // low effort keeps the hidden thinking tokens off a BYOK user's bill too.
+    output_config: { effort: ANTHROPIC_EFFORT },
     system: [{ type: "text", text: sys, cache_control: { type: "ephemeral" } }],
     messages: buildClaudeUserMessages(user, userParts),
     ...(tools ? { tools } : {}),

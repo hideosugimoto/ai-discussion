@@ -94,7 +94,7 @@ async function generateSearchQueries(apiKey, authToken, viaProxy, topic, profile
   }
 }
 
-// One gpt-5.4-mini call produces BOTH the per-round summary and the updated
+// One SUMMARY_MODEL (GPT-6 Luna) call produces BOTH the per-round summary and the updated
 // cumulative (rolling) summary, halving the summary call count. Same round text
 // and prev-rolling context the two separate calls used, so quality is preserved.
 // Returns { round, rolling } with the same shapes the callers already expect.

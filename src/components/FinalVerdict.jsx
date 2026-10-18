@@ -44,7 +44,7 @@ function StressTest({ critique, onRejudge, loading }) {
       {needsRejudge && onRejudge && (
         <div style={{ marginTop:10, paddingTop:10, borderTop:`1px dashed ${s.bd}` }}>
           <button onClick={onRejudge} disabled={loading}
-            title="この反論を判定材料に差し戻し、結論を出し直します（GPT-5.4 mini 使用、約0.005ドル）"
+            title="この反論を判定材料に差し戻し、結論を出し直します（GPT-6 Luna 使用、約0.001ドル）"
             style={{ background:isOverturn?"var(--error)":"none", border:`1px solid ${isOverturn?"var(--error)":s.bd}`, borderRadius:8, padding:"7px 14px", color:isOverturn?"#fff":s.color, cursor:loading?"wait":"pointer", fontSize:12, fontWeight:700, opacity:loading?0.6:1 }}>
             {loading ? "再判定中…" : isOverturn ? "🔁 反論を踏まえて再ジャッジ" : "🔁 反論で補強して再判定"}
           </button>
@@ -69,7 +69,7 @@ export default function FinalVerdict({ verdict, loading, onGenerate, onSaveImage
           🏛️ 結論を決める（最終ジャッジ）
         </button>
         <HelpHint style={{ marginTop:6 }}>
-          3者の議論から“1つの結論”に決めます。各対立点を妥当性・確度つきで判定（GPT-5.4 mini 使用、約0.005ドル）。中立まとめが「整理」なのに対し、こちらは「裁定」。Fuguと違い、根拠と議論はすべて見えたままです
+          3者の議論から“1つの結論”に決めます。各対立点を妥当性・確度つきで判定（GPT-6 Luna 使用、約0.001ドル）。中立まとめが「整理」なのに対し、こちらは「裁定」。Fuguと違い、根拠と議論はすべて見えたままです
         </HelpHint>
       </div>
     );

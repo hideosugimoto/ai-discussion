@@ -8,7 +8,7 @@ export const SOFT_LIMIT_BYTES = 80 * 1024;  // warn the user above this size
 export const HARD_LIMIT_BYTES = 150 * 1024; // reject a single file above this size
 
 // Above this total attachment size, "auto" summary mode kicks in and a single
-// gpt-5.4-mini call compresses each file before it's sent to the 3 main models.
+// SUMMARY_MODEL (GPT-6 Luna) call compresses each file before it's sent to the 3 main models.
 // Keeps long-context cost roughly constant across rounds.
 export const SUMMARY_THRESHOLD_BYTES = 50 * 1024;
 

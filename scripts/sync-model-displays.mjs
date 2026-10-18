@@ -8,9 +8,9 @@
 // rewrites the text *between* the markers.
 //
 // KEY grammar:
-//   <mode>.<provider>          -> the model's display label   (e.g. best.chatgpt -> "GPT-5.6 Sol")
-//   <mode>.<provider>:tag      -> the raw model tag           (e.g. best.chatgpt:tag -> "gpt-5.6-sol")
-//   <mode>.<provider>:lower    -> label, lower-cased          (e.g. best.chatgpt:lower -> "gpt-5.6 sol")
+//   <mode>.<provider>          -> the model's display label   (e.g. best.chatgpt -> "GPT-6.1 Sol")
+//   <mode>.<provider>:tag      -> the raw model tag           (e.g. best.chatgpt:tag -> "gpt-6.1-sol")
+//   <mode>.<provider>:lower    -> label, lower-cased          (e.g. best.chatgpt:lower -> "gpt-6.1 sol")
 //   summary.<mode>             -> "A / B / C" model summary    (e.g. summary.best)
 //
 // Usage:
