@@ -8,7 +8,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "xerj:check": "bash scripts/xerj-freshness.sh",
     "sync:models": "node scripts/sync-model-displays.mjs",
     "sync:models:check": "node scripts/sync-model-displays.mjs --check",
     "prebuild": "npm run sync:models",
