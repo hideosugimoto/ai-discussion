@@ -18,7 +18,7 @@
     "mammoth": "^1.12.0",
     "marked": "^18.0.5",
     "mermaid": "^11.14.0",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.4.299",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "workers-og": "^0.0.27"
@@ -29,5 +29,8 @@
     "vite": "^5.0.0",
     "vite-plugin-subresource-integrity": "^0.0.12",
     "vitest": "^4.1.2"
+  },
+  "overrides": {
+    "@xmldom/xmldom": ">=0.8.15"
   }
 }
